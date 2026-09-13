@@ -25,6 +25,8 @@
  * No external dependencies. All functions are pure.
  */
 
+import { normalizeTrendingV2 } from '@/services/trending/trendingV2';
+
 // ============================================================
 // Shared normalization — used by EVERY ranking function.
 // Prevents "exact match doesn't fire because dedupe stripped a
@@ -101,7 +103,7 @@ export interface ScorableResult {
   id?: string;
   // Local entities may carry these:
   popularity_score?: number | null;
-  trending_score?: number | null;
+  trending_score_v2?: number | null;
   is_verified?: boolean | null;
   image_url?: string | null;
   description?: string | null;
@@ -152,8 +154,10 @@ export function scoreResult(result: ScorableResult, query: string): number {
   if (result.is_verified) bonus += 4;
   const pop = Number(result.popularity_score) || 0;
   if (pop > 0) bonus += Math.min(6, Math.round(pop / 20));
-  const trend = Number(result.trending_score) || 0;
-  if (trend > 0) bonus += Math.min(4, Math.round(trend / 25));
+  // Phase 4.2B.3: v2 trending is bounded [0, 1.2]; normalise to [0, 1] and keep
+  // the same maximum bonus of 4 points the old 0–100 scale allowed.
+  const trend = normalizeTrendingV2(result.trending_score_v2);
+  if (trend > 0) bonus += Math.min(4, Math.round(trend * 4));
 
   return Math.min(100, base + bonus);
 }

@@ -4,6 +4,7 @@ import { PersonalizedEntity } from './enhancedExploreService';
 import { collaborativeFilteringService } from './collaborativeFilteringService';
 import { socialIntelligenceService } from './socialIntelligenceService';
 import { getEntityTypeLabel } from './entityTypeHelpers';
+import { normalizeTrendingV2 } from './trending/trendingV2';
 
 export interface PersonalizationContext {
   timeOfDay: number;
@@ -126,14 +127,15 @@ export class AdvancedPersonalizationService {
         .select('*')
         .eq('is_deleted', false)
         .in('type', validTypes)
-        .order('trending_score', { ascending: false })
+        .order('trending_score_v2', { ascending: false })
+        .order('id', { ascending: true })
         .limit(limit * 2);
 
       if (!entities) return [];
 
       return entities.map(entity => ({
         ...entity,
-        personalization_score: (entity.trending_score || 0) * contextualBoost,
+        personalization_score: normalizeTrendingV2(entity.trending_score_v2) * contextualBoost,
         reason: this.getContextualReason(context, entity.type)
       })).slice(0, limit);
 
@@ -174,14 +176,15 @@ export class AdvancedPersonalizationService {
         .select('*')
         .eq('is_deleted', false)
         .in('type', validTypes)
-        .order('trending_score', { ascending: false })
+        .order('trending_score_v2', { ascending: false })
+        .order('id', { ascending: true })
         .limit(limit);
 
       if (!entities) return [];
 
       return entities.map(entity => {
         const pattern = timePatterns.find(p => p.entity_type === entity.type);
-        const temporalScore = (pattern?.activity_score || 0) * (entity.trending_score || 0);
+        const temporalScore = (pattern?.activity_score || 0) * normalizeTrendingV2(entity.trending_score_v2);
 
         return {
           ...entity,

@@ -20,8 +20,11 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Call the trending score update function
-    const { data: updatedCount, error } = await supabase.rpc('update_all_trending_scores');
+    // Phase 4.2B.3: incremental v2 orchestrator. Bootstrap mode (every non-deleted
+    // entity) already ran once in 4.2B.2, so scheduled runs stay incremental.
+    const { data: updatedCount, error } = await supabase.rpc('update_all_trending_scores_v2', {
+      p_bootstrap: false,
+    });
     
     if (error) {
       console.error('Error updating trending scores:', error);

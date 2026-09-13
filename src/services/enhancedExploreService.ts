@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { TRENDING_V2_BOUND } from '@/services/trending/trendingV2';
+
 
 export interface PersonalizedEntity {
   id: string;
@@ -9,7 +11,7 @@ export interface PersonalizedEntity {
   venue?: string;
   metadata?: any;
   personalization_score?: number;
-  trending_score?: number;
+  trending_score_v2?: number;
   view_velocity?: number;
   is_hidden_gem?: boolean;
   reason?: string;
@@ -123,8 +125,8 @@ export class EnhancedExploreService {
       // Update activity patterns for temporal personalization
       await this.updateActivityPatterns(userId, entityType, category, timeOfDay, dayOfWeek, interactionScore);
       
-      // Trigger trending score update for this entity (async)
-      this.updateEntityTrendingScore(entityId);
+      // Phase 4.2B.3: trending scores are computed server-side only. The browser
+      // records the interaction (above) and never writes a score.
     } catch (error) {
       console.error('Error tracking interaction:', error);
     }
@@ -256,17 +258,6 @@ export class EnhancedExploreService {
     }
   }
 
-  // Update entity trending score (background operation)
-  private async updateEntityTrendingScore(entityId: string) {
-    try {
-      // Call the enhanced trending score function
-      await supabase.rpc('calculate_enhanced_trending_score', {
-        p_entity_id: entityId
-      });
-    } catch (error) {
-      console.error('Error updating entity trending score:', error);
-    }
-  }
 
   // Enhanced personalized featured entities with discovery integration
   async getPersonalizedFeaturedEntities(userId?: string, limit: number = 3): Promise<PersonalizedEntity[]> {
@@ -314,7 +305,8 @@ export class EnhancedExploreService {
         .select('*')
         .in('type', validEntityTypes)
         .eq('is_deleted', false)
-        .order('trending_score', { ascending: false })
+        .order('trending_score_v2', { ascending: false })
+        .order('id', { ascending: true })
         .limit(limit * 3); // Get more for diversity filtering
 
       if (!entities) return [];
@@ -329,7 +321,9 @@ export class EnhancedExploreService {
         
         const interestScore = userInterest?.interest_score || 0;
         const temporalBoost = timePattern?.activity_score || 0;
-        const trendingScore = entity.trending_score || 0;
+        // Phase 4.2B.3: v2 trending is bounded [0, 1.2]; normalise to [0, 1]
+        // before blending so existing weights keep their meaning.
+        const trendingScore = (entity.trending_score_v2 || 0) / TRENDING_V2_BOUND;
         const velocityBoost = (entity.view_velocity || 0) * 0.1;
         const geographicBoost = entity.geographic_boost || 0;
         const seasonalBoost = entity.seasonal_boost || 0;
@@ -442,10 +436,11 @@ export class EnhancedExploreService {
         query = query.eq('type', category as 'book' | 'movie' | 'place' | 'product' | 'food');
       }
 
-      // Order by enhanced trending score with velocity consideration
+      // Order by v2 trending score, then velocity, then id (deterministic)
       const { data: entities } = await query
-        .order('trending_score', { ascending: false })
+        .order('trending_score_v2', { ascending: false })
         .order('view_velocity', { ascending: false })
+        .order('id', { ascending: true })
         .limit(limit);
 
       if (!entities) return [];
@@ -574,17 +569,8 @@ export class EnhancedExploreService {
     return validTypes.includes(category);
   }
 
-  // Background job to update all trending scores
-  async updateAllTrendingScores(): Promise<number> {
-    try {
-      const { data: result } = await supabase.rpc('update_all_trending_scores');
-      console.log(`Updated trending scores for ${result} entities`);
-      return result || 0;
-    } catch (error) {
-      console.error('Error updating all trending scores:', error);
-      return 0;
-    }
-  }
+  // Phase 4.2B.3: trending score refreshes are server-only (scheduled job calling
+  // the `update-trending-scores` function). The client never triggers them.
 }
 
 export const enhancedExploreService = new EnhancedExploreService();

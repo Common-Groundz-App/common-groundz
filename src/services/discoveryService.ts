@@ -121,7 +121,8 @@ export class DiscoveryService {
       }
 
       const { data: entities } = await contextualQuery
-        .order('trending_score', { ascending: false })
+        .order('trending_score_v2', { ascending: false })
+        .order('id', { ascending: true })
         .limit(limit);
 
       if (!entities) return [];
@@ -148,7 +149,8 @@ export class DiscoveryService {
         .select('*')
         .eq('is_deleted', false)
         .eq('type', 'place')
-        .order('trending_score', { ascending: false })
+        .order('trending_score_v2', { ascending: false })
+        .order('id', { ascending: true })
         .limit(limit);
 
       if (!entities) return [];
@@ -175,7 +177,8 @@ export class DiscoveryService {
         .eq('is_deleted', false)
         .eq('type', 'food')
         .contains('metadata', { tags: ['comfort', 'cozy', 'warm'] })
-        .order('trending_score', { ascending: false })
+        .order('trending_score_v2', { ascending: false })
+        .order('id', { ascending: true })
         .limit(4);
 
       if (comfortFood && comfortFood.length > 0) {
@@ -190,8 +193,8 @@ export class DiscoveryService {
         .from('entities')
         .select('*')
         .eq('is_deleted', false)
-        .gte('trending_score', 5)
-        .order('trending_score', { ascending: false })
+        .order('trending_score_v2', { ascending: false })
+        .order('id', { ascending: true })
         .limit(4);
 
       if (quickPicks && quickPicks.length > 0) {
@@ -240,7 +243,8 @@ export class DiscoveryService {
         .select('*')
         .eq('is_deleted', false)
         .in('type', entityTypes)
-        .order('trending_score', { ascending: false })
+        .order('trending_score_v2', { ascending: false })
+        .order('id', { ascending: true })
         .limit(limit);
 
       if (!personalizedEntities) return socialEntities;
