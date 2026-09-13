@@ -123,16 +123,20 @@ const calculateFallbackScore = (recommendation: FallbackRecommendationData): num
 export const getTrendingEntities = async (
   entityId: string,
   entityType?: string,
-  limit: number = 3
+  limit: number = 3,
+  pool?: FallbackRecommendationData[]
 ): Promise<ProcessedFallbackRecommendation[]> => {
-  const fallbackRecs = await getFallbackEntityRecommendations(entityId, entityType, limit * 2);
-  
-  // Filter for trending entities (high trending score)
+  const fallbackRecs = pool ?? await getFallbackEntityRecommendations(entityId, entityType);
+
+  // Phase 4.2B.3: v2 bucket membership is trending_score_v2 > 0 (any measured
+  // 24h activity), ranked by the v2 value — not the old 0.5 threshold on the
+  // retired 0–100 scale.
   const trendingRecs = fallbackRecs
-    .filter(rec => rec.trending_score > 0.5)
+    .filter(rec => isTrendingV2(rec.trending_score))
+    .sort((a, b) => b.trending_score - a.trending_score || (a.entity_id < b.entity_id ? -1 : 1))
     .slice(0, limit);
 
-  return trendingRecs;
+  return trendingRecs.map(toProcessed);
 };
 
 /**
