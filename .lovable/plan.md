@@ -36,12 +36,17 @@ Every reference is classified, with the search or query that found it:
 | Blocking (live) | Non-blocking (historical) |
 |---|---|
 | application source, Edge Functions | past migration files |
-| database function bodies, views, triggers, policies, indexes | verification documents, comments |
-| scheduled jobs | generated database types before regeneration |
-| any required display or historical data dependency | archived plans |
+| CI/CD workflows, deployment and operational scripts | verification documents, comments |
+| root and `scripts/` maintenance commands, SQL outside `supabase/migrations/`, Supabase configuration | generated database types before regeneration |
+| test and setup code that invokes live routines | archived plans |
+| database function bodies, views, triggers, policies, indexes, plus the catalogue dependency graph | |
+| scheduled jobs | |
+| any required display or historical data dependency | |
 
-An artefact is a retirement candidate only when every blocking column is zero. Non-blocking mentions
-are recorded and explicitly do not block.
+An artefact is a retirement candidate only when every blocking row is zero. Non-blocking mentions are
+recorded and explicitly do not block. The trending scheduler being a CI workflow rather than app code
+is exactly why the workflow directory is a blocking surface.
+
 
 ### 2. Reachability of the trending-hashtags routine
 
@@ -85,9 +90,10 @@ deliverables, plus a roadmap update splitting 4.2B.4 into 4.2B.4A (proof, ticked
 
 ## Not in this stage
 
-No `DROP` of any kind, no threshold edits, no filter changes, no type regeneration, no scheduler
-changes. Legacy recommendation listing and display, and clearing the two conversion fields on reviews,
-stay 4.3; table and enum drops stay 4.5.
+No `DROP` of any kind, no threshold edits, no filter changes, no scheduler changes, and **no
+regeneration of generated database types** — those types are evidence of the current contracts and must
+change only after approved retirement. Legacy recommendation listing and display, and clearing the two
+conversion fields on reviews, stay 4.3; table and enum drops stay 4.5.
 
 ## 4.2B.4B — retirement (authorised separately, after review)
 
@@ -100,8 +106,14 @@ the full test suite, typecheck and build.
 
 ## Technical notes
 
-- Blocking-reference evidence comes from: repository search over `src/` and `supabase/functions/`;
-  catalogue queries over `pg_proc` bodies, views, triggers, policies and index definitions; and the
-  scheduled-job list. Each row records the method used, so the audit is reproducible.
+- Blocking-reference evidence comes from: repository-wide search across the whole tree, not just
+  `src/` and `supabase/functions/` — including `.github/workflows/`, `scripts/`, root-level commands,
+  SQL outside `supabase/migrations/`, Supabase configuration and test/setup code; catalogue queries over
+  `pg_proc` bodies, views, triggers, policies and index definitions **plus the `pg_depend` /
+  `pg_rewrite` dependency graph**, since an unqualified name in stored SQL text is not a reliable way to
+  find a dependency; and the scheduled-job list. Each row records the method used, so the audit is
+  reproducible.
+- The proposed drop list is published together with the exact migration order B4B would follow, so the
+  order itself is reviewed rather than improvised later.
 - Measurement of the 3.5 filter uses read-only queries against canonical endorsed reviews; no writes,
   no fixtures left behind.
