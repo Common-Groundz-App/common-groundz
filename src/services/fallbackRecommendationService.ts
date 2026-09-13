@@ -4,6 +4,14 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { isTrendingV2, normalizeTrendingV2 } from '@/services/trending/trendingV2';
+
+/**
+ * Phase 4.2B.3: the RPC caps its candidate pool at 50 rows ranked by
+ * avg_rating/rec_count. Buckets below operate over this pool client-side so the
+ * server-side pre-limit can never discard trending candidates.
+ */
+const FALLBACK_CANDIDATE_POOL = 50;
 
 export interface FallbackRecommendationData {
   average_rating: number;
