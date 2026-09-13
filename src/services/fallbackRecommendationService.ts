@@ -164,17 +164,27 @@ export const getCategoryRecommendations = async (
 export const getHighlyRatedRecommendations = async (
   entityId: string,
   entityType?: string,
-  limit: number = 3
+  limit: number = 3,
+  pool?: FallbackRecommendationData[]
 ): Promise<ProcessedFallbackRecommendation[]> => {
-  const fallbackRecs = await getFallbackEntityRecommendations(entityId, entityType, limit * 2);
-  
+  const fallbackRecs = pool ?? await getFallbackEntityRecommendations(entityId, entityType);
+
   // Filter for highly rated (4.5+)
   const highlyRatedRecs = fallbackRecs
     .filter(rec => rec.average_rating >= 4.5)
     .slice(0, limit);
 
-  return highlyRatedRecs;
+  return highlyRatedRecs.map(toProcessed);
 };
+
+/**
+ * Attach the display reason and composite score.
+ */
+const toProcessed = (rec: FallbackRecommendationData): ProcessedFallbackRecommendation => ({
+  ...rec,
+  displayReason: getFallbackDisplayReason(rec),
+  score: calculateFallbackScore(rec),
+});
 
 /**
  * Cache configuration for fallback recommendations
