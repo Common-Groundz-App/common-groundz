@@ -33,14 +33,19 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   try {
-    const cronSecret = Deno.env.get('INFLUENCE_REFRESH_CRON_SECRET');
+    // Accepted cron secrets: the scheduled pg_cron job presents the Vault secret
+    // 'influence_refresh_cron_secret', which is mirrored in INFLUENCE_CRON_VAULT_SECRET.
+    // INFLUENCE_REFRESH_CRON_SECRET remains accepted for manual triggers.
+    const cronSecrets = [
+      Deno.env.get('INFLUENCE_CRON_VAULT_SECRET'),
+      Deno.env.get('INFLUENCE_REFRESH_CRON_SECRET'),
+    ].filter(Boolean) as string[];
     const presented = req.headers.get('x-cron-secret');
 
     let authorized = false;
 
-    // Path 1: cron secret (the pg_cron job presents the matching Vault secret
-    // 'influence_refresh_cron_secret'; both stores hold the same value)
-    if (cronSecret && presented && presented === cronSecret) {
+    // Path 1: cron secret
+    if (presented && cronSecrets.includes(presented)) {
       authorized = true;
     }
 
