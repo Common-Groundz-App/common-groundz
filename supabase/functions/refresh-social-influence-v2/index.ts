@@ -33,20 +33,29 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   try {
-    // Accepted cron secrets: the scheduled pg_cron job presents the Vault secret
-    // 'influence_refresh_cron_secret', which is mirrored in INFLUENCE_CRON_VAULT_SECRET.
-    // INFLUENCE_REFRESH_CRON_SECRET remains accepted for manual triggers.
-    const cronSecrets = [
-      Deno.env.get('INFLUENCE_CRON_VAULT_SECRET'),
-      Deno.env.get('INFLUENCE_REFRESH_CRON_SECRET'),
-    ].filter(Boolean) as string[];
+    // Path 1: cron secret. The pg_cron job presents the Vault entry
+    // 'influence_refresh_cron_secret' as the x-cron-secret header; the presented
+    // value is validated by the service-role-only SQL validator so the stored
+    // secret never needs to be duplicated outside Vault.
+    // INFLUENCE_REFRESH_CRON_SECRET (env) remains accepted for manual triggers.
     const presented = req.headers.get('x-cron-secret');
+    const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
     let authorized = false;
 
-    // Path 1: cron secret
-    if (presented && cronSecrets.includes(presented)) {
-      authorized = true;
+    if (presented) {
+      const envSecret = Deno.env.get('INFLUENCE_REFRESH_CRON_SECRET');
+      if (envSecret && presented === envSecret) {
+        authorized = true;
+      } else {
+        const { data: valid, error: validErr } = await adminClient.rpc(
+          'is_valid_influence_cron_secret',
+          { p_presented: presented },
+        );
+        if (!validErr && valid === true) authorized = true;
+      }
     }
 
     // Path 2: admin JWT
