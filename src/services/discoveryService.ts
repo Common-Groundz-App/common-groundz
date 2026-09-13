@@ -105,24 +105,50 @@ export class DiscoveryService {
 
       const followingIds = followingUsers.map(f => f.following_id);
 
+      // Recent endorsed reviews by followed users. Visibility is scoped by RLS
+      // (the viewer sees what they are authorized to see); no client-side
+      // visibility re-implementation.
+      const { data: reviewRows } = await supabase
+        .from('reviews')
+        .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
+        .eq('status', 'published')
+        .eq('is_recommended', true)
+        .in('user_id', followingIds)
+        .not('entity_id', 'is', null)
+        .gte('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (!reviewRows || reviewRows.length === 0) return [];
+
+      // Canonical (latest per user+entity), preserving recency order of first appearance
+      const canonical = canonicalize(reviewRows as CanonicalReview[]);
+      const entityIdsInOrder: string[] = [];
+      const seenEntities = new Set<string>();
+      canonical.forEach(r => {
+        if (!seenEntities.has(r.entity_id)) {
+          seenEntities.add(r.entity_id);
+          entityIdsInOrder.push(r.entity_id);
+        }
+      });
+
       const { data: entities } = await supabase
         .from('entities')
-        .select(`
-          *,
-          recommendations!inner(user_id, rating, created_at)
-        `)
+        .select('*')
         .eq('is_deleted', false)
-        .in('recommendations.user_id', followingIds)
-        .gte('recommendations.created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
-        .order('recommendations.created_at', { ascending: false })
-        .limit(limit);
+        .in('id', entityIdsInOrder.slice(0, limit * 3));
 
       if (!entities) return [];
 
-      return entities.map(entity => ({
-        ...entity,
-        reason: 'Friends are loving this'
-      }));
+      const entityById = new Map(entities.map(e => [e.id, e]));
+      return entityIdsInOrder
+        .map(id => entityById.get(id))
+        .filter((e): e is NonNullable<typeof e> => Boolean(e))
+        .slice(0, limit)
+        .map(entity => ({
+          ...entity,
+          reason: 'Friends are loving this'
+        }));
     } catch (error) {
       console.error('Error getting social discovery:', error);
       return [];
