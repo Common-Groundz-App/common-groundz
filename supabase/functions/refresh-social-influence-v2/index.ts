@@ -68,9 +68,6 @@ Deno.serve(async (req) => {
         const token = authHeader.replace('Bearer ', '');
         const { data: claimsData, error: claimsErr } = await anonClient.auth.getClaims(token);
         if (!claimsErr && claimsData?.claims?.sub) {
-          const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-            auth: { autoRefreshToken: false, persistSession: false },
-          });
           const { data: isAdmin, error: roleErr } = await adminClient.rpc('has_role', {
             _user_id: claimsData.claims.sub,
             _role: 'admin',
@@ -84,9 +81,6 @@ Deno.serve(async (req) => {
       return json({ error: 'unauthorized', code: 'UNAUTHORIZED' }, 401);
     }
 
-    const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
     const { data, error } = await adminClient.rpc('refresh_social_influence_scores_v2');
     if (error) {
       console.error('[refresh-social-influence-v2] rpc failed', error);
