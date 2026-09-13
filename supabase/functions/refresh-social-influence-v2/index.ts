@@ -3,9 +3,14 @@
 // Phase 4.2B.2: reconciling refresh of the additive social_influence_scores_v2 cache.
 // Deployed UNSCHEDULED — the cron schedule is added in 4.2B.3.
 //
-// HTTP boundary (either path authorizes):
-//   1. Cron path:    x-cron-secret header must equal INFLUENCE_REFRESH_CRON_SECRET
-//   2. Admin path:   Bearer JWT + has_role('admin') via service client
+// HTTP boundary (any path authorizes):
+//   1. Cron path:    x-cron-secret header validated by the service-role-only SQL
+//                    validator is_valid_influence_cron_secret(), which compares the
+//                    presented value against the Vault entry 'influence_refresh_cron_secret'
+//                    inside the database (the value is never hard-coded or persisted
+//                    outside Vault; it travels only over HTTPS in the cron request).
+//   2. Manual path:  x-cron-secret equal to the INFLUENCE_REFRESH_CRON_SECRET env secret.
+//   3. Admin path:   Bearer JWT + has_role('admin') via service client.
 // Both paths then execute the service-role-only refresh_social_influence_scores_v2() routine,
 // which upserts current eligible (user, canonical_type) rows and removes stale v2 rows only.
 
