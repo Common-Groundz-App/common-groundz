@@ -23,39 +23,28 @@ export interface SocialRecommendation extends PersonalizedEntity {
  *   service-role refresh writes influence rows; there is intentionally no caller
  *   for that refresh here.
  * - Influencer rule: followed users with influence_score > 0, ranked DESC, top N.
- * - Recommendation sourcing: canonical published reviews with is_recommended = true,
- *   restricted server-side by RLS to rows the viewer is authorized to see
- *   (public reviews, plus the viewer's own). The client never re-implements
- *   visibility rules.
- * - Effective rating (latest_rating ?? rating) is used only for scoring/ordering.
- * - The viewer's exclusion set is ALL of the viewer's own reviews.
+ * - Recommendation sourcing goes through get_canonical_endorsements_for_viewer:
+ *   canonical selection (one current review per person per item) happens in SQL
+ *   BEFORE the endorsement flag is inspected; visibility is public + circle_only
+ *   reviews by authors the viewer follows (+ the viewer's own), enforced
+ *   server-side with identity verification.
+ * - The viewer never appears in a social-proof author set: the viewer's own
+ *   endorsement is excluded from influencer/extended/community candidates even
+ *   though the viewer-scoped routine can technically return it.
+ * - Effective rating is used only for scoring/ordering.
+ * - The viewer's exclusion set is ALL of the viewer's own reviews (any status or
+ *   visibility, including drafts).
  */
 
-interface CanonicalReview {
+/** Row returned by get_canonical_endorsements_for_viewer — already canonical + endorsed. */
+interface EndorsementRow {
   user_id: string;
   entity_id: string;
-  rating: number | null;
-  latest_rating: number | null;
-  is_recommended: boolean | null;
+  effective_rating: number;
   created_at: string;
 }
 
-/** Keep the latest review per (user_id, entity_id). Input must be created_at DESC. */
-const canonicalize = (rows: CanonicalReview[]): CanonicalReview[] => {
-  const seen = new Set<string>();
-  const out: CanonicalReview[] = [];
-  for (const row of rows) {
-    const key = `${row.user_id}:${row.entity_id}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(row);
-  }
-  return out;
-};
-
-const effectiveRating = (r: CanonicalReview): number => r.latest_rating ?? r.rating ?? 0;
-
-/** All entity ids the viewer has ever reviewed (any visibility/status). */
+/** All entity ids the viewer has any review record for (any status/visibility, incl. drafts). */
 const getViewerReviewedEntityIds = async (userId: string): Promise<string[]> => {
   const { data } = await supabase
     .from('reviews')
@@ -65,19 +54,26 @@ const getViewerReviewedEntityIds = async (userId: string): Promise<string[]> => 
   return [...new Set((data || []).map(r => r.entity_id as string))];
 };
 
-/** Viewer-visible endorsed reviews by the given authors, latest first (pre-canonical). */
-const getEndorsedReviewsByUsers = async (userIds: string[]): Promise<CanonicalReview[]> => {
-  if (userIds.length === 0) return [];
-  const { data } = await supabase
-    .from('reviews')
-    .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
-    .eq('status', 'published')
-    .eq('is_recommended', true)
-    .in('user_id', userIds)
-    .not('entity_id', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(500);
-  return (data || []) as CanonicalReview[];
+/**
+ * Viewer-visible canonical endorsements by the given authors (canonical-first in SQL).
+ * The viewer is always removed from the author set: social proof must come from
+ * other people, never from the viewer's own endorsement.
+ */
+const getViewerVisibleEndorsements = async (
+  viewerId: string,
+  userIds: string[]
+): Promise<EndorsementRow[]> => {
+  const authorIds = userIds.filter(id => id !== viewerId);
+  if (authorIds.length === 0) return [];
+  const { data, error } = await supabase.rpc('get_canonical_endorsements_for_viewer', {
+    p_viewer_id: viewerId,
+    p_user_ids: authorIds
+  });
+  if (error) {
+    console.error('Error fetching viewer-visible endorsements:', error);
+    return [];
+  }
+  return (data || []) as EndorsementRow[];
 };
 
 const fetchEntitiesByIds = async (ids: string[]) => {
@@ -132,8 +128,8 @@ export class SocialIntelligenceService {
 
       const excludedIds = new Set(await getViewerReviewedEntityIds(userId));
 
-      // Canonical endorsed reviews by influential users (viewer-authorized via RLS)
-      const endorsed = canonicalize(await getEndorsedReviewsByUsers(influencerIds))
+      // Canonical endorsed reviews by influential users (viewer-authorized, canonical-first)
+      const endorsed = (await getViewerVisibleEndorsements(userId, influencerIds))
         .filter(r => !excludedIds.has(r.entity_id))
         .slice(0, limit * 2);
 
@@ -145,7 +141,7 @@ export class SocialIntelligenceService {
       const scoredRecommendations: SocialRecommendation[] = entities.map(entity => {
         const recommendation = endorsed.find(r => r.entity_id === entity.id);
         const influenceScore = maxInfluenceByUser.get(recommendation?.user_id || '') || 0;
-        const socialProofScore = influenceScore * effectiveRating(recommendation!) / 5;
+        const socialProofScore = influenceScore * (recommendation?.effective_rating ?? 0) / 5;
 
         return {
           ...entity,
@@ -199,8 +195,8 @@ export class SocialIntelligenceService {
       const secondDegreeIds = [...new Set(secondDegreeUsers.map(u => u.following_id))];
       const excludedIds = new Set(await getViewerReviewedEntityIds(userId));
 
-      // Canonical endorsed reviews from second-degree connections (RLS-scoped visibility)
-      const endorsed = canonicalize(await getEndorsedReviewsByUsers(secondDegreeIds))
+      // Canonical endorsed reviews from second-degree connections (viewer-authorized)
+      const endorsed = (await getViewerVisibleEndorsements(userId, secondDegreeIds))
         .filter(r => !excludedIds.has(r.entity_id))
         .slice(0, limit * 2);
 
@@ -211,7 +207,7 @@ export class SocialIntelligenceService {
       // Score based on effective rating and network distance
       const scoredEntities: SocialRecommendation[] = entities.map(entity => {
         const recommendation = endorsed.find(r => r.entity_id === entity.id);
-        const rating = effectiveRating(recommendation!);
+        const rating = recommendation?.effective_rating ?? 0;
         const networkScore = rating / 5 * 0.7; // Reduced weight for extended network
 
         return {
@@ -278,8 +274,8 @@ export class SocialIntelligenceService {
 
       const excludedIds = new Set(await getViewerReviewedEntityIds(userId));
 
-      // Canonical endorsed reviews from the community (RLS-scoped visibility)
-      const endorsed = canonicalize(await getEndorsedReviewsByUsers(communityMembers))
+      // Canonical endorsed reviews from the community (viewer-authorized)
+      const endorsed = (await getViewerVisibleEndorsements(userId, communityMembers))
         .filter(r => !excludedIds.has(r.entity_id))
         .slice(0, limit * 2);
 
@@ -289,7 +285,7 @@ export class SocialIntelligenceService {
 
       const scoredEntities: SocialRecommendation[] = entities.map(entity => {
         const recommendation = endorsed.find(r => r.entity_id === entity.id);
-        const rating = effectiveRating(recommendation!);
+        const rating = recommendation?.effective_rating ?? 0;
         const communityScore = rating / 5 * 0.8;
 
         return {
