@@ -260,10 +260,12 @@ export const getMixedFallbackRecommendations = async (
   limit: number = 6
 ): Promise<ProcessedFallbackRecommendation[]> => {
   try {
+    // One widened candidate pool feeds all three buckets (single RPC round-trip).
+    const pool = await getFallbackEntityRecommendations(entityId, entityType);
     const [trending, category, highlyRated] = await Promise.all([
-      getTrendingEntities(entityId, entityType, 3),
-      getCategoryRecommendations(entityId, entityType, 3),
-      getHighlyRatedRecommendations(entityId, entityType, 3)
+      getTrendingEntities(entityId, entityType, 3, pool),
+      getCategoryRecommendations(entityId, entityType ?? '', 3, pool),
+      getHighlyRatedRecommendations(entityId, entityType, 3, pool)
     ]);
 
     // Combine and deduplicate
