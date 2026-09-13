@@ -37,11 +37,11 @@ export interface ProcessedFallbackRecommendation extends FallbackRecommendationD
 export const getFallbackEntityRecommendations = async (
   entityId: string,
   entityType?: string,
-  limit: number = 6
-): Promise<any[]> => {
+  limit: number = FALLBACK_CANDIDATE_POOL
+): Promise<FallbackRecommendationData[]> => {
   try {
     console.log('🔍 Fetching fallback recommendations for entity:', entityId);
-    
+
     const { data, error } = await supabase.rpc('get_fallback_entity_recommendations', {
       p_entity_id: entityId,
       p_current_user_id: null,
@@ -59,8 +59,24 @@ export const getFallbackEntityRecommendations = async (
       return [];
     }
 
-    console.log('✅ Fallback recommendations raw data:', data);
-    return data;
+    // The RPC returns avg_rating/display_reason/trending_score (the v2 value);
+    // normalise into the interface shape consumers expect. popularity_score is
+    // frozen at zero in v2 and no longer returned.
+    const normalized: FallbackRecommendationData[] = data.map((row: any) => ({
+      entity_id: row.entity_id,
+      entity_name: row.entity_name,
+      entity_type: row.entity_type,
+      entity_image_url: row.entity_image_url,
+      entity_slug: row.entity_slug,
+      average_rating: row.avg_rating ?? 0,
+      recommendation_count: row.recommendation_count ?? 0,
+      reason: row.display_reason ?? 'Popular choice',
+      trending_score: row.trending_score ?? 0,
+      popularity_score: 0,
+    }));
+
+    console.log('✅ Fallback recommendations fetched:', normalized.length);
+    return normalized;
   } catch (error) {
     console.error('Exception in getFallbackEntityRecommendations:', error);
     return [];
