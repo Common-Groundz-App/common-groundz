@@ -242,8 +242,8 @@ export const getFallbackEntityRecommendationsWithCache = async (
     return cached.slice(0, limit);
   }
 
-  // Fetch fresh data
-  const recommendations = await getFallbackEntityRecommendations(entityId, entityType, limit);
+  // Fetch fresh data (full candidate pool, then bucket/limit client-side)
+  const recommendations = (await getFallbackEntityRecommendations(entityId, entityType)).map(toProcessed);
   
   // Cache the results
   cacheFallbackRecommendations(entityId, entityType, recommendations);
