@@ -131,3 +131,6 @@ verify_jwt = false
 
 [functions.refresh-social-influence-v2]
 verify_jwt = false
+
+[functions.update-trending-scores]
+verify_jwt = false
