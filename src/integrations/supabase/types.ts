@@ -5215,6 +5215,10 @@ export type Database = {
         Args: { p_presented: string }
         Returns: boolean
       }
+      is_valid_trending_cron_secret: {
+        Args: { p_presented: string }
+        Returns: boolean
+      }
       log_admin_action: {
         Args: {
           p_action_type: string
