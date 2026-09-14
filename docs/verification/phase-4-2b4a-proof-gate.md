@@ -137,3 +137,90 @@ Legacy recommendation listing and display (profile service, entity page legacy s
 notification targets, content viewer, `/recommendations/:id`) and clearing `reviews.recommendation_id`
 / `reviews.is_converted` → 4.3. Recommendation tables and the `recommendation_category` enum → 4.5.
 Consensus calibration of influence → separate experiment. Legacy row count today: 9.
+
+## 8. Activation evidence and final retirement list (2026-09-14, Phase 4.2B.4A-bis)
+
+### 8.1 Scheduler inventory after activation — exactly one producer per job
+
+| Job | Schedule (UTC) | Execution path |
+| --- | --- | --- |
+| `refresh-entity-stats-view-hourly` | `0 * * * *` | cron → `REFRESH MATERIALIZED VIEW entity_stats_view` |
+| `refresh-entity-stats-v2-hourly` | `5 * * * *` | cron → `REFRESH MATERIALIZED VIEW entity_stats_v2` |
+| `cleanup-orphan-media-weekly-dryrun` | `0 3 * * 0` | cron → SQL (dry run) |
+| `prune-retracted-notifications` | `17 3 * * *` | cron → SQL |
+| `refresh-social-influence-v2-daily` | `12 4 * * *` | cron → `net.http_post` → protected `refresh-social-influence-v2` → `refresh_social_influence_scores_v2()` |
+| `refresh-trending-scores-v2-hourly` | `20 * * * *` | cron → `net.http_post` → protected `update-trending-scores` → `update_all_trending_scores_v2(false)` |
+
+- GitHub workflows: one only (`daily-refresh-entity-images`, `0 0 * * *`) — image refresh, unrelated to scoring.
+- Browser code: no scheduler, no writer of any score column.
+- Trending runs 15 minutes after the statistics refresh; influence remains daily at 04:12.
+- All three derived-score refreshers now live in the same operational system (Supabase cron → protected Edge Function → v2 routine), with the materialized views refreshed directly by cron.
+
+### 8.2 Guard on the trending function — frozen B2 security model preserved
+
+- `verify_jwt = false` for `update-trending-scores` (`supabase/config.toml`) so the request reaches the function's own guard rather than a platform response.
+- Accepted identities: `x-cron-secret` validated by `public.is_valid_trending_cron_secret(text)`; admin bearer JWT verified against `public.user_roles`; `TRENDING_REFRESH_CRON_SECRET` environment secret as a manual-trigger fallback. Everything else receives `401`.
+- `is_valid_trending_cron_secret`: `SECURITY DEFINER`, owner `postgres`, `search_path = ''`, `EXECUTE` granted to `postgres` and `service_role` only (confirmed via `aclexplode(proacl)`); null/empty short-circuits; no failure reason is ever returned.
+- The scheduler password is stored in Vault (`trending_refresh_cron_secret`) and read by the cron command at send time. No secret literal exists in the repository — searching both names returns references only (function source + migration files).
+- Bootstrap mode is unreachable from cron: the function always calls `update_all_trending_scores_v2(false)`. Bootstrap stays an administrative, explicitly invoked operation.
+
+### 8.3 Rejection matrix against the deployed function
+
+| Request | Result |
+| --- | --- |
+| `POST` anonymous | `401 {"error":"unauthorized","code":"UNAUTHORIZED"}` |
+| `POST` wrong secret | `401 {"error":"unauthorized","code":"UNAUTHORIZED"}` |
+| `POST` empty secret | `401 {"error":"unauthorized","code":"UNAUTHORIZED"}` |
+| `GET` | `405 {"error":"method_not_allowed"}` |
+| `POST` with the Vault-backed secret | `200 {"ok":true,"updatedCount":2,…}` |
+
+### 8.4 Execution proof
+
+Two authorised invocations fired from a temporary once-a-minute verification job carrying the
+identical Vault-backed command; the job was unscheduled immediately afterwards and the run history
+shows both `succeeded` / `1 row`.
+
+- `02:58:00` → `200 {"ok":true,"updatedCount":2,"timestamp":"2026-09-14T02:58:03.671Z"}`
+- `02:59:00` → `200 {"ok":true,"updatedCount":2,"timestamp":"2026-09-14T02:59:01.041Z"}`
+
+Both runs selected and rewrote the same two candidates and reported the same count, so the refresh
+is idempotent and self-selecting. Scores remained inside the frozen bound: across 329 non-deleted
+entities `min = 0`, `max = 0.0008`, and `0` rows outside `[0, 1.2]`. No synthetic activity rows were
+inserted into production at any point — the producer was observed working on real data only.
+
+### 8.5 Circle eligibility filter removed (Decision 2)
+
+`applyQualityFiltering` in `src/services/networkRecommendationService.ts` no longer rejects
+`average_rating < 3.5`. Endorsement — the canonical review's stored `is_recommended` resolution — is
+the sole eligibility rule; average rating stays available for display and ordering. The filter
+removed 0 of 81 endorsed viewer/entity pairs today, so nothing changes immediately; the removal
+deliberately allows a future explicitly endorsed entity with a low average rating to stay eligible.
+Both network-recommendation call sites share this function, so both are covered.
+
+### 8.6 Final B4B retirement list and migration order
+
+Precondition for step 7 (a proven live v2 Trending producer) is now satisfied; the order below is
+unchanged from §6. No `CASCADE` anywhere; any unexpected dependency stops that item.
+
+1. Delete the unused wrappers `hasNetworkRecommendations` / `getNetworkEntityRecommendations` in
+   `src/services/networkRecommendationService.ts` (verified no callers outside their own definitions),
+   then drop `public.has_network_recommendations(uuid)` and both
+   `public.get_network_entity_recommendations` overloads.
+2. Rewrite `enhancedDiscoveryService.getQualityNewThisWeek` (live caller: `src/hooks/use-discovery.ts`)
+   so it no longer reads `recommendation_quality_scores`, delete the dead `calculateQualityScores` /
+   `calculateEntityQuality`, then drop `public.recommendation_quality_scores` (22 stale rows).
+3. Drop `public.update_all_trending_scores()`, then `public.calculate_enhanced_trending_score(uuid)`,
+   then `public.calculate_trending_score(uuid)` (`calculate_trending_hashtags` no longer depends on them).
+4. Drop `public.calculate_user_similarity`, `public.get_who_to_follow`, `public.get_personalized_entities`,
+   `public.calculate_user_reputation`, `public.calculate_social_influence_score`.
+5. Drop `public.social_influence_scores` (0 rows; v2 holds 21).
+6. `cron.unschedule('refresh-entity-stats-view-hourly')`, then drop `entity_stats_view` and its two indexes.
+7. Drop `idx_entities_trending_score`, `idx_entities_trending_popularity`, then `entities.trending_score`
+   (84 entities still carry legacy values; v2 is now produced hourly).
+8. Apply the remaining approved threshold changes from §4, regenerate generated types **once**, re-run
+   the repository-wide sweep, exercise every switched surface, re-measure schedulers, run tests, typecheck, build.
+
+### 8.7 Verification
+
+Tests `633/633` pass; typecheck clean; production build green; Supabase linter output unchanged at
+475 issues / 8 distinct types (all pre-existing, none introduced by this stage).

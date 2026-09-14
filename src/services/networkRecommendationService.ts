@@ -313,13 +313,15 @@ export const getNetworkEntityRecommendationsWithCache = async (
 };
 
 /**
- * Apply quality filtering to network recommendations (Phase 4.1)
+ * Apply eligibility filtering to network recommendations (Phase 4.2B.4B)
+ *
+ * Endorsement is the eligibility truth: a canonical review that resolves to a
+ * recommendation qualifies here. Average rating is a ranking/display signal and
+ * deliberately does NOT veto an otherwise valid endorsement — see
+ * docs/verification/phase-4-2b4a-proof-gate.md (Finding B).
  */
 const applyQualityFiltering = (recommendations: ProcessedNetworkRecommendation[]): ProcessedNetworkRecommendation[] => {
   return recommendations.filter(rec => {
-    // Quality threshold: minimum 3.5 rating
-    if (rec.average_rating < 3.5) return false;
-    
     // Must have valid entity data
     if (!rec.entity_name || !rec.entity_id) return false;
     

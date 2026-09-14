@@ -116,3 +116,20 @@ No secret value appears in migrations, SQL, source or docs — only the Vault en
 - `reviews.recommendation_id` / `reviews.is_converted` clearing → 4.3; schema drop → 4.5.
 - v4 entity page's direct fallback RPC call with its own mapping — intentional, documented.
 - Pre-existing security-scan findings, unchanged by this work, tracked separately.
+
+## Correction (2026-09-14, Phase 4.2B.4A-bis)
+
+This record originally stated that the trending producer ran from a daily GitHub workflow that
+called `update-trending-scores`. That claim was **inaccurate** and is retracted.
+
+Evidence: the only workflow in the repository is `.github/workflows/daily-refresh.yml`, whose job
+is `daily-refresh-entity-images` (schedule `0 0 * * *`). It calls the entity-image refresh function
+and never touches the trending updater. No other workflow, cron entry or browser path invoked the
+trending producer, so `entities.trending_score_v2` had never been written: all 329 non-deleted
+entities sat at `0`, while every reader kept returning plausible lists because recency and the
+other candidate buckets carried them. In other words the Trending pipeline was read but not fed.
+
+This is now resolved: `refresh-trending-scores-v2-hourly` (Supabase cron) posts to the protected
+`update-trending-scores` Edge Function, which calls `update_all_trending_scores_v2(false)`. The
+producer has executed successfully and produced non-zero scores. Full evidence lives in
+`docs/verification/phase-4-2b4a-proof-gate.md` §8.

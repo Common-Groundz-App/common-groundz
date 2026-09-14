@@ -185,7 +185,13 @@ Boundary rule (three separate concepts, never conflated):
       `docs/verification/phase-4-2b4a-proof-gate.md`; `calculate_trending_hashtags` confirmed a
       name-match false positive (no dependency); two open decisions: nothing schedules the trending
       v2 orchestrator (all `trending_score_v2` values are 0), and the zero-impact 3.5 filter
-- [ ] 4.2B.4B retirement, only after those two decisions: drop the proven-dead v1 routines, the v1
+- [x] 4.2B.4A-bis activate the Trending producer and settle Decision 2: hourly Supabase cron job
+      `refresh-trending-scores-v2-hourly` → protected `update-trending-scores` (Vault-backed secret,
+      admin bearer or `x-cron-secret`, incremental mode only) → `update_all_trending_scores_v2(false)`;
+      rejection matrix and two idempotent 200 runs recorded, B3's inaccurate workflow claim corrected,
+      and the 3.5 Circle eligibility filter removed so endorsement alone decides eligibility.
+      Evidence: `docs/verification/phase-4-2b4a-proof-gate.md` §8
+- [ ] 4.2B.4B retirement, now that both decisions are closed: drop the proven-dead v1 routines, the v1
       influence table, `entity_stats_view` + its hourly job, the stale quality-score table, and
       (last, after v2 trending is actually produced) `entities.trending_score` + its two indexes;
       no CASCADE; then apply the approved threshold changes, regenerate types once, re-verify
