@@ -36,12 +36,15 @@ So the trending producer has genuinely never run — which is why every v2 score
 - A successful run that legitimately produces all zeros is acceptable when there has been no
   qualifying 24-hour activity — the proof target is execution and safety, not a forced non-zero
   value.
-- No synthetic activity rows are inserted into production. Formula behaviour (non-zero computation)
-  was already proven against isolated fixtures during 4.2B.2/4.2B.3, and an uncommitted transaction
-  could not be observed by the asynchronous cron/HTTP call anyway. Only if end-to-end execution
-  cannot otherwise be proven would a short-lived controlled fixture be considered — with exact-ID
-  cleanup and zero-leftover proof.
+- No synthetic activity rows are inserted into production, ever. Formula behaviour (non-zero
+  computation and decay) is proven with isolated fixtures or staging, never in production. If
+  production execution evidence is insufficient, stop and investigate rather than creating activity.
 - Run twice to show idempotency (no runaway growth, no duplicate side effects).
+- Final evidence must show: exactly one job named `refresh-trending-scores-v2-hourly`; no GitHub or
+  browser trending scheduler; anonymous, non-admin and wrong-secret requests all rejected with 401;
+  the valid Vault-backed invocation accepted; cron calls incremental mode, never bootstrap; two
+  successive runs safe; all v2 scores within the bound; a dated correction in the B3 record; the
+  3.5 predicate gone while normal entity-data validation stays; tests, typecheck and build pass.
 
 ## Stage 3 — remove the 3.5 Circle eligibility filter
 
