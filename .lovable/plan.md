@@ -28,14 +28,19 @@ So the trending producer has genuinely never run — which is why every v2 score
    Scheduled runs always call the updater in incremental mode; bootstrap stays admin-only.
 4. Keep the GitHub image-refresh workflow untouched — it is not a trending scheduler.
 
-## Stage 2 — prove the producer actually works
+## Stage 2 — prove the producer actually works (execution proof only, no production fixtures)
 
 - Show exactly one trending scheduler exists across Supabase cron, GitHub workflows and app code.
-- Trigger one run and prove: HTTP 200, updater executed, candidate/updated counts, run timestamps
-  in the job history, and every score inside the frozen bound.
-- Because production may have no qualifying 24-hour activity, insert a short-lived controlled
-  activity fixture with unique disposable IDs, prove a non-zero score is computed, then delete only
-  those exact rows and prove zero leftovers.
+- Trigger one run and prove: HTTP 200, updater executed, returned candidate/updated counts, run
+  timestamps in the job history, and every resulting score inside the frozen [0, 1.2] bound.
+- A successful run that legitimately produces all zeros is acceptable when there has been no
+  qualifying 24-hour activity — the proof target is execution and safety, not a forced non-zero
+  value.
+- No synthetic activity rows are inserted into production. Formula behaviour (non-zero computation)
+  was already proven against isolated fixtures during 4.2B.2/4.2B.3, and an uncommitted transaction
+  could not be observed by the asynchronous cron/HTTP call anyway. Only if end-to-end execution
+  cannot otherwise be proven would a short-lived controlled fixture be considered — with exact-ID
+  cleanup and zero-leftover proof.
 - Run twice to show idempotency (no runaway growth, no duplicate side effects).
 
 ## Stage 3 — remove the 3.5 Circle eligibility filter
