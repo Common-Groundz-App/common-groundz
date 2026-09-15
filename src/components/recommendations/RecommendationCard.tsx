@@ -284,18 +284,6 @@ const RecommendationCard = ({
                 <span>{likes}</span>
               </Button>
               
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-1 py-0 px-1 text-xs h-6"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/recommendations/${recommendation.id}?commentId=new`);
-                }}
-              >
-                <MessageCircle className="h-3 w-3" />
-                <span>{recommendation.comment_count || 0}</span>
-              </Button>
               
             </div>
             
@@ -421,18 +409,6 @@ const RecommendationCard = ({
               <span>{likes}</span>
             </Button>
             
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex items-center gap-1 py-0 px-2 sm:px-4"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/recommendations/${recommendation.id}?commentId=new`);
-              }}
-            >
-              <MessageCircle className="h-5 w-5" />
-              <span>{recommendation.comment_count || 0}</span>
-            </Button>
             
           </div>
           
