@@ -39,6 +39,8 @@ export interface SubjectRelationRow {
   /** Present when the loader selected display fields for the entity card. */
   name?: string | null;
   image_url?: string | null;
+  /** Present when the loader also needs a canonical route for the subject. */
+  slug?: string | null;
 }
 
 /**
