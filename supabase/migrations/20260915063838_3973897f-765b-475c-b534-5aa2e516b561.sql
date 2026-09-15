@@ -1,0 +1,1 @@
+DROP TABLE public.recommendation_quality_scores;
