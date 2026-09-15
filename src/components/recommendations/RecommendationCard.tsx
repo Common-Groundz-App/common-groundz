@@ -24,6 +24,7 @@ import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ProfileDisplay } from '@/components/common/ProfileDisplay';
+import { shareUrl } from '@/utils/sharePost';
 
 interface RecommendationCardProps {
   recommendation: any;
@@ -298,18 +299,20 @@ const RecommendationCard = ({
               
             </div>
             
-            {/* Share button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex items-center gap-1 py-0 px-1 text-xs h-6"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleShare();
-              }}
-            >
-              <Share className="h-3 w-3" />
-            </Button>
+            {/* Share button — only when there is a canonical destination */}
+            {canShare && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-1 py-0 px-1 text-xs h-6"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleShare();
+                }}
+              >
+                <Share className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -423,18 +426,20 @@ const RecommendationCard = ({
             
           </div>
           
-          {/* Share button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex items-center gap-1 py-0 px-2 sm:px-4"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleShare();
-            }}
-          >
-            <Share className="h-5 w-5" />
-          </Button>
+          {/* Share button — only when there is a canonical destination */}
+          {canShare && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-1 py-0 px-2 sm:px-4"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleShare();
+              }}
+            >
+              <Share className="h-5 w-5" />
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
