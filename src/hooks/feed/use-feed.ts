@@ -111,8 +111,6 @@ export const useFeed = (feedType: FeedVisibility) => {
       const item = allItems.find(r => r.id === id);
       if (!item) return;
       
-      const itemType = isItemPost(item) ? 'post' : 'recommendation';
-
       // Optimistically update cache
       queryClient.setQueryData(['feed', feedType, user?.id, page], (oldData: any) => {
         if (!oldData) return oldData;
@@ -155,8 +153,6 @@ export const useFeed = (feedType: FeedVisibility) => {
       const item = allItems.find(r => r.id === id);
       if (!item) return;
       
-      const itemType = isItemPost(item) ? 'post' : 'recommendation';
-
       // Optimistically update cache
       queryClient.setQueryData(['feed', feedType, user?.id, page], (oldData: any) => {
         if (!oldData) return oldData;
