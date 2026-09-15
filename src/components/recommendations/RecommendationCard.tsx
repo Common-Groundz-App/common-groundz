@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Heart, MessageCircle, Share } from 'lucide-react';
+import { Heart, Share } from 'lucide-react';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -59,7 +59,7 @@ const RecommendationCard = ({
 
   // Helper function to get entity route based on type and slug using canonical types
   const getEntityRoute = (entity: any) => {
-    if (!entity || !entity.slug) {
+    if (!entity || !entity.slug || entity.is_deleted === true) {
       return null;
     }
 
@@ -188,13 +188,12 @@ const RecommendationCard = ({
       return;
     }
     
-    // Try to navigate to entity page if entity exists
+    // Navigate to the canonical entity page when this endorsement has a linked,
+    // live subject. Phase 4.3 Gate 5: there is no standalone recommendation
+    // page any more, so an unlinked card is simply not navigable.
     const entityRoute = getEntityRoute(recommendation.entity);
     if (entityRoute) {
       navigate(entityRoute);
-    } else {
-      // Fallback to recommendation detail page if no entity
-      navigate(`/recommendations/${recommendation.id}`);
     }
   };
 
@@ -285,18 +284,6 @@ const RecommendationCard = ({
                 <span>{likes}</span>
               </Button>
               
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-1 py-0 px-1 text-xs h-6"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/recommendations/${recommendation.id}?commentId=new`);
-                }}
-              >
-                <MessageCircle className="h-3 w-3" />
-                <span>{recommendation.comment_count || 0}</span>
-              </Button>
               
             </div>
             
@@ -422,18 +409,6 @@ const RecommendationCard = ({
               <span>{likes}</span>
             </Button>
             
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex items-center gap-1 py-0 px-2 sm:px-4"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/recommendations/${recommendation.id}?commentId=new`);
-              }}
-            >
-              <MessageCircle className="h-5 w-5" />
-              <span>{recommendation.comment_count || 0}</span>
-            </Button>
             
           </div>
           

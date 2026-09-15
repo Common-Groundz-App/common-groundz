@@ -245,7 +245,14 @@ Boundary rule (three separate concepts, never conflated):
         (retired `entity_type='recommendation'` rows resolve to no destination instead of falling
         through to their stored legacy `action_url`); content routes, thumbnails, grouping and
         `commentsService` are post-only; `recommendations.image_url` dropped from both
-        orphan-media reference sets (last live readers). No schema changes
+        orphan-media reference sets (last live readers). No schema changes.
+        Closure audit second pass: `RecommendationCard`'s three retired-route navigations
+        removed — linked endorsements now open their canonical entity page (subject `slug`
+        added to the review subject lookup), unlinked ones are inert, and the dead
+        comment-count controls are gone; stale `supabase/functions/add_comment.sql` deleted
+        (authoritative post-only routines live in the Gate 1 migration).
+        RECORD CORRECTION: the profile Recs tab is RETAINED as a review-endorsement surface
+        (`reviews.is_recommended`) with zero legacy-table dependency — do not remove it in 4.4/4.5
         (evidence `docs/verification/phase-4-3-gate-5-surface-removal.md`)
   - [ ] 4.3 Gate 6 preservation + zero-dependency verification (recommendation posts,
         `reviews.is_recommended`, v4 recommending/Circle counts, Circle card, who-to-follow,

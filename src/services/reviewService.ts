@@ -53,6 +53,9 @@ export interface Review {
     name: string;
     type: string;
     image_url?: string;
+    /** Canonical route slug, when the loader selected it. */
+    slug?: string | null;
+    is_deleted?: boolean | null;
   };
   /**
    * Phase 2.5A — how the subject relation was resolved. A `failed` or
@@ -73,7 +76,7 @@ async function loadReviewSubjectEntities(reviews: { entity_id?: string }[]): Pro
 
   const { data, error } = await supabase
     .from('entities')
-    .select('id, name, type, image_url, is_deleted')
+    .select('id, name, type, image_url, is_deleted, slug')
     .in('id', entityIds);
 
   if (error) {
@@ -419,7 +422,9 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
           id: entity.id,
           name: entity.name,
           type: entity.type,
-          image_url: entity.image_url
+          image_url: entity.image_url,
+          slug: entity.slug ?? null,
+          is_deleted: entity.is_deleted ?? false
         } : undefined,
         subjectRelation: resolveSubjectRelation(review.entity_id, subjectOutcome),
         comment_count: 0,
