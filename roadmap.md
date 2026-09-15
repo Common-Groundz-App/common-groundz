@@ -141,7 +141,7 @@ Boundary rule (three separate concepts, never conflated):
       needed no change: it has no legacy creation CTA. Dormant listener, submit handler, upload hook
       and mounted form removed from `SmartComposerButton`. Legacy form/services left on disk and
       unreachable until 4.3
-- [ ] 4.2 Apply the per-consumer decisions: endorsement maths reads only `reviews.is_recommended`;
+- [x] 4.2 Apply the per-consumer decisions: endorsement maths reads only `reviews.is_recommended`;
       engagement inputs (trending, reputation, similarity, who-to-follow, personalisation, profile and
       directory counts, feed polling) get their own replacement or removal. Before/after numbers
       recorded per surface. No mechanical substitution
@@ -160,8 +160,11 @@ Boundary rule (three separate concepts, never conflated):
       deterministic limit, no external trigger side effects): raw recommending rows 3, people
       recommending 2, average 3.0. Whole-dataset parity unchanged (78 reviews / 58 recommended /
       same checksum). Evidence: `docs/verification/phase-4-2a-recommendation-truth.md`
-- [ ] 4.2B Intelligence/scoring migration (trending, similarity, influence, reputation,
-      collaborative + social client pipelines). Not started
+- [x] 4.2B Intelligence/scoring migration (trending, similarity, influence, reputation,
+      collaborative + social client pipelines). Complete — every subphase 4.2B.0–4.2B.4B done and
+      verified live. Deliberately open: `discoveryService.getNewThisWeek`'s `average >= 4.0`
+      branch, awaiting its own impact measurement and approval
+
 - [x] 4.2B.0 visible-number cutover: additive review-only entity stats materialized view
       (`entity_stats_v2`); canonicalize before aggregating; every reader switched without
       double-counting; directory counts and feed polling migrated; owner, idempotent single
@@ -202,9 +205,29 @@ Boundary rule (three separate concepts, never conflated):
       Evidence: `docs/verification/phase-4-2b4a-proof-gate.md` §9
 
 
-- [ ] 4.3 Remove the legacy application layer **and** its dummy data together (notifications point at
-      `/recommendations/:id`, so route and rows go in one step). Clear `reviews.recommendation_id` and
-      `reviews.is_converted` in the same statement. No permanent legacy viewer
+- [ ] 4.3 Remove the legacy application layer **and** its dummy data together, in six gates
+      (revision 5 plan). Nothing is removed for having "recommendation" in its name — only for
+      reading the legacy tables. `posts.post_type = 'recommendation'` untouched throughout
+  - [ ] 4.3 Gate 1 complete write freeze: revoke `anon`/`authenticated` DML + drop write policies on
+        the four legacy tables (SELECT stays), shared comment/interaction routines become post-only
+        with identical identity signatures/return shapes/owner/grants and pinned `search_path`,
+        legacy-only routines lose application EXECUTE, `service_role` keeps the DML the cleanup needs
+  - [ ] 4.3 Gate 2 client + Edge Function cutover (Recs tab, feed branch, search branch,
+        entity-page legacy list, legacy helpers, comments item type, profile network check);
+        `/recommendations/:id` deliberately stays alive as a controlled tombstone
+  - [ ] 4.3 Gate 3 prove deployed consumers no longer touch the legacy layer, then capture the
+        secured audit manifest (uncommitted; repo document carries counts, queries, checksum)
+  - [ ] 4.3 Gate 4 one audited transactional cleanup: lock the legacy tables and audited rows,
+        validate the manifest is the complete cohort, then notifications → review references →
+        comment likes/mentions → comments/likes/saves → parent records, with per-step count
+        assertions and final zero-reference assertions; abort on any mismatch
+  - [ ] 4.3 Gate 5 remove the route, `RecommendationView`, `RecommendationContentViewer` and the
+        legacy notification destination mappings; drop `recommendations.image_url` from both
+        orphan-media reference sets
+  - [ ] 4.3 Gate 6 preservation + zero-dependency verification (recommendation posts,
+        `reviews.is_recommended`, v4 recommending/Circle counts, Circle card, who-to-follow,
+        fallback/network services, chat + journey cards), sweep, tests, typecheck, build, evidence
+
 - [ ] 4.4 Verify zero remaining dependencies in code, routines, policies, triggers and indexes
 - [ ] 4.5 Separately approved schema migration: drop the recommendation tables, `recommendation_category`,
       `reviews.recommendation_id`, `reviews.is_converted`, and the obsolete routines/triggers/policies/indexes
