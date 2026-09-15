@@ -156,8 +156,19 @@ const RecommendationCard = ({
     }
   };
 
-  const handleShare = () => {
-    // Handle share logic here
+  // Phase 4.3 Gate 6: sharing points at the canonical entity page. There is no
+  // standalone recommendation page any more, so a card without a linked, live
+  // subject has nothing to share and the control is hidden instead.
+  const entityRoute = getEntityRoute(recommendation.entity);
+  const canShare = Boolean(entityRoute);
+
+  const handleShare = async () => {
+    if (!entityRoute) return;
+    await shareUrl(
+      `${window.location.origin}${entityRoute}`,
+      recommendation.entity?.name || recommendation.title || 'Check out this recommendation on Common Groundz',
+      'Link copied to clipboard'
+    );
   };
 
   const getBadgeColor = (category: string) => {
