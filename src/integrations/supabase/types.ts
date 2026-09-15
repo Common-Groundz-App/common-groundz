@@ -3564,42 +3564,6 @@ export type Database = {
         }
         Relationships: []
       }
-      social_influence_scores: {
-        Row: {
-          category: string
-          created_at: string
-          engagement_rate: number
-          expertise_score: number
-          follower_count: number
-          id: string
-          influence_score: number
-          last_calculated: string
-          user_id: string
-        }
-        Insert: {
-          category: string
-          created_at?: string
-          engagement_rate?: number
-          expertise_score?: number
-          follower_count?: number
-          id?: string
-          influence_score?: number
-          last_calculated?: string
-          user_id: string
-        }
-        Update: {
-          category?: string
-          created_at?: string
-          engagement_rate?: number
-          expertise_score?: number
-          follower_count?: number
-          id?: string
-          influence_score?: number
-          last_calculated?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       social_influence_scores_v2: {
         Row: {
           canonical_type: Database["public"]["Enums"]["entity_type"]
