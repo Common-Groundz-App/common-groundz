@@ -4387,10 +4387,6 @@ export type Database = {
           total_likes: number
         }[]
       }
-      calculate_social_influence_score: {
-        Args: { p_category: string; p_user_id: string }
-        Returns: number
-      }
       calculate_social_influence_score_v2: {
         Args: {
           p_canonical_type: Database["public"]["Enums"]["entity_type"]
@@ -4421,16 +4417,8 @@ export type Database = {
             }[]
           }
       calculate_trust_score: { Args: { p_review_id: string }; Returns: number }
-      calculate_user_reputation: {
-        Args: { p_user_id: string }
-        Returns: number
-      }
       calculate_user_reputation_v2: {
         Args: { p_user_id: string }
-        Returns: number
-      }
-      calculate_user_similarity: {
-        Args: { user_a_id: string; user_b_id: string }
         Returns: number
       }
       calculate_user_similarity_v2: {
@@ -4937,14 +4925,6 @@ export type Database = {
         }[]
       }
       get_overall_rating: { Args: { p_entity_id: string }; Returns: number }
-      get_personalized_entities: {
-        Args: { p_limit?: number; p_user_id: string }
-        Returns: {
-          entity_id: string
-          personalization_score: number
-          reason: string
-        }[]
-      }
       get_personalized_entities_v2: {
         Args: { p_limit?: number; p_user_id: string }
         Returns: {
@@ -5036,22 +5016,6 @@ export type Database = {
         Args: { p_review_ids: string[]; p_user_id: string }
         Returns: {
           review_id: string
-        }[]
-      }
-      get_who_to_follow: {
-        Args: { p_limit?: number; p_user_id: string }
-        Returns: {
-          activity_count: number
-          avatar_url: string
-          first_name: string
-          last_name: string
-          mutuals: number
-          profile_quality: number
-          reason: string
-          score: number
-          source: string
-          user_id: string
-          username: string
         }[]
       }
       get_who_to_follow_v2: {
