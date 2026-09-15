@@ -4963,27 +4963,6 @@ export type Database = {
           total_users_with_reputation: number
         }[]
       }
-      get_network_entity_recommendations: {
-        Args: { p_entity_id: string; p_limit?: number; p_user_id: string }
-        Returns: {
-          avatar_url: string
-          category: Database["public"]["Enums"]["recommendation_category"]
-          created_at: string
-          description: string
-          entity_id: string
-          entity_image_url: string
-          entity_name: string
-          entity_type: Database["public"]["Enums"]["entity_type"]
-          id: string
-          is_recommended: boolean
-          rating: number
-          title: string
-          updated_at: string
-          user_id: string
-          username: string
-          visibility: Database["public"]["Enums"]["recommendation_visibility"]
-        }[]
-      }
       get_network_recommendations_discovery: {
         Args: {
           p_current_entity_id: string
@@ -5142,24 +5121,6 @@ export type Database = {
         Args: { p_min_count?: number; p_user_id: string }
         Returns: boolean
       }
-      has_network_recommendations:
-        | {
-            Args: {
-              p_current_user_id: string
-              p_entity_id: string
-              p_min_following?: number
-              p_min_recommendations?: number
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              p_entity_id: string
-              p_min_count?: number
-              p_user_id: string
-            }
-            Returns: boolean
-          }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
