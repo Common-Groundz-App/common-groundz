@@ -215,8 +215,11 @@ Boundary rule (three separate concepts, never conflated):
         become post-only with identical identity signatures/return shapes/owner/grants and pinned
         `search_path`; legacy-only routines lose EXECUTE from PUBLIC/anon/authenticated AND
         `service_role` (Gate 4 uses direct audited DML); migration executes atomically
-  - [ ] 4.3 Gate 2 client + Edge Function cutover (Recs tab, feed branch, search branch,
-        entity-page legacy list, legacy helpers, comments item type, profile network check);
+  - [x] 4.3 Gate 2 client + Edge Function cutover (feed/search/entity surfaces are post- and
+        endorsement-backed; legacy services, hooks, feed card, search item and interaction cache
+        deleted; `RecommendationCard` kept presentational without the broken legacy delete;
+        `RecommendationView` is a static no-read tombstone; evidence
+        `docs/verification/phase-4-3-gate-2-client-cutover.md`);
         `/recommendations/:id` deliberately stays alive as a controlled tombstone
   - [ ] 4.3 Gate 3 prove deployed consumers no longer touch the legacy layer, then capture the
         secured audit manifest (uncommitted; repo document carries counts, queries, checksum)
