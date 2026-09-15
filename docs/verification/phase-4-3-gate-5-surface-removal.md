@@ -69,3 +69,79 @@ Updated, not deleted:
   `hooks/recommendations/*` entity hooks, and the presentational
   `RecommendationCard`.
 - `npx tsgo --noEmit` clean; 633/633 tests pass; build OK.
+
+## Closure audit corrections (Gate 5, second pass)
+
+The closure audit found two leftovers after the first pass. Both are fixed here.
+
+### Leftover 1 — `RecommendationCard` still navigated to the retired route
+
+Three navigations remained: card click fallback, and the comment-count button in
+both the full and compact layouts (`?commentId=new`).
+
+Root cause found by inspection: `reviewService.loadReviewSubjectEntities` selected
+`id, name, type, image_url, is_deleted` — no `slug` — and the mapped `entity`
+object omitted it too, while `RecommendationCard.getEntityRoute` returns `null`
+without a slug. Every Recs-tab card therefore fell through to the retired route.
+A blanket no-op would have left the whole tab unclickable, so the fix restores
+the real destination instead:
+
+- `SubjectRelationRow` gained an optional `slug`; `reviewService`'s subject
+  lookup now selects `slug`, and `fetchUserRecommendations` maps `slug` and
+  `is_deleted` onto `entity`. `Review.entity` typed accordingly. Additive only.
+- `getEntityRoute` additionally refuses a soft-deleted subject.
+- Card click navigates to the canonical entity page when a linked, live subject
+  exists; a genuinely unlinked endorsement does nothing. No new route added.
+- Both comment-count controls removed. This path hardcodes `comment_count: 0`
+  and there is no review-discussion destination, so a disabled affordance would
+  have implied functionality that does not exist. Likes and share untouched.
+  Unused `MessageCircle` import removed.
+
+Live data check (read-only): of 58 published endorsements, 20 have no
+`entity_id` (legacy unlinked → correctly non-navigable), 0 have a missing or
+slug-less subject, and 0 have a soft-deleted subject. So every linked card
+routes to its entity page.
+
+`RecommendationCard` has exactly one consumer, `ProfileRecommendations` (the
+profile Recs tab); no other surface is affected.
+
+### Leftover 2 — stale `supabase/functions/add_comment.sql`
+
+Confirmed zero references anywhere in the repo (no imports, config, scripts,
+tests, deployment inputs). Deleted. The authoritative post-only definitions of
+`add_comment`, `update_comment`, `delete_comment`, `toggle_comment_like`,
+`increment_comment_count` and both `get_comments_with_profiles` overloads live
+in the Gate 1 write-freeze migration
+(`supabase/migrations/20260915085556_a8c84270-f9b3-4069-a6d2-83351542804d.sql`),
+which is the single source of truth for those routines.
+
+### Record correction
+
+An earlier Phase 4.3 note said the profile Recs tab would disappear. That is
+factually wrong: only the retired standalone records disappeared. The tab is
+**retained** as a review-endorsement surface (`ProfileRecommendations` →
+`useRecommendations` → `reviewService.fetchUserRecommendations`, filtering
+`reviews.is_recommended = true`, likes via `toggle_review_like`). It has zero
+dependency on the retired tables and must not be removed in Phase 4.4/4.5.
+
+### Re-verification
+
+- Sweep for `/recommendations/` and `/recommendation/` across the repo: remaining
+  hits are only module import paths (`@/services/recommendation/types`,
+  `@/hooks/recommendations/*`), the explanatory comment in
+  `notificationDestination.ts`, deliberate rejection cases in
+  `notificationDestination.test.ts`, historical migrations, `docs/`, `roadmap.md`
+  and the generated types file. No live navigation to the retired route.
+- Recommendation-type posts unchanged: normal post destination path, post
+  comments and likes unaffected (comment handling is post-only end to end).
+- `reviews.is_recommended`, Entity V4 recommending/from-circle counts, the
+  "Recommended by Your Circle" card, `UserRecommendationCard`,
+  `fallbackRecommendationService`, `networkRecommendationService`,
+  `ChatRecommendationCards`, `JourneyRecommendationCard`: unmodified.
+- Browser check of `/u/hana.li?tab=recommendations` could not exercise the
+  signed-in tab (external Supabase project — no test session can be minted); the
+  guest gate rendered as expected. Navigation correctness is covered by the
+  static + live-data checks above.
+- `npx tsgo --noEmit` clean; 633/633 tests pass; build OK.
+
+Gate 5 is complete with zero live legacy-route dependencies.
