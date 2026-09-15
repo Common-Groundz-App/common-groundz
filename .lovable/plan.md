@@ -166,7 +166,16 @@ unaffected.
 
 ## Technical notes
 
+Implementation rules for the freeze: address every routine by its full identity signature
+(both `get_comments_with_profiles` overloads included); preserve owner, volatility, return
+type, parameter defaults, grants and post behaviour, changing only the legacy branch; keep
+rewritten SECURITY DEFINER routines on a pinned `search_path`. After the transaction, re-verify
+that no application role has any path that can fire a legacy trigger. The secured manifest is
+retained (uncommitted) through the Phase 4.5 close-out for rollback investigation. Generated
+Supabase types are regenerated only if a signature actually changes — no churn otherwise.
+
 One replayable migration (the freeze: grants, policies, routine bodies and EXECUTE) plus one
+
 audited transactional production cleanup driven by the secured manifest. No table, enum or
 column is dropped; review marker columns are cleared so 4.4 can prove zero dependency before
 4.5 removes them.
