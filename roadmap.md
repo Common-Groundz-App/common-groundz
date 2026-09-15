@@ -233,11 +233,13 @@ Boundary rule (three separate concepts, never conflated):
         and `dashboard_user` (existence of the last two verified live); Gate 4 execution
         identity documented as administrative/owner, not `service_role`
         (evidence `docs/verification/phase-4-3-gate-3-manifest.md`)
-  - [ ] 4.3 Gate 4 one audited transactional cleanup, executed in the administrative/owner
-        context (not `service_role`): lock the legacy tables and audited rows, validate the
-        captured manifest is the complete cohort, then notifications → review references →
-        comment likes/mentions → comments/likes/saves → parent records, with per-step count
-        assertions and final zero-reference assertions; abort on any mismatch
+  - [x] 4.3 Gate 4 one audited transactional cleanup, executed in the administrative/owner
+        context (not `service_role`): hardened per both review rounds — all 8 count kinds
+        asserted non-null, bidirectional exact-identity cohort checks on every legacy table,
+        audited review rows locked `FOR UPDATE`, exact two-form `?commentId=` URLs (no
+        wildcards), full polymorphic-children and notification zero assertions; completed with
+        zero aborts, all four legacy tables empty, markers cleared
+        (evidence `docs/verification/phase-4-3-gate-4-cleanup.md`)
   - [ ] 4.3 Gate 5 remove the route, `RecommendationView`, `RecommendationContentViewer` and the
         legacy notification destination mappings; drop `recommendations.image_url` from both
         orphan-media reference sets
