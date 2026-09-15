@@ -25,6 +25,7 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ProfileDisplay } from '@/components/common/ProfileDisplay';
 import { shareUrl } from '@/utils/sharePost';
+import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 
 interface RecommendationCardProps {
   recommendation: any;
