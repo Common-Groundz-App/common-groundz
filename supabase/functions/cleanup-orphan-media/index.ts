@@ -3,7 +3,7 @@
 // PHASE 1.5 — DRY-RUN ONLY.
 //
 // Scans the `post_media` storage bucket for objects older than 7 days that
-// are NOT referenced by any post / review / recommendation / entity photo /
+// are NOT referenced by any post / review / entity photo /
 // entity image, and reports counts + a sample of orphans.
 //
 // THIS FUNCTION DOES NOT DELETE ANYTHING. There is no destructive code path
@@ -109,13 +109,6 @@ async function collectReferencedUrls(): Promise<Set<string>> {
     const { data, error } = await supabase.from('review_updates').select('media');
     if (error) throw error;
     for (const row of data ?? []) addMediaArray((row as any).media);
-  }
-
-  // recommendations.image_url
-  {
-    const { data, error } = await supabase.from('recommendations').select('image_url');
-    if (error) throw error;
-    for (const row of data ?? []) addUrl((row as any).image_url);
   }
 
   // entity_photos.url

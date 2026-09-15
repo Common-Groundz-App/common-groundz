@@ -26,7 +26,7 @@ import {
  */
 
 export type NotificationTargetMedia = {
-  /** target key (`post:<id>` / `recommendation:<id>`) -> renderable image URL */
+  /** target key (`post:<id>`) -> renderable image URL */
   thumbnails: Map<string, string>;
   /** true while any chunk is still in flight */
   isLoading: boolean;
@@ -48,9 +48,7 @@ const fetchChunk = async (
 ): Promise<ChunkResult> => {
   const thumbnails: Array<[string, string]> = [];
 
-  // Posts only — the legacy recommendations layer is frozen (Phase 4.3) and
-  // its notifications resolve to no thumbnail.
-  if (entityType === 'post') {
+  {
     const { data, error } = await supabase
       .from('posts')
       .select('id, media')

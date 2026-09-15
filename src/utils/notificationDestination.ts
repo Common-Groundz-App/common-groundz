@@ -127,6 +127,12 @@ export const resolveNotificationDestination = (
   }
 
 
+  // 1b. Retired legacy recommendation rows have no page at all (Phase 4.3):
+  // never fall through to their stored legacy `action_url`.
+  if (entityType === 'recommendation') {
+    return { kind: 'none', reason: 'unsupported-type' };
+  }
+
   // 2. Follows and profile notifications → the actor's profile.
   if (entityType === 'profile' || notification.type === 'follow') {
     const profileId = entityId ?? asUuid(notification.sender_id);

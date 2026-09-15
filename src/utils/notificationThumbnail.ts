@@ -16,7 +16,7 @@ import { isMuxItem, muxThumbnailUrl } from '@/utils/muxMedia';
  *    means "render no thumbnail and no placeholder".
  */
 
-export const THUMBNAIL_TARGET_TYPES = ['post', 'recommendation'] as const;
+export const THUMBNAIL_TARGET_TYPES = ['post'] as const;
 export type ThumbnailTargetType = (typeof THUMBNAIL_TARGET_TYPES)[number];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -135,7 +135,6 @@ export const collectTargetIds = (
 ): Record<ThumbnailTargetType, string[]> => {
   const buckets: Record<ThumbnailTargetType, Set<string>> = {
     post: new Set(),
-    recommendation: new Set(),
   };
   for (const row of rows) {
     const ref = getNotificationTargetRef(row);
@@ -143,7 +142,6 @@ export const collectTargetIds = (
   }
   return {
     post: [...buckets.post].sort(),
-    recommendation: [...buckets.recommendation].sort(),
   };
 };
 
