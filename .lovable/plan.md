@@ -1,13 +1,15 @@
-# Phase 4.2B verification, then Phase 4.3 — retire the legacy recommendation layer (revision 4)
+# Phase 4.2B verification, then Phase 4.3 — retire the legacy recommendation layer (revision 5)
 
-## Revision 4: the trigger-order correction is right, and I confirmed it live
+## Revision 5: both remaining safeguards added, and I verified the trigger question
 
-`on_delete_recommendation_like` fires `retract_recommendation_like_notification()` AFTER
-DELETE on `recommendation_likes`, so deleting likes before notifications would retract
-notifications as a trigger side effect and break the count assertion. Notifications now go
-first in Gate 4, after a complete-cohort check. Gate 1's proof is also split into shared
-routines (legacy input rejected, post input still succeeds, contract otherwise unchanged),
-legacy-only routines (application execution denied) and `service_role` retention.
+Concurrency: the cleanup transaction now takes table-level locks on the four legacy tables
+plus row locks on the audited records and referenced reviews before validating the cohort, so
+no `service_role` write can change it between validation and commit. Triggers: I read both
+retraction bodies — each is a plain `UPDATE ... SET retracted_at` with no exception path, so
+with the notifications already deleted they match zero rows and no-op safely; no trigger is
+disabled. Full identity signatures, pinned `search_path`, preserved contracts, manifest
+retention through 4.5 and no needless type regeneration are recorded under Technical notes.
+
 
 ## Earlier accepted points, each confirmed live
 
@@ -105,9 +107,16 @@ live triggers and `on_delete_recommendation_like` fires
 deleting likes before notifications would silently retract notifications as a side effect and
 make the notification count assertion fail. Notifications therefore go first:
 
-1. lock the audited cohort and confirm the manifest represents the **complete** current legacy
-   record set at transaction time — otherwise "exact IDs only" and "zero rows afterwards"
-   cannot both hold
+I also read both retraction trigger bodies: each is a bare `UPDATE ... WHERE ...` setting
+`retracted_at`, so with the notifications already deleted they match zero rows and no-op
+safely. No trigger is disabled to get the cleanup through.
+
+1. inside the transaction, take table-level locks on the four legacy tables plus row locks on
+   the audited records and referenced reviews (blocking any concurrent `service_role` write),
+   then confirm the manifest represents the **complete** current legacy cohort — otherwise
+   "exact IDs only" and "zero rows afterwards" cannot both hold. A partial match or an
+   unexpected extra legacy record aborts; a genuinely empty environment is a no-op
+
 2. delete the audited notifications, both record and comment destinations
 3. clear `reviews.recommendation_id` / `is_converted` for the audited reviews —
    `reviews_recommendation_id_fkey` has no delete action, so it restricts and must precede the
@@ -159,7 +168,16 @@ unaffected.
 
 ## Technical notes
 
+Implementation rules for the freeze: address every routine by its full identity signature
+(both `get_comments_with_profiles` overloads included); preserve owner, volatility, return
+type, parameter defaults, grants and post behaviour, changing only the legacy branch; keep
+rewritten SECURITY DEFINER routines on a pinned `search_path`. After the transaction, re-verify
+that no application role has any path that can fire a legacy trigger. The secured manifest is
+retained (uncommitted) through the Phase 4.5 close-out for rollback investigation. Generated
+Supabase types are regenerated only if a signature actually changes — no churn otherwise.
+
 One replayable migration (the freeze: grants, policies, routine bodies and EXECUTE) plus one
+
 audited transactional production cleanup driven by the secured manifest. No table, enum or
 column is dropped; review marker columns are cleared so 4.4 can prove zero dependency before
 4.5 removes them.
