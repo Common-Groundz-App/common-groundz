@@ -727,19 +727,17 @@ serve(async (req) => {
       }
 
       // Search other tables in parallel
-      const [usersResult, reviewsResult, recommendationsResult] = await Promise.allSettled([
+      // The legacy recommendations layer is frozen (Phase 4.3) — not searched.
+      const [usersResult, reviewsResult] = await Promise.allSettled([
         supabase.from('profiles').select('id, username, avatar_url, bio').or(`username.ilike.%${query}%, bio.ilike.%${query}%`).limit(limit),
-        supabase.from('reviews').select(`id, title, description, rating, created_at, user_id, entities!inner(name, slug)`).or(`title.ilike.%${query}%, description.ilike.%${query}%`).eq('status', 'published').limit(limit),
-        supabase.from('recommendations').select(`id, title, description, rating, category, created_at, user_id, entities!inner(name, slug)`).or(`title.ilike.%${query}%, description.ilike.%${query}%`).limit(limit)
+        supabase.from('reviews').select(`id, title, description, rating, created_at, user_id, entities!inner(name, slug)`).or(`title.ilike.%${query}%, description.ilike.%${query}%`).eq('status', 'published').limit(limit)
       ])
 
-      // Collect unique user IDs from reviews and recommendations
+      // Collect unique user IDs from reviews
       const reviews = reviewsResult.status === 'fulfilled' && reviewsResult.value.data ? reviewsResult.value.data : []
-      const recommendations = recommendationsResult.status === 'fulfilled' && recommendationsResult.value.data ? recommendationsResult.value.data : []
-      
+
       const userIds = new Set<string>()
       reviews.forEach((r: any) => r.user_id && userIds.add(r.user_id))
-      recommendations.forEach((r: any) => r.user_id && userIds.add(r.user_id))
 
       // Only fetch profiles if we have user IDs (avoid Supabase .in() error with empty array)
       let profilesMap = new Map()
@@ -801,18 +799,8 @@ serve(async (req) => {
           }))
         }
       }
-      if (recommendationsResult.status === 'fulfilled') {
-        if (recommendationsResult.value.error) {
-          console.error('❌ Recommendations search failed:', recommendationsResult.value.error)
-        } else if (recommendationsResult.value.data) {
-          results.recommendations = recommendationsResult.value.data.map((rec: any) => ({
-            ...rec,
-            entity_name: rec.entities?.name || '',
-            username: profilesMap.get(rec.user_id)?.username || '',
-            avatar_url: profilesMap.get(rec.user_id)?.avatar_url || null
-          }))
-        }
-      }
+      // The legacy recommendations layer is frozen (Phase 4.3) — always empty.
+      results.recommendations = []
       
       console.log(`✅ Local search: ${results.entities.length} entities (${slugEntities?.length || 0} slug priority), ${results.users.length} users`)
     } catch (localError) {

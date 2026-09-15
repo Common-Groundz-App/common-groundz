@@ -1,7 +1,7 @@
 
 import { CombinedFeedItem } from '../types';
 import { MediaItem } from '@/types/media';
-import { PostFeedItem, FeedItem } from '../types';
+import { PostFeedItem } from '../types';
 
 // Helper function to determine if a feed item is a post
 export const isItemPost = (item: CombinedFeedItem): item is PostFeedItem => {

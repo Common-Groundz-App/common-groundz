@@ -7,7 +7,6 @@ import {
   collectTargetIds,
   getNotificationTargetRef,
   resolvePostThumbnail,
-  resolveRecommendationThumbnail,
   type ThumbnailTargetType,
 } from '@/utils/notificationThumbnail';
 
@@ -49,6 +48,8 @@ const fetchChunk = async (
 ): Promise<ChunkResult> => {
   const thumbnails: Array<[string, string]> = [];
 
+  // Posts only — the legacy recommendations layer is frozen (Phase 4.3) and
+  // its notifications resolve to no thumbnail.
   if (entityType === 'post') {
     const { data, error } = await supabase
       .from('posts')
@@ -59,16 +60,6 @@ const fetchChunk = async (
     for (const row of data ?? []) {
       const url = resolvePostThumbnail((row as { media?: unknown }).media);
       if (url) thumbnails.push([targetKey('post', (row as { id: string }).id), url]);
-    }
-  } else {
-    const { data, error } = await supabase
-      .from('recommendations')
-      .select('id, image_url')
-      .in('id', ids);
-    if (error) throw error;
-    for (const row of data ?? []) {
-      const url = resolveRecommendationThumbnail((row as { image_url?: unknown }).image_url);
-      if (url) thumbnails.push([targetKey('recommendation', (row as { id: string }).id), url]);
     }
   }
 

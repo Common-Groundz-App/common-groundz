@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, MessageSquare, MessageSquareHeart, Plus, Share, Flag, RefreshCw, Image, Info } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useEntityDetail } from '@/hooks/use-entity-detail';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import NotFound from './NotFound';

@@ -1,23 +1,19 @@
-import { supabase } from '@/integrations/supabase/client';
-import { toggleLike as toggleRecommendationLike } from '@/services/recommendationService';
 import { toggleLike as togglePostLike, toggleSave as togglePostSave } from '@/services/postService';
 import { isItemPost } from './api/utils';
 import type { CombinedFeedItem } from './types';
 import { useState } from 'react';
 
-// Toggle like for feed item (post or recommendation)
+// Toggle like for a feed item (posts only — the legacy recommendations layer is frozen)
 export const toggleFeedItemLike = async (
-  item: CombinedFeedItem, 
+  item: CombinedFeedItem,
   userId: string
 ): Promise<boolean> => {
   try {
-    // If the item is a post, use post like toggling
-    if (isItemPost(item)) {
-      return togglePostLike(item.id, userId);
+    if (!isItemPost(item)) {
+      console.error('Like attempted on unsupported item type');
+      return false;
     }
-    
-    // Otherwise use recommendation like toggling
-    return toggleRecommendationLike(item.id, userId, !!item.is_liked);
+    return togglePostLike(item.id, userId);
   } catch (error) {
     console.error('Error toggling like for feed item:', error);
     throw error;
@@ -26,7 +22,7 @@ export const toggleFeedItemLike = async (
 
 // Toggle save for feed item — only posts support saving
 export const toggleFeedItemSave = async (
-  item: CombinedFeedItem, 
+  item: CombinedFeedItem,
   userId: string
 ): Promise<boolean> => {
   if (!isItemPost(item)) {
@@ -41,24 +37,11 @@ export const useInteractions = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const handleLike = async (id: string, userId: string, itemType: 'post' | 'recommendation') => {
+  const handleLike = async (id: string, userId: string, itemType: 'post') => {
     setIsLoading(true);
     setError(null);
     try {
-      if (itemType === 'post') {
-        return await togglePostLike(id, userId);
-      } else {
-        // For recommendations, we need to determine the current like state
-        const { data } = await supabase
-          .from('recommendation_likes')
-          .select('id')
-          .eq('recommendation_id', id)
-          .eq('user_id', userId)
-          .single();
-        
-        const isLiked = !!data;
-        return await toggleRecommendationLike(id, userId, isLiked);
-      }
+      return await togglePostLike(id, userId);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to toggle like'));
       throw err;
@@ -67,14 +50,10 @@ export const useInteractions = () => {
     }
   };
 
-  const handleSave = async (id: string, userId: string, itemType: 'post' | 'recommendation') => {
+  const handleSave = async (id: string, userId: string, itemType: 'post') => {
     setIsLoading(true);
     setError(null);
     try {
-      if (itemType !== 'post') {
-        console.error('Save attempted on unsupported item type:', itemType);
-        return false;
-      }
       return await togglePostSave(id, userId);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to toggle save'));

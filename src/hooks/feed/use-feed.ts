@@ -7,7 +7,6 @@ import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { FeedVisibility, FeedState } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
 import { toggleFeedItemLike, toggleFeedItemSave, useInteractions } from './interactions';
-import { isItemPost } from './api/utils';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -111,8 +110,6 @@ export const useFeed = (feedType: FeedVisibility) => {
       const item = allItems.find(r => r.id === id);
       if (!item) return;
       
-      const itemType = isItemPost(item) ? 'post' : 'recommendation';
-
       // Optimistically update cache
       queryClient.setQueryData(['feed', feedType, user?.id, page], (oldData: any) => {
         if (!oldData) return oldData;
@@ -155,8 +152,6 @@ export const useFeed = (feedType: FeedVisibility) => {
       const item = allItems.find(r => r.id === id);
       if (!item) return;
       
-      const itemType = isItemPost(item) ? 'post' : 'recommendation';
-
       // Optimistically update cache
       queryClient.setQueryData(['feed', feedType, user?.id, page], (oldData: any) => {
         if (!oldData) return oldData;

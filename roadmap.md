@@ -208,15 +208,18 @@ Boundary rule (three separate concepts, never conflated):
 - [ ] 4.3 Remove the legacy application layer **and** its dummy data together, in six gates
       (revision 5 plan). Nothing is removed for having "recommendation" in its name — only for
       reading the legacy tables. `posts.post_type = 'recommendation'` untouched throughout
-  - [ ] 4.3 Gate 1 complete write freeze: revoke `anon`/`authenticated` INSERT/UPDATE/DELETE/
+  - [x] 4.3 Gate 1 complete write freeze: revoke `anon`/`authenticated` INSERT/UPDATE/DELETE/
         TRUNCATE/REFERENCES/TRIGGER (SELECT stays, nothing new granted) + drop write policies on
         the four legacy tables; narrow `service_role` to SELECT/DELETE only (Gate 4 never UPDATEs
         the legacy tables — review markers live on `reviews`); shared comment/interaction routines
         become post-only with identical identity signatures/return shapes/owner/grants and pinned
         `search_path`; legacy-only routines lose EXECUTE from PUBLIC/anon/authenticated AND
         `service_role` (Gate 4 uses direct audited DML); migration executes atomically
-  - [ ] 4.3 Gate 2 client + Edge Function cutover (Recs tab, feed branch, search branch,
-        entity-page legacy list, legacy helpers, comments item type, profile network check);
+  - [x] 4.3 Gate 2 client + Edge Function cutover (feed/search/entity surfaces are post- and
+        endorsement-backed; legacy services, hooks, feed card, search item and interaction cache
+        deleted; `RecommendationCard` kept presentational without the broken legacy delete;
+        `RecommendationView` is a static no-read tombstone; evidence
+        `docs/verification/phase-4-3-gate-2-client-cutover.md`);
         `/recommendations/:id` deliberately stays alive as a controlled tombstone
   - [ ] 4.3 Gate 3 prove deployed consumers no longer touch the legacy layer, then capture the
         secured audit manifest (uncommitted; repo document carries counts, queries, checksum)

@@ -240,20 +240,11 @@ serve(async (req) => {
         .eq('status', 'published')
         .limit(limit)
 
-      // Search recommendations  
-      const { data: recommendations } = await supabase
-        .from('recommendations')
-        .select(`
-          id, title, description, rating, category, created_at, user_id,
-          entities!inner(name, slug)
-        `)
-        .or(`title.ilike.%${query}%, description.ilike.%${query}%`)
-        .limit(limit)
+      // The legacy recommendations layer is frozen (Phase 4.3) — not searched.
 
-      // Collect unique user IDs from reviews and recommendations
+      // Collect unique user IDs from reviews
       const userIds = new Set<string>()
       reviews?.forEach(r => r.user_id && userIds.add(r.user_id))
-      recommendations?.forEach(r => r.user_id && userIds.add(r.user_id))
 
       // Only fetch profiles if we have user IDs (avoid Supabase .in() error with empty array)
       let profilesMap = new Map()
@@ -275,12 +266,7 @@ serve(async (req) => {
         username: profilesMap.get(review.user_id)?.username || '',
         avatar_url: profilesMap.get(review.user_id)?.avatar_url || null
       }))
-      results.recommendations = (recommendations || []).map(rec => ({
-        ...rec,
-        entity_name: rec.entities?.name || '',
-        username: profilesMap.get(rec.user_id)?.username || '',
-        avatar_url: profilesMap.get(rec.user_id)?.avatar_url || null
-      }))
+      results.recommendations = []
       
       console.log(`✅ Local search: ${results.entities.length} entities, ${results.users.length} users`)
     } catch (localError) {

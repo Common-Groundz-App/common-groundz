@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useEffect } from 'react';
-import { fetchEntityBySlug, fetchEntityRecommendations, fetchEntityReviews, getEntityStats } from '@/services/entityService';
+import { fetchEntityBySlug, fetchEntityReviews, getEntityStats } from '@/services/entityService';
 import { Entity } from '@/services/recommendation/types';
 import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
 import { useAuth } from '@/contexts/AuthContext';
@@ -71,15 +71,15 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
       }
       
       // Fetch related data in parallel
-      const [recommendations, reviews, stats] = await Promise.all([
-        fetchEntityRecommendations(entity.id, user?.id || null),
+      // (the legacy recommendations layer is frozen — Phase 4.3)
+      const [reviews, stats] = await Promise.all([
         fetchEntityReviews(entity.id, user?.id || null),
         getEntityStats(entity.id, user?.id || null)
       ]);
-      
+
       return {
         entity,
-        recommendations,
+        recommendations: [],
         reviews: attachPageEntityRelation(reviews, entity),
         stats,
         redirectToSlug

@@ -394,50 +394,13 @@ export const clearAllProfileCache = (): void => {
 
 /**
  * Network recommendation context methods
+ *
+ * (The legacy hasStrongNetwork check was removed in Phase 4.3 — it read the
+ * frozen legacy recommendations table and had no callers.)
  */
 
 /**
- * Check if user has sufficient network for entity recommendations
- * Requires at least 3 follows AND at least 2 relevant recommendations from network
- */
-export const hasStrongNetwork = async (
-  userId: string,
-  entityId: string
-): Promise<boolean> => {
-  try {
-    // Check follow count
-    const { data: followData, error: followError } = await supabase
-      .from('follows')
-      .select('following_id')
-      .eq('follower_id', userId);
 
-    if (followError || !followData || followData.length < 3) {
-      return false;
-    }
-
-    // Check if network has relevant recommendations
-    const followingIds = followData.map(f => f.following_id);
-    
-    const { data: recData, error: recError } = await supabase
-      .from('recommendations')
-      .select('id')
-      .in('user_id', followingIds)
-      .gte('rating', 4) // Only high-quality recommendations
-      .neq('entity_id', entityId) // Different from current entity
-      .limit(2);
-
-    if (recError || !recData || recData.length < 2) {
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error checking network strength:', error);
-    return false;
-  }
-};
-
-/**
  * Get user's following IDs for network recommendations
  */
 export const getUserFollowingIds = async (userId: string): Promise<string[]> => {

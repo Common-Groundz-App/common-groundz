@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
-import { Entity, RecommendationCategory } from '@/services/recommendation/types';
+import { Entity } from '@/services/recommendation/types';
 import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
-import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
+import { ReviewWithUser } from '@/types/entities';
 import { MediaItem } from '@/types/common';
 import { resolveSlugWithHistory } from '@/services/entityRedirectService';
 import { SUBJECT_RELATION_NOT_LOADED } from '@/services/reviewSubjectRelation';
@@ -109,113 +109,6 @@ export const fetchEntityWithParentContext = async (slugOrId: string): Promise<{
 const isValidUUID = (str: string): boolean => {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
-};
-
-/**
- * Fetch all recommendations related to an entity with enhanced unified profile service
- */
-export const fetchEntityRecommendations = async (
-  entityId: string, 
-  userId: string | null = null
-): Promise<RecommendationWithUser[]> => {
-  console.log('Fetching entity recommendations for entityId:', entityId, 'userId:', userId);
-  
-  try {
-    // Fetch recommendations with only existing fields
-    const { data: recommendationsData, error } = await supabase
-      .from('recommendations')
-      .select('*')
-      .eq('entity_id', entityId)
-      .eq('visibility', 'public');
-    
-    if (error) {
-      console.error('Error fetching entity recommendations:', error);
-      return [];
-    }
-
-    if (!recommendationsData || recommendationsData.length === 0) {
-      return [];
-    }
-    
-    console.log('Found recommendations:', recommendationsData.length);
-    
-    // Attach profiles using enhanced unified service
-    const recommendationsWithProfiles = await attachProfilesToEntities(recommendationsData);
-    
-    // Get recommendation IDs for interaction data
-    const recommendationIds = recommendationsData.map(rec => rec.id);
-    
-    // Fetch interaction data if user is logged in
-    let likedIds = new Set<string>();
-    let likeCountMap = new Map<string, number>();
-    
-    if (userId && recommendationIds.length > 0) {
-      const [likesData, likeCountsData] = await Promise.all([
-        supabase
-          .from('recommendation_likes')
-          .select('recommendation_id')
-          .eq('user_id', userId)
-          .in('recommendation_id', recommendationIds),
-        
-        supabase.rpc('get_recommendation_likes_by_ids', {
-          p_recommendation_ids: recommendationIds
-        })
-      ]);
-      
-      likedIds = new Set((likesData.data || []).map(like => like.recommendation_id));
-      likeCountMap = new Map(
-        (likeCountsData.data || []).map(item => [item.recommendation_id, item.like_count])
-      );
-    }
-    
-    // Transform to final format with interaction data
-    const finalRecommendations: RecommendationWithUser[] = recommendationsWithProfiles.map(rec => {
-      // Map string category to RecommendationCategory enum
-      const categoryMap: Record<string, RecommendationCategory> = {
-        'food': RecommendationCategory.Food,
-        'drink': RecommendationCategory.Drink,
-        'movie': RecommendationCategory.Movie,
-        'book': RecommendationCategory.Book,
-        'place': RecommendationCategory.Place,
-        'product': RecommendationCategory.Product,
-        'activity': RecommendationCategory.Activity,
-        'music': RecommendationCategory.Music,
-        'art': RecommendationCategory.Art,
-        'tv': RecommendationCategory.TV,
-        'travel': RecommendationCategory.Travel,
-      };
-      
-      return {
-        id: rec.id,
-        title: rec.title,
-        subtitle: undefined,
-        description: rec.description,
-        image_url: rec.image_url,
-        rating: rec.rating,
-        venue: rec.venue,
-        entity_id: rec.entity_id,
-        entity: undefined, // Entity not included in select
-        is_certified: rec.is_certified,
-        user_id: rec.user_id,
-        user: rec.user,
-        category: categoryMap[rec.category as string] || RecommendationCategory.Product,
-        likes: likeCountMap.get(rec.id) || 0,
-        isLiked: likedIds.has(rec.id),
-        comment_count: rec.comment_count || 0,
-        view_count: rec.view_count || 0,
-        visibility: rec.visibility as any,
-        media: [] as MediaItem[], // Recommendations don't have media field in DB
-        created_at: rec.created_at,
-        updated_at: rec.updated_at
-      };
-    });
-    
-    console.log('Processed recommendations with enhanced unified profiles:', finalRecommendations.length);
-    return finalRecommendations;
-  } catch (err) {
-    console.error('Exception in fetchEntityRecommendations:', err);
-    return [];
-  }
 };
 
 /**
