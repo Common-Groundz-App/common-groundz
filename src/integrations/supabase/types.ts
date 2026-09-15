@@ -4372,10 +4372,6 @@ export type Database = {
         }
       }
       admin_pending_entity_count: { Args: never; Returns: number }
-      calculate_enhanced_trending_score: {
-        Args: { p_entity_id: string }
-        Returns: number
-      }
       calculate_entity_trending_score_v2: {
         Args: { p_entity_id: string }
         Returns: number
@@ -4424,10 +4420,6 @@ export type Database = {
               trending_score: number
             }[]
           }
-      calculate_trending_score: {
-        Args: { p_entity_id: string }
-        Returns: number
-      }
       calculate_trust_score: { Args: { p_review_id: string }; Returns: number }
       calculate_user_reputation: {
         Args: { p_user_id: string }
@@ -5399,7 +5391,6 @@ export type Database = {
         Args: { p_review_id: string; p_user_id: string }
         Returns: boolean
       }
-      update_all_trending_scores: { Args: never; Returns: number }
       update_all_trending_scores_v2: {
         Args: { p_bootstrap?: boolean }
         Returns: number
