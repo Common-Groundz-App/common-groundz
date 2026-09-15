@@ -738,7 +738,6 @@ export type Database = {
           slug: string | null
           specifications: Json | null
           stored_photo_urls: Json | null
-          trending_score: number | null
           trending_score_v2: number
           type: Database["public"]["Enums"]["entity_type"]
           updated_at: string
@@ -802,7 +801,6 @@ export type Database = {
           slug?: string | null
           specifications?: Json | null
           stored_photo_urls?: Json | null
-          trending_score?: number | null
           trending_score_v2?: number
           type: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
@@ -866,7 +864,6 @@ export type Database = {
           slug?: string | null
           specifications?: Json | null
           stored_photo_urls?: Json | null
-          trending_score?: number | null
           trending_score_v2?: number
           type?: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
@@ -4120,7 +4117,6 @@ export type Database = {
           slug: string | null
           specifications: Json | null
           stored_photo_urls: Json | null
-          trending_score: number | null
           trending_score_v2: number
           type: Database["public"]["Enums"]["entity_type"]
           updated_at: string
