@@ -1,13 +1,15 @@
-# Phase 4.2B verification, then Phase 4.3 — retire the legacy recommendation layer (revision 4)
+# Phase 4.2B verification, then Phase 4.3 — retire the legacy recommendation layer (revision 5)
 
-## Revision 4: the trigger-order correction is right, and I confirmed it live
+## Revision 5: both remaining safeguards added, and I verified the trigger question
 
-`on_delete_recommendation_like` fires `retract_recommendation_like_notification()` AFTER
-DELETE on `recommendation_likes`, so deleting likes before notifications would retract
-notifications as a trigger side effect and break the count assertion. Notifications now go
-first in Gate 4, after a complete-cohort check. Gate 1's proof is also split into shared
-routines (legacy input rejected, post input still succeeds, contract otherwise unchanged),
-legacy-only routines (application execution denied) and `service_role` retention.
+Concurrency: the cleanup transaction now takes table-level locks on the four legacy tables
+plus row locks on the audited records and referenced reviews before validating the cohort, so
+no `service_role` write can change it between validation and commit. Triggers: I read both
+retraction bodies — each is a plain `UPDATE ... SET retracted_at` with no exception path, so
+with the notifications already deleted they match zero rows and no-op safely; no trigger is
+disabled. Full identity signatures, pinned `search_path`, preserved contracts, manifest
+retention through 4.5 and no needless type regeneration are recorded under Technical notes.
+
 
 ## Earlier accepted points, each confirmed live
 
