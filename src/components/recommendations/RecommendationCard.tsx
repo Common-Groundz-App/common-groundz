@@ -222,12 +222,6 @@ const RecommendationCard = ({
               </div>
               <h3 className="font-bold text-lg leading-tight mb-1">{recommendation.title}</h3>
             </div>
-                  >
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
           </div>
           
           {/* Ultra-Compact User Info */}
