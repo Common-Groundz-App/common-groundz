@@ -181,7 +181,7 @@ export const updateComment = async (commentId: string, content: string, itemType
   }
 };
 
-export const toggleCommentLike = async (commentId: string, commentType: 'post' | 'recommendation', userId: string): Promise<boolean | null> => {
+export const toggleCommentLike = async (commentId: string, commentType: 'post', userId: string): Promise<boolean | null> => {
   try {
     const { data, error } = await (supabase.rpc as any)('toggle_comment_like', {
       p_comment_id: commentId,
