@@ -55,64 +55,8 @@ export interface ProcessedNetworkRecommendation {
   is_mutual_connection?: boolean;
 }
 
-/**
- * Check if user has sufficient network recommendations for an entity
- */
-export const hasNetworkRecommendations = async (
-  userId: string,
-  entityId: string
-): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase.rpc('has_network_recommendations', {
-      p_user_id: userId,
-      p_entity_id: entityId
-    });
 
-    if (error) {
-      console.error('Error checking network recommendations:', error);
-      return false;
-    }
 
-    return data || false;
-  } catch (error) {
-    console.error('Exception in hasNetworkRecommendations:', error);
-    return false;
-  }
-};
-
-/**
- * Get entity recommendations from user's network
- */
-export const getNetworkEntityRecommendations = async (
-  userId: string,
-  entityId: string,
-  limit: number = 6
-): Promise<any[]> => {
-  try {
-    const { data, error } = await supabase.rpc('get_network_entity_recommendations', {
-      p_user_id: userId,
-      p_entity_id: entityId,
-      p_limit: limit
-    });
-
-    if (error) {
-      console.error('❌ Error fetching network recommendations:', error);
-      console.error('Error details:', { message: error.message, details: error.details, hint: error.hint });
-      return [];
-    }
-
-    if (!data || data.length === 0) {
-      console.log('📭 No network recommendations found for userId:', userId);
-      return [];
-    }
-
-    console.log('✅ Network recommendations raw data:', data);
-    return data;
-  } catch (error) {
-    console.error('Exception in getNetworkEntityRecommendations:', error);
-    return [];
-  }
-};
 
 /**
  * Get network recommendation context for display
