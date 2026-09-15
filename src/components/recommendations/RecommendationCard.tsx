@@ -345,12 +345,6 @@ const RecommendationCard = ({
               <RatingDisplay rating={recommendation.rating} />
             </div>
           </div>
-                >
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
         </div>
         
         {/* Title and Category */}
