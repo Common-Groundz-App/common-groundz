@@ -141,7 +141,7 @@ Boundary rule (three separate concepts, never conflated):
       needed no change: it has no legacy creation CTA. Dormant listener, submit handler, upload hook
       and mounted form removed from `SmartComposerButton`. Legacy form/services left on disk and
       unreachable until 4.3
-- [ ] 4.2 Apply the per-consumer decisions: endorsement maths reads only `reviews.is_recommended`;
+- [x] 4.2 Apply the per-consumer decisions: endorsement maths reads only `reviews.is_recommended`;
       engagement inputs (trending, reputation, similarity, who-to-follow, personalisation, profile and
       directory counts, feed polling) get their own replacement or removal. Before/after numbers
       recorded per surface. No mechanical substitution
@@ -160,8 +160,11 @@ Boundary rule (three separate concepts, never conflated):
       deterministic limit, no external trigger side effects): raw recommending rows 3, people
       recommending 2, average 3.0. Whole-dataset parity unchanged (78 reviews / 58 recommended /
       same checksum). Evidence: `docs/verification/phase-4-2a-recommendation-truth.md`
-- [ ] 4.2B Intelligence/scoring migration (trending, similarity, influence, reputation,
-      collaborative + social client pipelines). Not started
+- [x] 4.2B Intelligence/scoring migration (trending, similarity, influence, reputation,
+      collaborative + social client pipelines). Complete — every subphase 4.2B.0–4.2B.4B done and
+      verified live. Deliberately open: `discoveryService.getNewThisWeek`'s `average >= 4.0`
+      branch, awaiting its own impact measurement and approval
+
 - [x] 4.2B.0 visible-number cutover: additive review-only entity stats materialized view
       (`entity_stats_v2`); canonicalize before aggregating; every reader switched without
       double-counting; directory counts and feed polling migrated; owner, idempotent single
