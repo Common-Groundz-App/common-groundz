@@ -30,12 +30,13 @@ export type CommentsLoadResult =
 
 export const fetchCommentsResult = async (
   itemId: string,
-  itemType: 'recommendation' | 'post',
+  itemType: 'post',
   currentUserId?: string | null
 ): Promise<CommentsLoadResult> => {
   try {
-    const tableName = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
-    const idField = itemType === 'recommendation' ? 'recommendation_id' : 'post_id';
+    // Posts only — the legacy recommendations layer is retired (Phase 4.3).
+    const tableName = 'post_comments';
+    const idField = 'post_id';
     
     const rpcParams: any = { 
       p_table_name: tableName, 
@@ -80,13 +81,13 @@ export const fetchCommentsResult = async (
 };
 
 /** Legacy array-only wrapper — kept for existing callers. */
-export const fetchComments = async (itemId: string, itemType: 'recommendation' | 'post', currentUserId?: string | null): Promise<CommentData[]> => {
+export const fetchComments = async (itemId: string, itemType: 'post', currentUserId?: string | null): Promise<CommentData[]> => {
   const { comments } = await fetchCommentsResult(itemId, itemType, currentUserId);
   return comments;
 };
 
 
-export const fetchCommentCount = async (itemId: string, itemType: 'recommendation' | 'post') => {
+export const fetchCommentCount = async (itemId: string, itemType: 'post') => {
   try {
     // Posts only — the legacy recommendations layer is frozen (Phase 4.3).
     const { data, error } = await supabase
@@ -103,7 +104,7 @@ export const fetchCommentCount = async (itemId: string, itemType: 'recommendatio
   }
 };
 
-export const addComment = async (itemId: string, itemType: 'recommendation' | 'post', content: string, userId: string, parentId?: string | null): Promise<boolean> => {
+export const addComment = async (itemId: string, itemType: 'post', content: string, userId: string, parentId?: string | null): Promise<boolean> => {
   try {
     const rpcParams: any = { 
       p_item_id: itemId, 
@@ -126,7 +127,7 @@ export const addComment = async (itemId: string, itemType: 'recommendation' | 'p
   }
 };
 
-export const deleteComment = async (commentId: string, itemType: 'recommendation' | 'post', userId: string): Promise<boolean> => {
+export const deleteComment = async (commentId: string, itemType: 'post', userId: string): Promise<boolean> => {
   try {
     console.log(`Starting deleteComment with: commentId=${commentId}, itemType=${itemType}, userId=${userId}`);
     
@@ -154,7 +155,7 @@ export const deleteComment = async (commentId: string, itemType: 'recommendation
   }
 };
 
-export const updateComment = async (commentId: string, content: string, itemType: 'recommendation' | 'post', userId: string): Promise<boolean> => {
+export const updateComment = async (commentId: string, content: string, itemType: 'post', userId: string): Promise<boolean> => {
   try {
     const { data, error } = await (supabase.rpc as any)('update_comment', {
       p_comment_id: commentId,
