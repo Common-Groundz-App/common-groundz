@@ -1,8 +1,17 @@
-# Phase 4.2B verification, then Phase 4.3 — retire the legacy recommendation layer (revision 3)
+# Phase 4.2B verification, then Phase 4.3 — retire the legacy recommendation layer (revision 4)
 
-## The three new points are all accepted; one was a real hole I confirmed
+## Revision 4: the trigger-order correction is right, and I confirmed it live
 
-Queried live before accepting:
+`on_delete_recommendation_like` fires `retract_recommendation_like_notification()` AFTER
+DELETE on `recommendation_likes`, so deleting likes before notifications would retract
+notifications as a trigger side effect and break the count assertion. Notifications now go
+first in Gate 4, after a complete-cohort check. Gate 1's proof is also split into shared
+routines (legacy input rejected, post input still succeeds, contract otherwise unchanged),
+legacy-only routines (application execution denied) and `service_role` retention.
+
+## Earlier accepted points, each confirmed live
+
+
 
 - **The write freeze in revision 2 was incomplete — codex is right.** Thirteen `public`
   routines touch the legacy tables and **every one is SECURITY DEFINER and executable by
