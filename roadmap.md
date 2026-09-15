@@ -191,10 +191,15 @@ Boundary rule (three separate concepts, never conflated):
       rejection matrix and two idempotent 200 runs recorded, B3's inaccurate workflow claim corrected,
       and the 3.5 Circle eligibility filter removed so endorsement alone decides eligibility.
       Evidence: `docs/verification/phase-4-2b4a-proof-gate.md` §8
-- [ ] 4.2B.4B retirement, now that both decisions are closed: drop the proven-dead v1 routines, the v1
-      influence table, `entity_stats_view` + its hourly job, the stale quality-score table, and
-      (last, after v2 trending is actually produced) `entities.trending_score` + its two indexes;
-      no CASCADE; then apply the approved threshold changes, regenerate types once, re-verify
+- [x] 4.2B.4B retirement executed: dropped the two `has_network_recommendations` overloads and the
+      single `get_network_entity_recommendations` overload (signatures corrected from live `pg_proc`),
+      the stale quality-score table with its dead writer, the three v1 trending routines, the five v1
+      similarity/who-to-follow/personalized/reputation/influence routines, the empty v1 influence
+      table, `entity_stats_view` + its hourly job, and `entities.trending_score` + its two indexes.
+      No CASCADE, nothing stopped; the live circle-count and Circle-card routines untouched. Only
+      threshold change applied: `getQualityNewThisWeek` no longer reads the quality table.
+      `discoveryService.getNewThisWeek`'s `average >= 4.0` branch deferred for separate approval.
+      Evidence: `docs/verification/phase-4-2b4a-proof-gate.md` §9
 
 
 - [ ] 4.3 Remove the legacy application layer **and** its dummy data together (notifications point at

@@ -224,3 +224,66 @@ unchanged from §6. No `CASCADE` anywhere; any unexpected dependency stops that 
 
 Tests `633/633` pass; typecheck clean; production build green; Supabase linter output unchanged at
 475 issues / 8 distinct types (all pre-existing, none introduced by this stage).
+
+## 9. Phase 4.2B.4B — executed retirement (2026-09-15)
+
+### 9.1 Signature correction (from live `pg_proc`, not generated types)
+
+The §8 drop list named `has_network_recommendations(uuid)` and "both
+`get_network_entity_recommendations` overloads". That was wrong. Live identity signatures:
+
+| Signature | Action | Evidence |
+|---|---|---|
+| `public.has_network_recommendations(uuid, uuid, integer)` | dropped | no caller |
+| `public.has_network_recommendations(uuid, uuid, integer, integer)` | dropped | no caller |
+| `public.get_network_entity_recommendations(uuid, uuid, integer)` | dropped (one overload, not two) | no caller |
+| `public.get_aggregated_network_recommendations_discovery(uuid, uuid, integer)` | kept — live | Circle card |
+| `public.get_aggregated_network_recommendations_discovery(uuid, uuid[], integer)` | kept — deferred to 4.3 | unused, needs its own sweep |
+| `public.has_network_activity(uuid, integer)` | kept — live | gates the Circle card |
+| `public.get_circle_recommendation_count(uuid, uuid)` | kept — live | entity header "N from circle" |
+| `public.get_circle_recommendation_counts_batch(uuid[], uuid)` | kept — live | explore + discovery |
+
+The entity-v4 header counts ("6 recommending (4 from circle)") never touched the retired wrappers.
+
+### 9.2 Threshold changes actually applied
+
+| File / routine | Current | Applied | Reason |
+|---|---|---|---|
+| `enhancedDiscoveryService.getQualityNewThisWeek` | read `recommendation_quality_scores`, scored by quality/spam/social-proof | reads nothing from it; recency order + upstream reviewer-evidence bar | table's writer was already dead; prerequisite for the drop |
+
+Deferred, **not** applied: `discoveryService.getNewThisWeek` `count >= 2 OR average >= 4.0` → reviewer
+count alone. Needs its own impact measurement and separate approval.
+
+### 9.3 Migration order executed (no `CASCADE`, none stopped)
+
+1. Deleted `hasNetworkRecommendations` / `getNetworkEntityRecommendations` wrappers, then dropped the
+   three Circle routines above.
+2. Rewrote `getQualityNewThisWeek`, deleted `calculateQualityScores`, `calculateEntityQuality`,
+   `detectSpamPatterns`, `calculateRatingVariance`, `enhanceNewReasonWithQuality`, then dropped
+   `public.recommendation_quality_scores`.
+3. Dropped `update_all_trending_scores()`, `calculate_enhanced_trending_score(uuid)`,
+   `calculate_trending_score(uuid)`.
+4. Dropped `calculate_user_similarity(uuid,uuid)`, `get_who_to_follow(uuid,integer)`,
+   `get_personalized_entities(uuid,integer)`, `calculate_user_reputation(uuid)`,
+   `calculate_social_influence_score(uuid,text)`.
+5. Dropped `public.social_influence_scores`.
+6. Guarded `cron.unschedule('refresh-entity-stats-view-hourly')` (raising if absent), then
+   `DROP MATERIALIZED VIEW public.entity_stats_view;` — post-check confirmed 0 leftover
+   `idx_entity_stats_view%` objects, so both owned indexes went with the view.
+7. Pre-check before the column drop: job `refresh-trending-scores-v2-hourly` had 3 successful runs in
+   the preceding 3 hours (last 2026-09-15 06:20 UTC), so the v2 producer is live. Then dropped
+   `idx_entities_trending_score`, `idx_entities_trending_popularity`, `entities.trending_score`.
+
+### 9.4 Post-retirement verification
+
+- Repository sweep: no live reference to any retired object. Remaining `trending_score` hits in
+  `fallbackRecommendationService.ts` are the v2 RPC's own output field name, not the dropped column.
+- Generated types refreshed once, after the final migration: zero occurrences of
+  `recommendation_quality_scores`, `has_network_recommendations`,
+  `get_network_entity_recommendations`, `entity_stats_view`, `social_influence_scores`.
+- Schedulers: 5 cron jobs remain — entity-stats v2 hourly (minute 5), trending v2 hourly (minute 20),
+  influence v2 daily 04:12, orphan-media weekly dry run, retracted-notification prune. Exactly one
+  trending and one influence scheduler; no browser scheduler or writer; the only GitHub workflow
+  refreshes entity images.
+- Tests 633/633, typecheck clean, build OK, Supabase linter 448 issues / 8 types (down from 475
+  purely through removals; nothing new).
