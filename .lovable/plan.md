@@ -90,22 +90,33 @@ artefact, **not committed**; the repository document records counts, the queries
 execution evidence and the manifest checksum.
 
 **Gate 4 — audited, transactional cleanup operation** (a one-off run against production, not
-part of the replayable chain), exact IDs only, in FK-safe order:
+part of the replayable chain), exact IDs only. The order is trigger-aware: I inspected the
+live triggers and `on_delete_recommendation_like` fires
+`retract_recommendation_like_notification()` **AFTER DELETE** on `recommendation_likes`, so
+deleting likes before notifications would silently retract notifications as a side effect and
+make the notification count assertion fail. Notifications therefore go first:
 
-1. clear `reviews.recommendation_id` / `is_converted` for the audited reviews —
-   `reviews_recommendation_id_fkey` has no delete action, so it restricts and must go first
-2. comment likes and mentions for the audited comment IDs — `comment_likes` has no FK to
+1. lock the audited cohort and confirm the manifest represents the **complete** current legacy
+   record set at transaction time — otherwise "exact IDs only" and "zero rows afterwards"
+   cannot both hold
+2. delete the audited notifications, both record and comment destinations
+3. clear `reviews.recommendation_id` / `is_converted` for the audited reviews —
+   `reviews_recommendation_id_fkey` has no delete action, so it restricts and must precede the
+   parent delete
+4. comment likes and mentions for the audited comment IDs — `comment_likes` has no FK to
    comments, so a cascade would orphan them
-3. audited comments, then likes, then saves
-4. notifications referencing the audited record IDs
-5. the audited records
+5. audited comments, then likes, then saves
+6. the audited parent records
 
 Each step asserts its expected affected-row count against the manifest; any mismatch, or a
-partial cohort match, aborts and rolls the whole transaction back. Then assert zero
-remaining legacy rows and interactions. A clean or already-applied environment is a
-successful no-op, never a failure.
+partial cohort match, aborts and rolls the whole transaction back. Final assertions before
+commit: zero legacy records, zero legacy interactions, zero polymorphic comment references,
+zero legacy notification destinations, no review holding a legacy reference, and exactly the
+expected review markers cleared. A clean or already-applied environment is a successful
+no-op, never a failure.
 
 **Gate 5 — remove the route and mappings last:** `/recommendations/:id`,
+
 `RecommendationView`, `RecommendationContentViewer`, and the legacy mappings in
 `notificationService` / `notificationDestination` (including the dead `/recommendation/`
 rewrite), tests updated. Until then the route returns the existing controlled "content not
