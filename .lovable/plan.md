@@ -59,8 +59,11 @@ tables.
   legacy-only routines (`toggle_recommendation_like`, `increment_recommendation_view`,
   `get_recommendation_likes_by_ids`, `get_user_recommendation_likes`, and the two legacy
   notification triggers' helpers) lose application EXECUTE
-- proof: as an authenticated user, both a direct legacy insert **and** each RPC path fail;
-  the same calls against a post still succeed
+- proof, recorded in three separate categories so no impossible test is written: shared
+  routines reject legacy input while the same call against a post still succeeds, with
+  signatures, return shapes, ownership and grants otherwise unchanged; legacy-only routines
+  deny application execution; `service_role` retains only what the Gate 4 cleanup needs
+
 
 **Gate 2 — client and Edge Function cutover** (detail route deliberately still alive):
 
