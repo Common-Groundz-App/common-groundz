@@ -105,9 +105,16 @@ live triggers and `on_delete_recommendation_like` fires
 deleting likes before notifications would silently retract notifications as a side effect and
 make the notification count assertion fail. Notifications therefore go first:
 
-1. lock the audited cohort and confirm the manifest represents the **complete** current legacy
-   record set at transaction time — otherwise "exact IDs only" and "zero rows afterwards"
-   cannot both hold
+I also read both retraction trigger bodies: each is a bare `UPDATE ... WHERE ...` setting
+`retracted_at`, so with the notifications already deleted they match zero rows and no-op
+safely. No trigger is disabled to get the cleanup through.
+
+1. inside the transaction, take table-level locks on the four legacy tables plus row locks on
+   the audited records and referenced reviews (blocking any concurrent `service_role` write),
+   then confirm the manifest represents the **complete** current legacy cohort — otherwise
+   "exact IDs only" and "zero rows afterwards" cannot both hold. A partial match or an
+   unexpected extra legacy record aborts; a genuinely empty environment is a no-op
+
 2. delete the audited notifications, both record and comment destinations
 3. clear `reviews.recommendation_id` / `is_converted` for the audited reviews —
    `reviews_recommendation_id_fkey` has no delete action, so it restricts and must precede the
