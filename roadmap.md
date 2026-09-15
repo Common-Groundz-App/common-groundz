@@ -254,13 +254,23 @@ Boundary rule (three separate concepts, never conflated):
         RECORD CORRECTION: the profile Recs tab is RETAINED as a review-endorsement surface
         (`reviews.is_recommended`) with zero legacy-table dependency — do not remove it in 4.4/4.5
         (evidence `docs/verification/phase-4-3-gate-5-surface-removal.md`)
-  - [ ] 4.3 Gate 6 preservation + zero-dependency verification (recommendation posts,
-        `reviews.is_recommended`, v4 recommending/Circle counts, Circle card, who-to-follow,
-        fallback/network services, chat + journey cards), sweep, tests, typecheck, build, evidence
+  - [x] 4.3 Gate 6 preservation + live zero-dependency verification: recommendation posts,
+        `reviews.is_recommended` (58 endorsements), v4 recommending count (6 on the reference
+        entity), Circle card, who-to-follow, fallback/network services, chat + journey cards all
+        preserved; both retired routes render 404; legacy tables empty, app roles SELECT-only,
+        legacy-only RPCs `postgres=X` only, exactly 5 cron jobs. Two defects fixed: the share
+        no-op (`shareUrl` helper, share hidden without a canonical destination) and Gate 5's
+        replacement navigation, which used non-existent type-prefixed paths — now
+        `getEntityUrlWithParent` (`/entity/:slug`). Two dead pre-freeze snapshot files deleted
+        (`supabase/functions/get_comments_with_profiles.sql`, `increment_comment_count.sql`).
+        BLOCKED (external Supabase, no session, no psql): authenticated/Circle-viewer runtime
+        interaction and rollback-based mutation fixtures — covered by automated tests + static
+        contract only (evidence `docs/verification/phase-4-3-gate-6-preservation.md`)
 
 - [ ] 4.4 Verify zero remaining dependencies in code, routines, policies, triggers and indexes
 - [ ] 4.5 Separately approved schema migration: drop the recommendation tables, `recommendation_category`,
-      `reviews.recommendation_id`, `reviews.is_converted`, and the obsolete routines/triggers/policies/indexes
+      `reviews.recommendation_id`, `reviews.is_converted`, and the obsolete routines/triggers/policies/indexes.
+      KEEP `recommendation_visibility` — it types `posts.visibility` and `reviews.visibility` (rename at most).
 
 ## Phase 5 — the feed card (after Phase 4)
 
