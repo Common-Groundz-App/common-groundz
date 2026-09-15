@@ -22,7 +22,6 @@ import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search'
 import type {
   EntitySearchResult,
   ReviewSearchResult,
-  RecommendationSearchResult,
 } from '@/hooks/use-unified-search';
 import { Badge } from '@/components/ui/badge';
 import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
