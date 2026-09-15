@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { toast } from '@/hooks/use-toast';
-import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { MediaItem } from '@/types/media';
 import { ensureHttps } from '@/utils/urlUtils';
@@ -50,8 +49,6 @@ const RecommendationCard = ({
   const { requireAuth } = useAuthPrompt();
   const [isLiked, setIsLiked] = useState(recommendation.isLiked || false);
   const [likes, setLikes] = useState(recommendation.likes || 0);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   
   const isOwner = user?.id === recommendation.user_id;
 
@@ -164,30 +161,6 @@ const RecommendationCard = ({
     }
   };
 
-  const handleDelete = async () => {
-    if (!user) return;
-    setIsDeleting(true);
-    try {
-      await deleteRecommendation(recommendation.id);
-      toast({
-        title: 'Recommendation deleted',
-        description: 'Your recommendation has been deleted successfully.'
-      });
-      setIsDeleteModalOpen(false);
-      if (onDeleted) {
-        onDeleted();
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Something went wrong',
-        description: error.message,
-        variant: 'destructive'
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   const handleShare = () => {
     // Handle share logic here
   };
@@ -249,24 +222,6 @@ const RecommendationCard = ({
               </div>
               <h3 className="font-bold text-lg leading-tight mb-1">{recommendation.title}</h3>
             </div>
-            
-            {/* Options Menu for own content */}
-            {isOwner && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full p-0 h-6 w-6 ml-2"
-                  >
-                    <MoreVertical className="h-3 w-3" />
-                    <span className="sr-only">Menu</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem 
-                    className="text-destructive focus:text-destructive"
-                    onClick={() => setIsDeleteModalOpen(true)}
                   >
                     Delete
                   </DropdownMenuItem>
@@ -370,16 +325,6 @@ const RecommendationCard = ({
             </Button>
           </div>
         </CardContent>
-        
-        {/* Delete confirmation dialog */}
-        <DeleteConfirmationDialog
-          isOpen={isDeleteModalOpen}
-          onClose={() => setIsDeleteModalOpen(false)}
-          onConfirm={handleDelete}
-          title="Delete Recommendation"
-          description="Are you sure you want to delete this recommendation? This action cannot be undone."
-          isLoading={isDeleting}
-        />
       </Card>
     );
   }
@@ -406,24 +351,6 @@ const RecommendationCard = ({
               <RatingDisplay rating={recommendation.rating} />
             </div>
           </div>
-          
-          {/* Options Menu for own content */}
-          {isOwner && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full p-0 h-8 w-8"
-                >
-                  <MoreVertical className="h-4 w-4" />
-                  <span className="sr-only">Menu</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem 
-                  className="text-destructive focus:text-destructive"
-                  onClick={() => setIsDeleteModalOpen(true)}
                 >
                   Delete
                 </DropdownMenuItem>
@@ -541,16 +468,6 @@ const RecommendationCard = ({
           </Button>
         </div>
       </CardContent>
-      
-      {/* Delete confirmation dialog */}
-      <DeleteConfirmationDialog
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={handleDelete}
-        title="Delete Recommendation"
-        description="Are you sure you want to delete this recommendation? This action cannot be undone."
-        isLoading={isDeleting}
-      />
     </Card>
   );
 };
