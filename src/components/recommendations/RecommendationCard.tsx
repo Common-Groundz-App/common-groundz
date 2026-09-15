@@ -58,33 +58,15 @@ const RecommendationCard = ({
     entityImageUrl: entityImageUrl
   });
 
-  // Helper function to get entity route based on type and slug using canonical types
+  // Canonical entity destination. Phase 4.3 Gate 6: the app serves entity pages
+  // only under `/entity/:slug` (and `/entity/:parentSlug/:childSlug`), so the
+  // canonical helper is the single source of truth here — type-prefixed paths
+  // like `/place/:slug` are not routes and would resolve to "page not found".
   const getEntityRoute = (entity: any) => {
     if (!entity || !entity.slug || entity.is_deleted === true) {
       return null;
     }
-
-    const canonical = getCanonicalType(entity.type);
-    const typeToRoute: Record<EntityType, string> = {
-      [EntityType.Place]: '/place',
-      [EntityType.Food]: '/place',
-      [EntityType.Movie]: '/movie',
-      [EntityType.TVShow]: '/tv',
-      [EntityType.Book]: '/book',
-      [EntityType.Product]: '/product',
-      [EntityType.Course]: '/course',
-      [EntityType.App]: '/app',
-      [EntityType.Game]: '/game',
-      [EntityType.Experience]: '/experience',
-      [EntityType.Brand]: '/brand',
-      [EntityType.Event]: '/event',
-      [EntityType.Service]: '/service',
-      [EntityType.Professional]: '/professional',
-      [EntityType.Others]: '/entity'
-    };
-
-    const routePrefix = typeToRoute[canonical] || '/entity';
-    return `${routePrefix}/${entity.slug}`;
+    return getEntityUrlWithParent(entity);
   };
 
   // Process media items for proper fallback handling
