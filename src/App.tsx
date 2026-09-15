@@ -24,7 +24,6 @@ import SavedInsights from '@/pages/SavedInsights';
 import Search from '@/pages/Search';
 import EntityDetail from '@/pages/EntityDetail';
 import PostView from '@/pages/PostView';
-import RecommendationView from '@/pages/RecommendationView';
 import TagPage from '@/pages/TagPage';
 import ProductSearch from '@/pages/ProductSearch';
 import PlacesPage from '@/pages/PlacesPage';
@@ -192,7 +191,6 @@ function App() {
                   <Route path="/entity/:slug" element={<EntityDetail />} />
                   <Route path="/entity/:parentSlug/:childSlug" element={<EntityDetail />} />
                   <Route path="/post/:postId" element={<PostView />} />
-                  <Route path="/recommendations/:recommendationId" element={<RecommendationView />} />
                   <Route path="/t/:hashtag" element={
                     <AppProtectedRoute>
                       <TagPage />

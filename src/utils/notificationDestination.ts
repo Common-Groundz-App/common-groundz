@@ -49,7 +49,6 @@ const matchAllowlistedPath = (pathname: string): string | null => {
 
   switch (head) {
     case 'post':
-    case 'recommendations':
     case 'profile':
       return isUuid(param) ? `/${head}/${param}` : null;
     case 'u':
@@ -83,11 +82,9 @@ export const normalizeInternalPath = (raw: unknown): string | null => {
   }
   if (url.origin !== PARSE_ORIGIN) return null;
 
-  // Legacy singular recommendation links point at a route that does not exist.
-  let pathname = url.pathname.replace(
-    /^\/recommendation\//,
-    '/recommendations/'
-  );
+  // Legacy recommendation links (both `/recommendation/:id` and
+  // `/recommendations/:id`) point at retired routes and are rejected below.
+  let pathname = url.pathname;
 
   const allowed = matchAllowlistedPath(pathname);
   if (!allowed) return null;
@@ -121,7 +118,7 @@ export const resolveNotificationDestination = (
   const entityId = asUuid(notification.entity_id);
   const commentId = asUuid(notification.metadata?.comment_id);
 
-  // 1. Post / recommendation → full content page, with exact comment when known.
+  // 1. Post → full content page, with exact comment when known.
   if (isRoutableContentType(entityType)) {
     const path = buildContentPath(entityType, entityId, commentId);
     if (path) {

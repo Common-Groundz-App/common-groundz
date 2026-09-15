@@ -4,22 +4,20 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * Content types that have a real page in the app's route table.
  * Reviews have no page, so they are deliberately absent here.
  */
-export type RoutableContentType = 'post' | 'recommendation';
+export type RoutableContentType = 'post';
 
 const CONTENT_ROUTE_BASE: Record<RoutableContentType, string> = {
   post: '/post',
-  recommendation: '/recommendations',
 };
 
 export const isRoutableContentType = (
   type: unknown
-): type is RoutableContentType =>
-  type === 'post' || type === 'recommendation';
+): type is RoutableContentType => type === 'post';
 
 /**
  * Builds the canonical in-app path for a piece of content.
  * Returns null for unsupported types or missing ids so callers never push
- * a bogus URL (e.g. the legacy singular `/recommendation/:id`).
+ * a bogus URL (e.g. the retired legacy recommendation routes).
  *
  * Note: `focus=comment` is deliberately NEVER synthesized here — it means
  * "focus the comment composer", which would steal focus away from a
