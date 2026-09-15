@@ -221,10 +221,21 @@ Boundary rule (three separate concepts, never conflated):
         `RecommendationView` is a static no-read tombstone; evidence
         `docs/verification/phase-4-3-gate-2-client-cutover.md`);
         `/recommendations/:id` deliberately stays alive as a controlled tombstone
-  - [ ] 4.3 Gate 3 prove deployed consumers no longer touch the legacy layer, then capture the
-        secured audit manifest (uncommitted; repo document carries counts, queries, checksum)
-  - [ ] 4.3 Gate 4 one audited transactional cleanup: lock the legacy tables and audited rows,
-        validate the manifest is the complete cohort, then notifications → review references →
+  - [x] 4.3 Gate 3 prove deployed consumers no longer touch the legacy layer, then capture the
+        secured audit manifest (stored in the owner-only `audit` schema, never in the repo; repo
+        document carries counts, queries and the capture id only). Reviewer corrections applied:
+        per-capture `capture_id` created atomically in the same statement as the snapshot;
+        counts scoped to that capture with zero-count kinds recorded; notification cohort
+        selected by exact audited ids and exact enumerated legacy route forms (never substring
+        matching); whole capture is one statement under REPEATABLE READ so all source tables
+        share one snapshot without locking live `notifications`/`reviews`; audit schema, tables
+        and sequences hard-denied to `anon`, `authenticated`, `service_role`, `authenticator`
+        and `dashboard_user` (existence of the last two verified live); Gate 4 execution
+        identity documented as administrative/owner, not `service_role`
+        (evidence `docs/verification/phase-4-3-gate-3-manifest.md`)
+  - [ ] 4.3 Gate 4 one audited transactional cleanup, executed in the administrative/owner
+        context (not `service_role`): lock the legacy tables and audited rows, validate the
+        captured manifest is the complete cohort, then notifications → review references →
         comment likes/mentions → comments/likes/saves → parent records, with per-step count
         assertions and final zero-reference assertions; abort on any mismatch
   - [ ] 4.3 Gate 5 remove the route, `RecommendationView`, `RecommendationContentViewer` and the
