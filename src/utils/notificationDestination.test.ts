@@ -1,7 +1,7 @@
 /**
  * Destination resolution matrix for every notification shape actually emitted
- * by the database (post like, recommendation like, legacy post comment, legacy
- * recommendation comment, mention, reply, comment like, follow), plus the
+ * by the database (post like, legacy post comment, mention, reply, comment
+ * like, follow), plus the retired legacy recommendation shapes, plus the
  * degraded and hostile inputs the safe-URL parser must reject.
  *
  * Vitest-compatible structure; harmless no-op if vitest is absent at import
@@ -39,9 +39,9 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
     { kind: 'route', path: `/post/${POST_ID}` },
   ],
   [
-    'recommendation like → recommendation viewer',
+    'retired recommendation like → no destination',
     n({ type: 'like', entity_type: 'recommendation', entity_id: REC_ID }),
-    { kind: 'route', path: `/recommendations/${REC_ID}` },
+    { kind: 'none', reason: 'unsupported-type' },
   ],
   [
     'legacy post comment (no comment_id) → parent, no false highlight',
@@ -55,7 +55,7 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
     { kind: 'route', path: `/post/${POST_ID}` },
   ],
   [
-    'legacy recommendation comment → recommendation viewer',
+    'legacy recommendation comment → no destination, legacy action_url ignored',
     n({
       type: 'comment',
       entity_type: 'recommendation',
@@ -63,7 +63,7 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
       action_url: `/recommendations/${REC_ID}`,
       metadata: { comment_text: 'hi' },
     }),
-    { kind: 'route', path: `/recommendations/${REC_ID}` },
+    { kind: 'none', reason: 'unsupported-type' },
   ],
   [
     'mention → viewer with commentId',
@@ -79,11 +79,11 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
     'reply → viewer with commentId',
     n({
       type: 'comment',
-      entity_type: 'recommendation',
-      entity_id: REC_ID,
+      entity_type: 'post',
+      entity_id: POST_ID,
       metadata: { event: 'reply', comment_id: COMMENT_ID },
     }),
-    { kind: 'route', path: `/recommendations/${REC_ID}?commentId=${COMMENT_ID}` },
+    { kind: 'route', path: `/post/${POST_ID}?commentId=${COMMENT_ID}` },
   ],
   [
     'comment like → viewer with commentId',
@@ -118,9 +118,14 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
     { kind: 'route', path: `/post/${POST_ID}` },
   ],
   [
-    'legacy singular recommendation action_url is rewritten',
+    'legacy singular recommendation action_url is rejected',
     n({ type: 'comment', action_url: `/recommendation/${REC_ID}?commentId=${COMMENT_ID}`, sender_id: null }),
-    { kind: 'route', path: `/recommendations/${REC_ID}?commentId=${COMMENT_ID}` },
+    { kind: 'none', reason: 'unsafe-url' },
+  ],
+  [
+    'legacy plural recommendation action_url is rejected',
+    n({ type: 'comment', action_url: `/recommendations/${REC_ID}`, sender_id: null }),
+    { kind: 'none', reason: 'unsafe-url' },
   ],
   [
     'nothing usable → missing-target',
@@ -140,7 +145,6 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
 ];
 
 const pathAcceptCases: Array<[string, string]> = [
-  [`/recommendation/${REC_ID}?commentId=${COMMENT_ID}`, `/recommendations/${REC_ID}?commentId=${COMMENT_ID}`],
   [`/post/${POST_ID}?focus=comment`, `/post/${POST_ID}`],
   [`/post/${POST_ID}?focus=comment&commentId=${COMMENT_ID}`, `/post/${POST_ID}?commentId=${COMMENT_ID}`],
   [`/post/${POST_ID}?next=https://evil.com`, `/post/${POST_ID}`],

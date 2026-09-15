@@ -54,8 +54,8 @@ describe('isGroupableNotification — eligibility fence', () => {
   it('accepts a top-level post like', () => {
     expect(isGroupableNotification(row())).toBe(true);
   });
-  it('accepts a recommendation like', () => {
-    expect(isGroupableNotification(row({ entity_type: 'recommendation' }))).toBe(true);
+  it('rejects a retired recommendation like', () => {
+    expect(isGroupableNotification(row({ entity_type: 'recommendation' }))).toBe(false);
   });
   it('rejects comment likes (they have a distinct destination)', () => {
     expect(isGroupableNotification(row({ metadata: { comment_id: COMMENT_ID } }))).toBe(false);
@@ -188,13 +188,13 @@ describe('formatGroupPrimary — event-aware, name-aware copy', () => {
     expect(formatGroupPrimary(groups[0], [])).toBe('3 people liked your post');
   });
 
-  it('uses the recommendation noun', () => {
+  it('always uses the post noun', () => {
     const groups = groupNotifications([
-      row({ entity_type: 'recommendation', entity_id: POST_B }),
-      row({ entity_type: 'recommendation', entity_id: POST_B }),
+      row({ entity_id: POST_B }),
+      row({ entity_id: POST_B }),
     ]);
     expect(formatGroupPrimary(groups[0], ['linda', 'hana'])).toBe(
-      'linda and hana liked your recommendation'
+      'linda and hana liked your post'
     );
   });
 });
@@ -274,8 +274,8 @@ describe('formatRowPrimary — event precedence with a resolved name', () => {
       'Linda Williams commented on your post'
     );
   });
-  it('renders a like on a recommendation', () => {
-    expect(named({ entity_type: 'recommendation' })).toBe('Linda Williams liked your recommendation');
+  it('renders a retired recommendation like with the post noun', () => {
+    expect(named({ entity_type: 'recommendation' })).toBe('Linda Williams liked your post');
   });
   it('renders a follow', () => {
     expect(named({ type: 'follow', entity_type: null, entity_id: null })).toBe(
