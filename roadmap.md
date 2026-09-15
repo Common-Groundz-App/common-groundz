@@ -208,7 +208,7 @@ Boundary rule (three separate concepts, never conflated):
 - [ ] 4.3 Remove the legacy application layer **and** its dummy data together, in six gates
       (revision 5 plan). Nothing is removed for having "recommendation" in its name — only for
       reading the legacy tables. `posts.post_type = 'recommendation'` untouched throughout
-  - [ ] 4.3 Gate 1 complete write freeze: revoke `anon`/`authenticated` INSERT/UPDATE/DELETE/
+  - [x] 4.3 Gate 1 complete write freeze: revoke `anon`/`authenticated` INSERT/UPDATE/DELETE/
         TRUNCATE/REFERENCES/TRIGGER (SELECT stays, nothing new granted) + drop write policies on
         the four legacy tables; narrow `service_role` to SELECT/DELETE only (Gate 4 never UPDATEs
         the legacy tables — review markers live on `reviews`); shared comment/interaction routines

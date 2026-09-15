@@ -1,27 +1,9 @@
 
-import { 
-  Recommendation,
-  RecommendationCategory, 
-  RecommendationVisibility,
-  Entity
-} from '@/services/recommendation/types';
+import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { RecommendationWithUser, PostWithUser } from '@/types/entities';
 
 export type FeedVisibility = 'for_you' | 'following';
-
-// Legacy types for backward compatibility - will be replaced in Phase 4
-export interface FeedItem extends Recommendation {
-  likes: number;
-  is_liked: boolean;
-  is_saved: boolean;
-  username: string | null;
-  displayName: string | null;
-  avatar_url: string | null;
-  comment_count: number;
-}
-
-export type RecommendationFeedItem = FeedItem;
 
 export interface PostFeedItem {
   id: string;
@@ -47,8 +29,8 @@ export interface PostFeedItem {
   tags?: string[];
 }
 
-// Current combined feed item type (legacy)
-export type CombinedFeedItem = FeedItem | PostFeedItem;
+// Feed item type (posts only — the legacy recommendations layer is frozen)
+export type CombinedFeedItem = PostFeedItem;
 
 // New unified feed item type (will replace CombinedFeedItem in Phase 4)
 export type UnifiedFeedItem = RecommendationWithUser | PostWithUser;

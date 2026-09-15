@@ -88,9 +88,9 @@ export const fetchComments = async (itemId: string, itemType: 'recommendation' |
 
 export const fetchCommentCount = async (itemId: string, itemType: 'recommendation' | 'post') => {
   try {
-    const tableName = itemType === 'recommendation' ? 'recommendations' : 'posts';
+    // Posts only — the legacy recommendations layer is frozen (Phase 4.3).
     const { data, error } = await supabase
-      .from(tableName)
+      .from('posts')
       .select('comment_count')
       .eq('id', itemId)
       .single();

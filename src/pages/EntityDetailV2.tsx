@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { MapPin, Star, Users, Calendar, Plus, Share, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image, Info, ArrowLeft, ArrowRight } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useEntityDetail } from '@/hooks/use-entity-detail';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { useAuth } from '@/contexts/AuthContext';

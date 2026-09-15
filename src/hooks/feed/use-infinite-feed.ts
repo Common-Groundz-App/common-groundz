@@ -68,21 +68,8 @@ export const useInfiniteFeed = (feedType: FeedVisibility) => {
       }
     );
 
-    // Subscribe to new recommendations
-    const recsChannel = realtimeService.subscribeToTable(
-      'recommendations',
-      {
-        onInsert: (newRec) => {
-          queryClient.invalidateQueries({
-            queryKey: ['infinite-feed', feedType, user.id]
-          });
-        }
-      }
-    );
-
     return () => {
       realtimeService.unsubscribe(postsChannel);
-      realtimeService.unsubscribe(recsChannel);
     };
   }, [user, feedType, queryClient]);
 

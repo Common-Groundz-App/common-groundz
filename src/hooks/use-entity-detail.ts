@@ -1,11 +1,10 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  fetchEntityBySlug, 
-  fetchEntityRecommendations, 
-  fetchEntityReviews, 
-  getEntityStats 
+import {
+  fetchEntityBySlug,
+  fetchEntityReviews,
+  getEntityStats
 } from '@/services/entityService';
 import { Entity } from '@/services/recommendation/types';
 import { subjectRelationFromKnownEntity } from '@/services/reviewSubjectRelation';
@@ -70,12 +69,12 @@ export const useEntityDetail = (slugOrId: string) => {
           setRedirectToSlug(fetchResult.canonicalSlug);
         }
 
-        // Steps 2-4: Fetch recommendations, reviews, and stats in parallel
+        // Steps 2-4: Fetch reviews and stats in parallel
+        // (the legacy recommendations layer is frozen — Phase 4.3)
         setLoadingStep(2);
         console.log('🚀 Starting parallel data fetch for entity:', entityData.id);
-        
-        const [entityRecommendations, entityReviews, entityStats] = await Promise.all([
-          fetchEntityRecommendations(entityData.id, user?.id || null),
+
+        const [entityReviews, entityStats] = await Promise.all([
           fetchEntityReviews(entityData.id, user?.id || null),
           getEntityStats(entityData.id)
         ]);
@@ -83,7 +82,7 @@ export const useEntityDetail = (slugOrId: string) => {
         console.log('✅ Parallel fetch completed');
 
         // Update all state at once after parallel fetch
-        setRecommendations(entityRecommendations);
+        setRecommendations([]);
         setReviews(attachPageEntityRelation(entityReviews, entityData));
         setStats(entityStats);
         
@@ -112,13 +111,12 @@ export const useEntityDetail = (slugOrId: string) => {
     try {
       setLoadingStep(2);
       
-      const [refreshedRecommendations, refreshedReviews, refreshedStats] = await Promise.all([
-        fetchEntityRecommendations(entity.id, user?.id || null),
+      const [refreshedReviews, refreshedStats] = await Promise.all([
         fetchEntityReviews(entity.id, user?.id || null),
         getEntityStats(entity.id)
       ]);
 
-      setRecommendations(refreshedRecommendations);
+      setRecommendations([]);
       setReviews(attachPageEntityRelation(refreshedReviews, entity));
       setStats(refreshedStats);
     } catch (err) {
