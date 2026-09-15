@@ -40,7 +40,7 @@ export async function shareUrl(url: string, title: string, copiedDescription = '
       textArea.remove();
       if (!successful) throw new Error('Copy command failed');
     }
-    toast({ title: 'Link copied', description: 'Post link copied to clipboard' });
+    toast({ title: 'Link copied', description: copiedDescription });
   } catch {
     toast({ title: 'Copy failed', description: 'Please copy the URL manually.', variant: 'destructive' });
   }
