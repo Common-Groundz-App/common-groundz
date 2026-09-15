@@ -27,7 +27,7 @@ interface CommentDialogProps {
   isOpen: boolean;
   onClose: () => void;
   itemId: string;
-  itemType: 'recommendation' | 'post';
+  itemType: 'post';
   onCommentAdded?: () => void;
   highlightCommentId?: string | null;
 }

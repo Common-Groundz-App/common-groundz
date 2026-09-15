@@ -3,7 +3,7 @@
 // PHASE 2 — DESTRUCTIVE CLEANUP (manual-only, hard-capped).
 //
 // Scans `post_media` for objects older than MIN_AGE_DAYS that are NOT
-// referenced by any post / review / review_update / recommendation /
+// referenced by any post / review / review_update /
 // entity_photo / entity, and (when mode='execute') deletes them in batches.
 //
 // Guardrails:
@@ -112,13 +112,6 @@ async function collectReferencedUrls(): Promise<Set<string>> {
     const { data, error } = await supabase.from('review_updates').select('media');
     if (error) throw error;
     for (const row of data ?? []) addMediaArray((row as any).media);
-  }
-  {
-    const { data, error } = await supabase
-      .from('recommendations')
-      .select('image_url');
-    if (error) throw error;
-    for (const row of data ?? []) addUrl((row as any).image_url);
   }
   {
     const { data, error } = await supabase.from('entity_photos').select('url');

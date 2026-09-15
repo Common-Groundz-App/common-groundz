@@ -171,11 +171,8 @@ describe('getNotificationTargetRef', () => {
     }
   });
 
-  it('includes recommendation targets', () => {
-    expect(getNotificationTargetRef({ entity_type: 'recommendation', entity_id: REC_A })).toEqual({
-      entityType: 'recommendation',
-      entityId: REC_A,
-    });
+  it('excludes retired recommendation targets', () => {
+    expect(getNotificationTargetRef({ entity_type: 'recommendation', entity_id: REC_A })).toBeNull();
   });
 
   it('excludes follow rows, system rows and invalid ids', () => {
@@ -198,11 +195,11 @@ describe('collectTargetIds', () => {
       null,
     ]);
     expect(result.post).toEqual([POST_A, POST_B]);
-    expect(result.recommendation).toEqual([REC_A]);
+    expect((result as Record<string, string[]>).recommendation).toBeUndefined();
   });
 
   it('returns empty buckets for no eligible rows', () => {
-    expect(collectTargetIds([])).toEqual({ post: [], recommendation: [] });
+    expect(collectTargetIds([])).toEqual({ post: [] });
   });
 });
 

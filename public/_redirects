@@ -7,7 +7,6 @@
 /settings    /index.html   200
 /search/*    /index.html   200
 /post/*    /index.html   200
-/recommendations/*    /index.html   200
 /entity/*    /index.html   200
 /place/*    /index.html   200
 /movie/*    /index.html   200

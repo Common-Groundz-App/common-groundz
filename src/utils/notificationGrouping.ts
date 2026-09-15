@@ -11,7 +11,7 @@
  * rows. Group counts are presentation only and must never be substituted for
  * `unreadCount`, `loadedUnreadCount` or `hasMore`.
  *
- * v1 groups top-level post/recommendation LIKES only. Comments, mentions,
+ * v1 groups top-level post LIKES only. Comments, mentions,
  * replies, comment likes, follows and system rows always render as singletons,
  * because each of those has (or will have) a distinct per-comment destination.
  */
@@ -25,7 +25,7 @@ export const GROUP_WINDOW_MS = 24 * 60 * 60 * 1000;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const GROUPABLE_ENTITY_TYPES = new Set(['post', 'recommendation']);
+const GROUPABLE_ENTITY_TYPES = new Set(['post']);
 
 export interface NotificationGroup {
   /** Unique per rendered instance — safe as a React key even when the same
@@ -192,8 +192,7 @@ export const getPreviewLine = (n: Notification): string | null => {
   return null;
 };
 
-const targetNoun = (n: Notification): string =>
-  n.entity_type === 'recommendation' ? 'your recommendation' : 'your post';
+const targetNoun = (_n: Notification): string => 'your post';
 
 /* --- Actor name resolution -------------------------------------------------
  *

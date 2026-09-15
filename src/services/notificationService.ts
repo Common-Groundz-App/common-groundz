@@ -503,9 +503,6 @@ export const getContentUrl = (type: EntityType, id: string, commentId?: string):
     case 'post':
       url = `/post/${id}`;
       break;
-    case 'recommendation':
-      url = `/recommendations/${id}`;
-      break;
 
     case 'profile':
       url = `/profile/${id}`;

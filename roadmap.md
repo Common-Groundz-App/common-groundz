@@ -240,9 +240,13 @@ Boundary rule (three separate concepts, never conflated):
         wildcards), full polymorphic-children and notification zero assertions; completed with
         zero aborts, all four legacy tables empty, markers cleared
         (evidence `docs/verification/phase-4-3-gate-4-cleanup.md`)
-  - [ ] 4.3 Gate 5 remove the route, `RecommendationView`, `RecommendationContentViewer` and the
-        legacy notification destination mappings; drop `recommendations.image_url` from both
-        orphan-media reference sets
+  - [x] 4.3 Gate 5 removed the route, `RecommendationView`, `RecommendationContentViewer`, the
+        `/recommendations/*` redirect line and the legacy notification destination mappings
+        (retired `entity_type='recommendation'` rows resolve to no destination instead of falling
+        through to their stored legacy `action_url`); content routes, thumbnails, grouping and
+        `commentsService` are post-only; `recommendations.image_url` dropped from both
+        orphan-media reference sets (last live readers). No schema changes
+        (evidence `docs/verification/phase-4-3-gate-5-surface-removal.md`)
   - [ ] 4.3 Gate 6 preservation + zero-dependency verification (recommendation posts,
         `reviews.is_recommended`, v4 recommending/Circle counts, Circle card, who-to-follow,
         fallback/network services, chat + journey cards), sweep, tests, typecheck, build, evidence

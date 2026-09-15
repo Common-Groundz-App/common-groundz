@@ -29,7 +29,7 @@ import { Popover, PopoverAnchor } from '@/components/ui/popover';
 
 interface InlineCommentThreadProps {
   itemId: string;
-  itemType: 'recommendation' | 'post';
+  itemType: 'post';
   highlightCommentId?: string | null;
   onCommentCountChange?: (count: number) => void;
 }
@@ -524,7 +524,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     ));
 
     try {
-      const result = await toggleCommentLike(comment.id, itemType === 'post' ? 'post' : 'recommendation', user.id);
+      const result = await toggleCommentLike(comment.id, 'post', user.id);
       if (result === null) {
         // Revert on failure
         setComments(prev => prev.map(c => 
