@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Heart, MessageCircle, MoreVertical, Share } from 'lucide-react';
+import { Heart, MessageCircle, Share } from 'lucide-react';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -17,7 +17,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { toast } from '@/hooks/use-toast';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { MediaItem } from '@/types/media';
@@ -40,17 +39,14 @@ const RecommendationCard = ({
   recommendation, 
   onLike, 
   highlightCommentId,
-  onDeleted,
   hideEntityFallbacks = false,
   compact = false
 }: RecommendationCardProps) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { requireAuth } = useAuthPrompt();
   const [isLiked, setIsLiked] = useState(recommendation.isLiked || false);
   const [likes, setLikes] = useState(recommendation.likes || 0);
   
-  const isOwner = user?.id === recommendation.user_id;
 
   // Get optimal entity image URL - prioritizes stored photos over proxy URLs
   const entityImageUrl = getOptimalEntityImageUrl(recommendation.entity);
