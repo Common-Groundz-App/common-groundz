@@ -422,7 +422,9 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
           id: entity.id,
           name: entity.name,
           type: entity.type,
-          image_url: entity.image_url
+          image_url: entity.image_url,
+          slug: entity.slug ?? null,
+          is_deleted: entity.is_deleted ?? false
         } : undefined,
         subjectRelation: resolveSubjectRelation(review.entity_id, subjectOutcome),
         comment_count: 0,
