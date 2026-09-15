@@ -24,6 +24,8 @@ import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ProfileDisplay } from '@/components/common/ProfileDisplay';
+import { shareUrl } from '@/utils/sharePost';
+import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 
 interface RecommendationCardProps {
   recommendation: any;
@@ -57,33 +59,15 @@ const RecommendationCard = ({
     entityImageUrl: entityImageUrl
   });
 
-  // Helper function to get entity route based on type and slug using canonical types
+  // Canonical entity destination. Phase 4.3 Gate 6: the app serves entity pages
+  // only under `/entity/:slug` (and `/entity/:parentSlug/:childSlug`), so the
+  // canonical helper is the single source of truth here — type-prefixed paths
+  // like `/place/:slug` are not routes and would resolve to "page not found".
   const getEntityRoute = (entity: any) => {
     if (!entity || !entity.slug || entity.is_deleted === true) {
       return null;
     }
-
-    const canonical = getCanonicalType(entity.type);
-    const typeToRoute: Record<EntityType, string> = {
-      [EntityType.Place]: '/place',
-      [EntityType.Food]: '/place',
-      [EntityType.Movie]: '/movie',
-      [EntityType.TVShow]: '/tv',
-      [EntityType.Book]: '/book',
-      [EntityType.Product]: '/product',
-      [EntityType.Course]: '/course',
-      [EntityType.App]: '/app',
-      [EntityType.Game]: '/game',
-      [EntityType.Experience]: '/experience',
-      [EntityType.Brand]: '/brand',
-      [EntityType.Event]: '/event',
-      [EntityType.Service]: '/service',
-      [EntityType.Professional]: '/professional',
-      [EntityType.Others]: '/entity'
-    };
-
-    const routePrefix = typeToRoute[canonical] || '/entity';
-    return `${routePrefix}/${entity.slug}`;
+    return getEntityUrlWithParent(entity);
   };
 
   // Process media items for proper fallback handling
@@ -156,8 +140,19 @@ const RecommendationCard = ({
     }
   };
 
-  const handleShare = () => {
-    // Handle share logic here
+  // Phase 4.3 Gate 6: sharing points at the canonical entity page. There is no
+  // standalone recommendation page any more, so a card without a linked, live
+  // subject has nothing to share and the control is hidden instead.
+  const entityRoute = getEntityRoute(recommendation.entity);
+  const canShare = Boolean(entityRoute);
+
+  const handleShare = async () => {
+    if (!entityRoute) return;
+    await shareUrl(
+      `${window.location.origin}${entityRoute}`,
+      recommendation.entity?.name || recommendation.title || 'Check out this recommendation on Common Groundz',
+      'Link copied to clipboard'
+    );
   };
 
   const getBadgeColor = (category: string) => {
@@ -287,18 +282,20 @@ const RecommendationCard = ({
               
             </div>
             
-            {/* Share button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex items-center gap-1 py-0 px-1 text-xs h-6"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleShare();
-              }}
-            >
-              <Share className="h-3 w-3" />
-            </Button>
+            {/* Share button — only when there is a canonical destination */}
+            {canShare && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center gap-1 py-0 px-1 text-xs h-6"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleShare();
+                }}
+              >
+                <Share className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -412,18 +409,20 @@ const RecommendationCard = ({
             
           </div>
           
-          {/* Share button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex items-center gap-1 py-0 px-2 sm:px-4"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleShare();
-            }}
-          >
-            <Share className="h-5 w-5" />
-          </Button>
+          {/* Share button — only when there is a canonical destination */}
+          {canShare && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex items-center gap-1 py-0 px-2 sm:px-4"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleShare();
+              }}
+            >
+              <Share className="h-5 w-5" />
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

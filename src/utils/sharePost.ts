@@ -1,8 +1,17 @@
 import { toast } from '@/hooks/use-toast';
 
 export async function sharePost(postId: string, title?: string) {
-  const url = `${window.location.origin}/post/${postId}`;
-  const shareTitle = title || 'Check out this post on Common Groundz';
+  return shareUrl(`${window.location.origin}/post/${postId}`, title || 'Check out this post on Common Groundz', 'Post link copied to clipboard');
+}
+
+/**
+ * Shares an absolute in-app URL using the same behaviour as post sharing:
+ * the native share sheet when available, otherwise a clipboard copy with a toast.
+ */
+export async function shareUrl(url: string, title: string, copiedDescription = 'Link copied to clipboard') {
+  const shareTitle = title;
+
+
 
   if (navigator.share) {
     try {
@@ -31,7 +40,7 @@ export async function sharePost(postId: string, title?: string) {
       textArea.remove();
       if (!successful) throw new Error('Copy command failed');
     }
-    toast({ title: 'Link copied', description: 'Post link copied to clipboard' });
+    toast({ title: 'Link copied', description: copiedDescription });
   } catch {
     toast({ title: 'Copy failed', description: 'Please copy the URL manually.', variant: 'destructive' });
   }
