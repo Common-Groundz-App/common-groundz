@@ -210,10 +210,11 @@ Boundary rule (three separate concepts, never conflated):
       reading the legacy tables. `posts.post_type = 'recommendation'` untouched throughout
   - [ ] 4.3 Gate 1 complete write freeze: revoke `anon`/`authenticated` INSERT/UPDATE/DELETE/
         TRUNCATE/REFERENCES/TRIGGER (SELECT stays, nothing new granted) + drop write policies on
-        the four legacy tables; narrow `service_role` to SELECT/UPDATE/DELETE only (no INSERT/
-        TRUNCATE/REFERENCES/TRIGGER); shared comment/interaction routines become post-only
-        with identical identity signatures/return shapes/owner/grants and pinned `search_path`,
-        legacy-only routines lose application EXECUTE; migration executes atomically
+        the four legacy tables; narrow `service_role` to SELECT/DELETE only (Gate 4 never UPDATEs
+        the legacy tables — review markers live on `reviews`); shared comment/interaction routines
+        become post-only with identical identity signatures/return shapes/owner/grants and pinned
+        `search_path`; legacy-only routines lose EXECUTE from PUBLIC/anon/authenticated AND
+        `service_role` (Gate 4 uses direct audited DML); migration executes atomically
   - [ ] 4.3 Gate 2 client + Edge Function cutover (Recs tab, feed branch, search branch,
         entity-page legacy list, legacy helpers, comments item type, profile network check);
         `/recommendations/:id` deliberately stays alive as a controlled tombstone
