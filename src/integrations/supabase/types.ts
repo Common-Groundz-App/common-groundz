@@ -2940,45 +2940,6 @@ export type Database = {
           },
         ]
       }
-      recommendation_quality_scores: {
-        Row: {
-          created_at: string
-          entity_id: string | null
-          freshness_score: number
-          id: string
-          last_calculated: string
-          quality_score: number
-          recommendation_id: string | null
-          relevance_score: number
-          social_proof_score: number
-          spam_score: number
-        }
-        Insert: {
-          created_at?: string
-          entity_id?: string | null
-          freshness_score?: number
-          id?: string
-          last_calculated?: string
-          quality_score?: number
-          recommendation_id?: string | null
-          relevance_score?: number
-          social_proof_score?: number
-          spam_score?: number
-        }
-        Update: {
-          created_at?: string
-          entity_id?: string | null
-          freshness_score?: number
-          id?: string
-          last_calculated?: string
-          quality_score?: number
-          recommendation_id?: string | null
-          relevance_score?: number
-          social_proof_score?: number
-          spam_score?: number
-        }
-        Relationships: []
-      }
       recommendation_saves: {
         Row: {
           created_at: string
