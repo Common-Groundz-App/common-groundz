@@ -4728,13 +4728,6 @@ export type Database = {
           recommendation_count: number
         }[]
       }
-      get_recommendation_likes_by_ids: {
-        Args: { p_recommendation_ids: string[] }
-        Returns: {
-          like_count: number
-          recommendation_id: string
-        }[]
-      }
       get_review_likes_batch: {
         Args: { p_review_ids: string[] }
         Returns: {
@@ -4760,12 +4753,6 @@ export type Database = {
         Returns: {
           recommendation_count: number
           user_id: string
-        }[]
-      }
-      get_user_recommendation_likes: {
-        Args: { p_recommendation_ids: string[]; p_user_id: string }
-        Returns: {
-          recommendation_id: string
         }[]
       }
       get_user_review_likes: {
@@ -4814,10 +4801,6 @@ export type Database = {
       increment_image_enrich_rate_limit: {
         Args: { _user_id: string }
         Returns: number
-      }
-      increment_recommendation_view: {
-        Args: { rec_id: string; viewer_id: string }
-        Returns: undefined
       }
       increment_search_rate_limit: {
         Args: { _user_id: string }
@@ -5103,10 +5086,6 @@ export type Database = {
       }
       toggle_post_save: {
         Args: { p_post_id: string; p_user_id: string }
-        Returns: boolean
-      }
-      toggle_recommendation_like: {
-        Args: { p_recommendation_id: string; p_user_id: string }
         Returns: boolean
       }
       toggle_review_like: {
