@@ -31,11 +31,8 @@ export const AUTH_CONFIG = {
  *   - Applied to INSERT policies on:
  *     - posts
  *     - post_comments
- *     - recommendation_comments
  *     - post_likes
- *     - recommendation_likes
  *     - follows
- *     - recommendations
  * 
  * PHASE 4 (COMPLETE): Rate Limiting + CAPTCHA
  *   - auth-gateway edge function handles rate limiting for all auth actions
