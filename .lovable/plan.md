@@ -1,95 +1,122 @@
 # Phase 4.5 — Remove the retired recommendation layer (destructive, approval-gated)
 
-Phase 4.4 proved every candidate is safe to remove. Phase 4.5 executes exactly that
-removal — nothing more. Scope comes verbatim from `docs/verification/phase-4-4-drop-readiness.md`.
+Revision 2. Both reviewers were right on all points, and two of their concerns are now
+settled with live catalogue evidence rather than deferred into execution:
+
+- **`recommendation_category` must be KEPT.** `recommendations_backup.category` is still
+  typed `recommendation_category` (verified live). Since the backup is intentionally
+  retained, the enum is retained with it. The former "migration D" is removed from Phase 4.5
+  and the enum is classified **KEEP — required by retained backup**. No known-to-fail drop
+  is attempted, and the backup is not altered merely to free the enum.
+- **Three of the seven routines are trigger functions** (verified live): 
+  `create_recommendation_comment_notification()` → `on_new_recommendation_comment` on
+  `recommendation_comments`; `create_recommendation_like_notification()` →
+  `on_new_recommendation_like`; `retract_recommendation_like_notification()` →
+  `on_delete_recommendation_like`, both on `recommendation_likes`. They cannot be dropped
+  before their tables, so routine removal is split into two migrations around the table drops.
+
+Also **not in scope, KEEP**: `reviews_apply_recommendation()` and its trigger
+`reviews_apply_recommendation_trigger` on `reviews` — live Phase 3C endorsement logic,
+merely shares the word "recommendation".
 
 ## What the user will notice
 
-Nothing. The retired tables are empty, the routines are unreachable from the app, and
-every live surface (profile Recs tab, entity page "recommending"/"from circle" counts,
-"Recommended by Your Circle", recommendation-type posts) is untouched.
+Nothing. The retired tables are empty, the routines are unreachable from the app, and every
+live surface (profile Recs tab, entity "recommending"/"from circle" counts, "Recommended by
+Your Circle", recommendation-type posts) behaves exactly as today.
 
 ## Must be preserved (explicit non-goals)
 
 - `recommendation_visibility` enum — used by `posts.visibility`, `reviews.visibility`,
-  `reviews_backup.visibility`. Never dropped.
-- `reviews.is_recommended` (endorsement truth), `posts.post_type='recommendation'`.
-- `update_updated_at_column()`, `retract_comment_notifications()` — shared functions; only
-  their retired trigger instances disappear (with their tables).
-- `recommendation_images` storage bucket and its 4 policies — live upload path.
-- `entity_stats_v2` and its hourly refresh job; all 5 cron jobs.
-- `recommendations_backup` (14 rows) and the other `*_backup` tables — retained; retention
-  revisited at the 4.5 close-out, not dropped here.
-- `audit.phase_4_3_*` manifest tables — owner-only, retained.
+  `reviews_backup.visibility`, plus the retained backup. Never dropped.
+- `recommendation_category` enum — KEEP (retained backup depends on it).
+- `reviews.is_recommended`, `posts.post_type='recommendation'`,
+  `reviews_apply_recommendation()` + its trigger.
+- Shared functions `update_updated_at_column()` and `retract_comment_notifications()` — only
+  their retired trigger instances disappear, with their tables.
+- `recommendation_images` storage bucket + its 4 policies (live upload path).
+- `entity_stats_v2` and all 5 cron jobs.
+- `recommendations_backup` (14 rows) and the other `*_backup` tables; `audit.phase_4_3_*`.
 
-## Execution order (no CASCADE at any step)
+## Final candidate list
 
-Step 0 — re-verify invariants (read-only, abort on any non-zero):
-- `recommendations`, `recommendation_comments`, `recommendation_likes`,
-  `recommendation_saves` all 0 rows.
-- 0 reviews with `recommendation_id IS NOT NULL` or `is_converted = true`.
-- 0 notifications with a legacy `action_url`.
-- Security linter baseline captured (expected 436).
+| Object | Action in 4.5 |
+|---|---|
+| `toggle_recommendation_like(uuid, uuid)` | DROP (migration A) |
+| `increment_recommendation_view(uuid, uuid)` | DROP (migration A) |
+| `get_recommendation_likes_by_ids(uuid[])` | DROP (migration A) |
+| `get_user_recommendation_likes(uuid[], uuid)` | DROP (migration A) |
+| `reviews_recommendation_id_fkey` | DROP (migration B) |
+| `reviews.recommendation_id` | DROP (migration B) |
+| `reviews.is_converted` | DROP (migration B) |
+| `recommendation_comments`, `recommendation_likes`, `recommendation_saves` | DROP (migration C, children first) |
+| `recommendations` | DROP (migration C, last) |
+| `create_recommendation_comment_notification()` | DROP (migration D, after its table) |
+| `create_recommendation_like_notification()` | DROP (migration D) |
+| `retract_recommendation_like_notification()` | DROP (migration D) |
+| `recommendation_category` | KEEP — required by retained backup |
+| Triggers, read policies, indexes on the retired tables | removed by their table drops |
 
-Step 1 — code-side deprecated fields (no behaviour change):
+## Execution order
+
+**Step 0 — preflight (read-only, abort on any failure).** Retired tables all 0 rows;
+0 reviews with `recommendation_id` or `is_converted = true`; 0 notifications with a legacy
+`action_url`; zero application/runtime references (repo sweep); re-confirm the enum and
+trigger-function dependencies above; freeze this candidate list; capture the security-linter
+baseline (expected 436).
+
+**Step 1 — code cleanup, then typecheck before any DDL.**
 - `src/types/entities.ts` — remove `recommendation_id?: string` from `CommentWithUser`.
 - `src/services/reviewService.ts` — remove the deprecated `recommendation_id` /
-  `is_converted` type note/fields.
+  `is_converted` type fields and note.
 - `src/config/authConfig.ts` — tidy the historical comment naming the retired tables.
 
-Step 2 — migration A: drop the 7 retired routines by full signature.
-`toggle_recommendation_like(uuid, uuid)`, `increment_recommendation_view(uuid, uuid)`,
-`get_recommendation_likes_by_ids(uuid[])`, `get_user_recommendation_likes(uuid[], uuid)`,
-`create_recommendation_comment_notification()`,
-`create_recommendation_like_notification()`,
-`retract_recommendation_like_notification()`.
+**Migration A — standalone RPCs** (zero trigger dependants). Guard: each routine exists with
+the expected signature and has no dependant beyond itself; then `DROP FUNCTION` by full
+signature.
 
-Step 3 — migration B: the reviews marker columns.
-1. `ALTER TABLE public.reviews DROP CONSTRAINT reviews_recommendation_id_fkey;`
-2. `ALTER TABLE public.reviews DROP COLUMN recommendation_id;`
-3. `ALTER TABLE public.reviews DROP COLUMN is_converted;`
-Guard in the same transaction: re-assert 0 marker rows before dropping.
+**Migration B — reviews marker columns.** Guard: 0 marker rows (re-asserted inside the
+transaction) and no policy/index/check/view/routine reads either column; then drop the FK,
+then `recommendation_id`, then `is_converted`.
 
-Step 4 — migration C: the tables, children first, no CASCADE.
-`recommendation_comments`, `recommendation_likes`, `recommendation_saves`, then
-`recommendations`. Their triggers, read policies and indexes are owned by the drops.
+**Migration C — retired tables.** Guard: each table empty and no external dependant besides
+the known children/FKs; then drop `recommendation_comments`, `recommendation_likes`,
+`recommendation_saves`, then `recommendations`. Their triggers, read policies and indexes are
+owned by the drops.
 
-Step 5 — migration D: `DROP TYPE public.recommendation_category;`
-(proven used only by `recommendations` and `recommendations_backup` — the latter's column
-type must be re-checked first; if `recommendations_backup.category` still uses it, keep the
-enum and record it as BLOCKED-BY-RETAINED-BACKUP instead of forcing a change).
+**Migration D — retired trigger functions**, now dependency-free. Guard: no trigger
+references them; then drop the three by full signature.
 
-Step 6 — regenerate the database types once (single regeneration, after all DDL).
+**Step 2 — regenerate the database types once**, after the final schema state is known.
 
-Step 7 — verification and evidence:
-- Retired tables/routines/columns/type absent from the live catalogues.
-- Preservation checks: `recommendation_visibility` intact with its 3 columns;
-  `reviews.is_recommended` and endorsement counts unchanged (58 endorsements);
-  5 cron jobs unchanged; `recommendation_images` bucket + 4 policies intact;
-  `entity_stats_v2` refreshes; shared functions and their remaining triggers intact.
-- Security linter delta vs the captured baseline; explain any change.
-- Repo-wide sweep: zero references to the dropped identifiers outside historical
-  migrations, docs and archived plans.
-- Full test suite, typecheck, build.
-- Write `docs/verification/phase-4-5-removal.md` (object, action, proof, reversibility) and
-  tick `roadmap.md`.
+**Step 3 — verify and record.** Dropped objects absent from the live catalogues; preservation
+checks (both enums intact with their remaining columns, `reviews.is_recommended` and the 58
+endorsements unchanged, 5 cron jobs, storage bucket + 4 policies, `entity_stats_v2` refresh,
+shared functions and their remaining triggers, `reviews_apply_recommendation` intact);
+security-linter delta vs baseline with any change explained; repo-wide sweep showing no
+references outside historical migrations, docs and archived plans; full test suite, typecheck,
+build. Evidence in `docs/verification/phase-4-5-removal.md`; `roadmap.md` updated with the
+accurate status.
 
-## Halt rule
+## Halt rule (dependency-aware)
 
-Any unexpected dependant, non-zero invariant, or failed guard halts **that candidate only**;
-the remaining independent steps continue, and the halted item is recorded as BLOCKED with
-its exact dependant. No CASCADE is ever used to force a drop.
+No CASCADE, ever. An unexpected dependant halts that candidate **and every later step whose
+safety depended on it** — e.g. if a table cannot be dropped, migration D is skipped rather
+than forced. Independent steps continue. Each blocked item is recorded with its exact
+dependant.
+
+## Completion status
+
+- An approved **KEEP** disposition (the enum) does not block completion — it is a recorded
+  scope decision.
+- Any **unexpected blocked in-scope candidate** means Phase 4.5 is **partially complete**;
+  the roadmap records partial completion with the exact blocked objects, not a full tick.
+- Phase 4.5 is fully complete only when every in-scope candidate in the table above is
+  removed and all verification checks pass.
 
 ## Reversibility
 
 Routines, policies, triggers, constraints and the two reviews columns are re-creatable from
 migration history. The four table drops are irreversible, but all four are empty, so no data
-is at risk. `recommendations_backup` remains as the pre-cleanup snapshot.
-
-## Technical notes
-
-- One `supabase--migration` call per step (A–D) so a failure isolates cleanly; each is a
-  single transaction with its own guards.
-- Migration D is the only step that can be skipped without affecting the rest.
-- No data-changing SQL, no re-clearing of review markers (Gate 4 already did that), no
-  changes to grants on surviving objects.
+is at risk; `recommendations_backup` remains the pre-cleanup snapshot. Backup retention is
+revisited at the 4.5 close-out, together with the enum that depends on it.
