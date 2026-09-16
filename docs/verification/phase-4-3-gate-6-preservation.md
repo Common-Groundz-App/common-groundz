@@ -43,7 +43,7 @@ No `.sql` file under `supabase/functions/` mentions the legacy layer any more.
 
 | Check | Level | Result |
 |-------|-------|--------|
-| Recs card click routes to the canonical entity page | T + M | **PASS** static/live route (destination is `/entity/:slug`, which loads). Authenticated click-through **BLOCKED** (see §6) |
+| Recs card click routes to the canonical entity page | T + M | **PASS** — static/live route confirmed; signed-in click-through verified by the project owner on 2026-09-16 (§6) |
 | Share produces the canonical entity URL, never a retired URL | T | **PASS** |
 | No dead comment affordance on the card | T | **PASS** (comment-count controls removed in Gate 5; none reintroduced) |
 | `/recommendations/:id` does not resolve live | R | **PASS** — renders the 404 page |
@@ -56,9 +56,9 @@ No `.sql` file under `supabase/functions/` mentions the legacy layer any more.
 |---------|-------|--------|
 | `posts.post_type='recommendation'` behaves as a normal post (feed, detail, notifications on the post path, comments, likes) | T | **PASS** — comment/notification handling is post-only end to end; 633/633 tests |
 | `reviews.is_recommended` untouched; 58 public published endorsements present | R | **PASS** (post-cleanup observation) |
-| Profile Recs tab retained, endorsement-backed (`ProfileRecommendations` → `useRecommendations` → `reviewService.fetchUserRecommendations` → `reviews.is_recommended`) | T | **PASS**; authenticated render **BLOCKED** (guest profiles are gated by design) |
+| Profile Recs tab retained, endorsement-backed (`ProfileRecommendations` → `useRecommendations` → `reviewService.fetchUserRecommendations` → `reviews.is_recommended`) | T + M | **PASS** — signed-in render verified by the project owner on 2026-09-16 (§6) |
 | Entity v4 recommending count | R | **PASS** — "6 recommending" on `/entity/isha-foundation-chikkaballapura`, matching the live distinct-endorser count (6) |
-| "Recommended by Your Circle" card | R (guest) | **PASS** — renders with the guest conversion prompt; signed-in circle count **BLOCKED** |
+| "Recommended by Your Circle" card | R | **PASS** — guest render verified; signed-in circle counts and card verified by the project owner on 2026-09-16 (§6) |
 | `UserRecommendationCard`, `fallbackRecommendationService`, `networkRecommendationService`, `ChatRecommendationCards`, `JourneyRecommendationCard`, who-to-follow | T | **PASS** — unmodified, no legacy-table reads |
 
 Baseline note: the Gate 3 manifest captured only the six converted reviews' markers, not
