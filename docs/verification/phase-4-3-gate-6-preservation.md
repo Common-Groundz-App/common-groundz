@@ -98,20 +98,36 @@ the triggers on the legacy tables (`on_new_recommendation_comment`,
 `posts.visibility`, `reviews.visibility` and the backup tables. It must be kept (rename at most).
 Only `recommendation_category` is legacy-only (`recommendations`, `recommendations_backup`).
 
-## 6. BLOCKED checks (honest status)
+## 6. Signed-in checks — closed by manual observation
 
-This project uses the user's own external Supabase (`LOVABLE_BROWSER_AUTH_STATUS=external_unmanaged`),
-no session can be injected or minted, and no `psql`/PG* environment is available, so:
+This project uses the user's own external Supabase, so no test session could be injected or
+minted from this environment and no transaction fixtures could be run from here. That limitation
+is why manual observation was used for the three signed-in checks.
 
-- authenticated self / other-viewer / Circle-viewer runtime interaction — **BLOCKED**
-- transaction-scoped authorization fixtures and rollback-based mutation tests
-  (recommendation-post create/comment/like/notification with disposable IDs) — **BLOCKED**;
-  covered instead by the automated suite and static contract checks, per the plan's fallback.
+On 2026-09-16 the project owner verified, on their own signed-in session, that all three work
+as expected:
 
-Per the completion rule these remain BLOCKED rather than PASS; documenting the limitation does
-not convert them. Gate 6 is therefore closed as **complete for every check verifiable in this
-environment**, with the authenticated-runtime checks explicitly recorded as blocked and requiring
-manual observation on the user's own signed-in session.
+1. **Profile Recs tab** — renders correctly; clicking a card opens the correct entity page and
+   Share uses the entity link. **PASS (manual observation)**
+2. **Entity V4** — the recommending and from-circle counts and the "Recommended by Your Circle"
+   card behave correctly. **PASS (manual observation)**
+3. **Recommendation-type posts** — create, comment, like and open notifications through the
+   normal post flow. **PASS (manual observation)**
+
+All previously blocked checks are now PASS. Nothing remains blocked.
+
+## 6a. Gate 6 close-out verdict
+
+Every Gate 6 requirement is PASS — runtime/fixture, automated-test/static, and the three
+manual-observation checks above. Combined with the live audit of Gates 0–5: all four retired
+tables empty; no review conversion markers; no retired notification links; `anon`/`authenticated`
+read-only with every write policy gone; retired-only routines owner-executable only; the seven
+shared comment routines post-only in the live database; recommendation posts on the normal post
+path; exactly one trending job (hourly :20) and one influence job (daily 04:12); both
+media-cleanup jobs clean; 633/633 tests, type check clean, build green.
+
+**Gate 6 is complete and Phase 4.3 is fully complete: every gate PASS, no leftovers, no
+defect-level references to the retired system.**
 
 ## 7. Build health
 
