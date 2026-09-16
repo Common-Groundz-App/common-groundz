@@ -275,9 +275,13 @@ Boundary rule (three separate concepts, never conflated):
       routine signatures; trigger instances vs shared functions; backup retention decisions;
       zero UNRESOLVED; authoritative no-CASCADE 4.5 order; evidence
       `docs/verification/phase-4-4-drop-readiness.md`)
-- [ ] 4.5 Separately approved schema migration: drop the recommendation tables, `recommendation_category`,
-      `reviews.recommendation_id`, `reviews.is_converted`, and the obsolete routines/triggers/policies/indexes.
-      KEEP `recommendation_visibility` — it types `posts.visibility` and `reviews.visibility` (rename at most).
+- [x] 4.5 Separately approved schema removal executed (2026-09-16): the four retired tables,
+      the seven retired routines, `reviews.recommendation_id` (+ FK) and `reviews.is_converted` dropped —
+      no CASCADE, guarded single-transaction migrations, typecheck before DDL, types regenerated once.
+      KEPT: `recommendation_visibility` (types posts/reviews/backups) and `recommendation_category`
+      (required by the retained `recommendations_backup`); backup/audit retention deferred to close-out.
+      Preservation verified (58 endorsements, 5 cron jobs, bucket policies, entity_stats_v2); linter 436→426,
+      all deltas explained; 633/633 tests, build OK. Evidence `docs/verification/phase-4-5-removal.md`
 
 ## Phase 5 — the feed card (after Phase 4)
 
