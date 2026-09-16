@@ -56,7 +56,6 @@ export interface ReviewWithUser extends WithUserProfile, InteractionData, Timest
 // Base comment with user profile
 export interface CommentWithUser extends WithUserProfile, CommentMetadata {
   // Specific fields for different comment types
-  recommendation_id?: string;
   post_id?: string;
   review_id?: string;
 }
