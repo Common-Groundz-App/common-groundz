@@ -3096,14 +3096,12 @@ export type Database = {
           has_timeline: boolean | null
           id: string
           image_url: string | null
-          is_converted: boolean
           is_recommended: boolean | null
           is_verified: boolean | null
           latest_rating: number | null
           media: Json | null
           metadata: Json | null
           rating: number
-          recommendation_id: string | null
           status: string
           subtitle: string | null
           timeline_count: number | null
@@ -3128,14 +3126,12 @@ export type Database = {
           has_timeline?: boolean | null
           id?: string
           image_url?: string | null
-          is_converted?: boolean
           is_recommended?: boolean | null
           is_verified?: boolean | null
           latest_rating?: number | null
           media?: Json | null
           metadata?: Json | null
           rating: number
-          recommendation_id?: string | null
           status?: string
           subtitle?: string | null
           timeline_count?: number | null
@@ -3160,14 +3156,12 @@ export type Database = {
           has_timeline?: boolean | null
           id?: string
           image_url?: string | null
-          is_converted?: boolean
           is_recommended?: boolean | null
           is_verified?: boolean | null
           latest_rating?: number | null
           media?: Json | null
           metadata?: Json | null
           rating?: number
-          recommendation_id?: string | null
           status?: string
           subtitle?: string | null
           timeline_count?: number | null
@@ -3192,13 +3186,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entity_stats_v2"
             referencedColumns: ["entity_id"]
-          },
-          {
-            foreignKeyName: "reviews_recommendation_id_fkey"
-            columns: ["recommendation_id"]
-            isOneToOne: false
-            referencedRelation: "recommendations"
-            referencedColumns: ["id"]
           },
         ]
       }
