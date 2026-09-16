@@ -205,7 +205,7 @@ Boundary rule (three separate concepts, never conflated):
       Evidence: `docs/verification/phase-4-2b4a-proof-gate.md` §9
 
 
-- [ ] 4.3 Remove the legacy application layer **and** its dummy data together, in six gates
+- [x] 4.3 Remove the legacy application layer **and** its dummy data together, in six gates
       (revision 5 plan). Nothing is removed for having "recommendation" in its name — only for
       reading the legacy tables. `posts.post_type = 'recommendation'` untouched throughout
   - [x] 4.3 Gate 1 complete write freeze: revoke `anon`/`authenticated` INSERT/UPDATE/DELETE/
@@ -263,9 +263,12 @@ Boundary rule (three separate concepts, never conflated):
         replacement navigation, which used non-existent type-prefixed paths — now
         `getEntityUrlWithParent` (`/entity/:slug`). Two dead pre-freeze snapshot files deleted
         (`supabase/functions/get_comments_with_profiles.sql`, `increment_comment_count.sql`).
-        BLOCKED (external Supabase, no session, no psql): authenticated/Circle-viewer runtime
-        interaction and rollback-based mutation fixtures — covered by automated tests + static
-        contract only (evidence `docs/verification/phase-4-3-gate-6-preservation.md`)
+        Signed-in checks closed by owner manual observation on 2026-09-16 (external Supabase,
+        no mintable session): Recs tab + card click-through + Share, Entity V4
+        recommending/from-circle counts + Circle card, recommendation-post create/comment/
+        like/notification — all verified working as expected. Gate 6 and Phase 4.3 are
+        fully complete, every gate PASS, no leftovers, no defects
+        (evidence `docs/verification/phase-4-3-gate-6-preservation.md`)
 
 - [ ] 4.4 Verify zero remaining dependencies in code, routines, policies, triggers and indexes
 - [ ] 4.5 Separately approved schema migration: drop the recommendation tables, `recommendation_category`,
