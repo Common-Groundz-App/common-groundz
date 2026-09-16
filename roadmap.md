@@ -270,7 +270,11 @@ Boundary rule (three separate concepts, never conflated):
         fully complete, every gate PASS, no leftovers, no defects
         (evidence `docs/verification/phase-4-3-gate-6-preservation.md`)
 
-- [ ] 4.4 Verify zero remaining dependencies in code, routines, policies, triggers and indexes
+- [x] 4.4 Verify zero remaining dependencies in code, routines, policies, triggers and indexes
+      (read-only proof gate, 2026-09-16: structural + textual + operational layers; exact
+      routine signatures; trigger instances vs shared functions; backup retention decisions;
+      zero UNRESOLVED; authoritative no-CASCADE 4.5 order; evidence
+      `docs/verification/phase-4-4-drop-readiness.md`)
 - [ ] 4.5 Separately approved schema migration: drop the recommendation tables, `recommendation_category`,
       `reviews.recommendation_id`, `reviews.is_converted`, and the obsolete routines/triggers/policies/indexes.
       KEEP `recommendation_visibility` — it types `posts.visibility` and `reviews.visibility` (rename at most).
