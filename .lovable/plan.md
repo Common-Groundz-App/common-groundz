@@ -19,13 +19,13 @@ No `DROP`, no `ALTER`, no `CASCADE`, no data changes, no type regeneration. Any 
 
 ### 2.1 Provisional candidate inventory (disposition unknown until proven)
 
-Nothing below is safe until Phase 4.4 says so. Each item ends with exactly one disposition: **SAFE TO DROP IN 4.5**, **KEEP**, or **BLOCKED / NEEDS REVIEW**.
+Nothing below is safe until Phase 4.4 says so. Each item ends with exactly one disposition: **SAFE TO DROP IN 4.5**, **KEEP / EXCLUDE FROM 4.5**, **BLOCKED BY KNOWN DEPENDENCY**, or **UNRESOLVED / NEEDS REVIEW**.
 
 - Tables: `recommendations`, `recommendation_comments`, `recommendation_likes`, `recommendation_saves`.
 - Backup/archive relations, each audited separately: `recommendations_backup`, and every other `*_backup` relation in scope.
 - Columns: `reviews.recommendation_id` and its foreign key, `reviews.is_converted`.
 - Type: `recommendation_category`.
-- Routines: every candidate recorded as `schema.name(argument types)` from `pg_proc`, with overloads listed separately, never as a bare name.
+- Routines: every candidate recorded as `schema.name(argument types)` from `pg_proc`, with overloads listed separately, never as a bare name. The audit is seeded with the known legacy routine signatures identified in Phase 4.3, then expanded from the live catalogue — a routine already on the list can never be missed because a name search did not catch it.
 - Trigger instances on the retired tables, recorded as `trigger name ON table` and mapped to their trigger function, with that function's other live instances listed.
 - Read-only policies, indexes and constraints on the retired tables.
 
@@ -77,7 +77,7 @@ Phase 4.5 does not re-clear anything — Phase 4.3 already cleared the review ma
 
 Discovering an unexpected dependant does not end the phase. It stops that one candidate being called removable; the dependency is recorded as new evidence, investigated, given a supported disposition, and auditing of unrelated candidates continues.
 
-Phase 4.4 closes when every candidate has an evidence-backed disposition and no unresolved or unexplained finding remains. Candidates ending as KEEP or BLOCKED / NEEDS REVIEW are simply excluded from the Phase 4.5 removal list — their existence does not block closure. Only an unresolved surprise or an ambiguous candidate does.
+Phase 4.4 may close with candidates at **SAFE TO DROP IN 4.5**, **KEEP / EXCLUDE FROM 4.5**, or **BLOCKED BY KNOWN DEPENDENCY** — all three are evidence-backed dispositions, and the latter two simply stay out of the Phase 4.5 removal list. It must not close while any candidate remains **UNRESOLVED / NEEDS REVIEW**: zero unresolved items is the close-out rule.
 
 ### 2.7 Output and stop
 
