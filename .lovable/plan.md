@@ -67,17 +67,23 @@ Phase 4.5 does not re-clear anything — Phase 4.3 already cleared the review ma
 
 ### 2.5 My additions
 
-- **Preserve the Gate 3/4 audit manifest.** The owner-only `audit` schema holds the only record of what was deleted. Phase 4.4 records it as KEEP and confirms it is still inaccessible to every application role; it must never be swept up with the retired layer.
+- **Preserve the Gate 3/4 audit manifest, with a documented retention basis.** The owner-only `audit` schema holds the only record of what was deleted. Phase 4.4 records it as KEEP and documents: retention purpose, owner and grants, confirmed absence of application access, whether it contains personal identifiers, a retention duration or future review point, and confirmation that it sits outside the Phase 4.5 removal list — so KEEP never becomes indefinite unexplained retention.
 - **Fail-safe check on the reviews columns.** Before proposing the column drops, confirm no view, index, policy, routine or generated expression reads `reviews.recommendation_id` or `reviews.is_converted` — column drops are the one step here that can silently break a live surface.
 - **Rollback note per step.** For each proposed 4.5 step, state whether it is reversible and what recreating it would require, so a mid-phase stop is recoverable.
 - **Security-linter delta.** Record the linter count before and after the proof so Phase 4.5 can prove it introduced no new finding category.
 - **Deployed-versus-repo drift list.** Where any deployed Edge Function or database routine differs from the repository, record the drift explicitly — that mismatch has already caused stale-snapshot findings twice in this phase.
 
-### 2.6 Output and stop
+### 2.6 Completion rule (clarified)
 
-Evidence in `docs/verification/phase-4-4-drop-readiness.md`: the provisional inventory, per-object dependant evidence across all three proof layers, backup retention decisions, the three final buckets (SAFE TO DROP IN 4.5 / KEEP / BLOCKED-NEEDS REVIEW), the authoritative no-CASCADE drop order with reversibility notes, and any surprise found. Roadmap ticked only if nothing unexpected appeared.
+Discovering an unexpected dependant does not end the phase. It stops that one candidate being called removable; the dependency is recorded as new evidence, investigated, given a supported disposition, and auditing of unrelated candidates continues.
 
-Phase 4.4 stops there. Phase 4.5 removal needs its own approval.
+Phase 4.4 closes when every candidate has an evidence-backed disposition and no unresolved or unexplained finding remains. Candidates ending as KEEP or BLOCKED / NEEDS REVIEW are simply excluded from the Phase 4.5 removal list — their existence does not block closure. Only an unresolved surprise or an ambiguous candidate does.
+
+### 2.7 Output and stop
+
+Evidence in `docs/verification/phase-4-4-drop-readiness.md`, presented as an object-level table — object (exact identity), runtime references, schema references, operational references, data/size, disposition, proposed Phase 4.5 action — with the reproducible catalogue query and repository/operational search method attached to every row. Plus: backup retention decisions, shared-object exclusions, the three final buckets, the authoritative no-CASCADE order with reversibility notes, the linter delta, and the drift list.
+
+Phase 4.4 stops there. Nothing is dropped, altered or regenerated; Phase 4.5 removal needs its own approval.
 
 ### Must be preserved (already established)
 
