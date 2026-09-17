@@ -1,288 +1,260 @@
-# Phase 5 — Feed card hierarchy and type-aware content
+# Phase 5 — Incremental feed-card polish
 
-## Goal
+## Direction
 
-Redesign the existing post card into a clearer, more scannable card while preserving every post interaction and the Phase 4 boundary between:
+The current card anatomy is already good. Phase 5 will polish the real `PostFeedItem` in small, separately approved steps—not prototype or reconstruct the card.
 
-- editorial post types (`experience`, `review`, `recommendation`, `comparison`, `question`, `tip`);
-- review endorsement truth (`reviews.is_recommended`);
-- entity/Circle recommendation counts.
+The only planned visual changes are:
 
-Implementation proceeds one sub-phase at a time. Each sub-phase is reviewed and closed before the next begins.
+1. clearer header hierarchy;
+2. subtle spacing improvements;
+3. the post author’s own rating on review posts.
+
+Like, comment, save, share, media behavior, navigation, entity behavior, composer behavior, and Phase 4 recommendation semantics remain unchanged.
 
 ## Verified starting point
 
-- `src/components/feed/PostFeedItem.tsx` currently owns the header, title/body, media, entity/location tags, actions, edit/delete dialogs, and both feed/detail behavior in one component.
-- The same card renders in the home feed, hashtag pages, Entity V4 posts, the post detail page, and related-post lists.
-- The badge currently shares the timestamp line, the main sections have tight spacing, and the feed card has no post-local rating row.
-- `posts.structured_fields.rating` is the approved source for review-post rings. However, the main feed query, entity-post query, hashtag-post query, processor type, and `PostFeedItem` interface currently omit `structured_fields`; only the standalone post-detail query reads it.
-- Comparison posts already carry their linked subjects through `tagged_entities`. Question framing already exists in `structured_fields` (`options_considered`, `what_matters`, `budget`).
-- The detail page currently renders its own post-type badge and `StructuredFieldsDisplay` below `PostFeedItem`; this must be reconciled deliberately to avoid duplicate badges or ratings.
-- There are no focused `PostFeedItem` component tests today, so Phase 5 adds them before extraction.
+- `PostFeedItem` is shared by the home feed, hashtag results, Entity V4 posts, related-post lists, and post detail.
+- The post-type badge currently sits on the timestamp line.
+- The current body order is **title → prose → media → entity chips → location tags → actions**.
+- The detail page renders a second post-type badge and `StructuredFieldsDisplay`, whose rating would duplicate a rating added to the shared card.
+- Feed, entity, and hashtag post reads currently omit `structured_fields`; the detail read already includes it.
+- There are no focused automated tests for `PostFeedItem` today.
+
+## First implementation action
+
+Update `roadmap.md` to record Phase 5.0A–5.4 and the boundary that editorial post types, review-post ratings, and review endorsements are three separate concepts. Keep Phase 2.5B deferred.
+
+Then implement **5.0A only** and stop.
 
 ---
 
-## 5.0 — Prototype the hierarchy on the existing card
+## 5.0A — Header hierarchy only
 
-### Scope
+Implement directly on the real shared card.
 
-Work directly in `PostFeedItem`; do not create `FeedCardShell` yet.
+### Changes
 
-### Data prerequisite
+- Move the post-type badge into a protected trailing region beside the overflow menu.
+- Keep the avatar, display name, and username in the leading region.
+- Put timestamp, optional `edited`, and non-public visibility on their own second metadata line.
+- Ensure long display names and usernames cannot overlap or displace the badge/menu.
+- Share this new header anatomy with detail mode.
+- Remove the separate duplicate post-type badge from the detail page.
+- Preserve the existing rule that `experience` has no badge.
 
-Add `structured_fields` as a read-only post field everywhere that supplies `PostFeedItem`:
+### Frozen areas
 
-- `src/hooks/feed/api/posts/fetch-posts.ts`
-- `src/services/entityPostsService.ts`
-- `src/services/hashtagService.ts`
-- `src/hooks/feed/types.ts`
-- the existing post processor/type path
+Do not change:
 
-No query may read `reviews`, review timelines, entity aggregates, or endorsement RPCs for this card.
+- title, prose, media, entity chips, location tags, or their order;
+- action-row layout, icons, counts, handlers, authentication gates, or destinations;
+- card navigation, profile/entity links, owner-menu behavior, or detail comments;
+- any query or stored data.
 
-### Prototype anatomy
+### Verification and stop gate
 
-1. **Header grid**
-   - Keep avatar and identity on the left.
-   - Give the right side a stable trailing region containing the post-type badge and owner overflow menu.
-   - Allow long display names/handles to wrap or truncate within the identity region without colliding with the trailing controls.
-   - Put timestamp, optional `edited`, and non-public visibility on a dedicated second metadata line.
-   - Keep `experience` badge behavior consistent with the existing rule: no badge unless the product review explicitly changes that rule.
-
-2. **Content rhythm**
-   - Establish conditional spacing between header, title, post-local rating, prose, entity/location context, media, and actions.
-   - Render no empty wrappers or fixed-height gaps when a section is absent.
-   - Preserve the current three-line feed preview and untruncated detail behavior.
-   - Keep text-only cards compact.
-
-3. **Review rating prototype**
-   - For `post_type === 'review'`, render `ConnectedRingsRating` only when that post has a valid numeric `structured_fields.rating` in the accepted 1–5 range.
-   - Show the numeric value with the non-interactive rings.
-   - Render nothing when the field is absent or invalid.
-   - Do not infer a rating and do not consult `reviews`, `review_updates`, entities, timelines, aggregates, or recommendation intent.
-
-4. **Entity and media order**
-   - Use one explicit order for title/rating/prose/entity context/media/actions, matching the approved anatomy.
-   - Keep entity navigation, category hiding, lightbox/video behavior, and media aspect handling unchanged.
-   - Remove accidental double media margin by assigning vertical spacing at one ownership boundary only.
-
-5. **Actions**
-   - Visually separate the action row without changing like, comment, save, share, authentication gating, counts, or routes.
-   - Retain proper icon buttons and accessible names.
-
-6. **Detail-page compatibility**
-   - Decide explicitly in code whether the new header/rating anatomy is shared with detail mode or feed-only.
-   - If shared, remove the duplicate detail badge and suppress the duplicate rating inside `StructuredFieldsDisplay` while retaining its other structured fields.
-   - If feed-only, leave the current detail-only badge and structured field presentation unchanged.
-   - Do not alter inline comments or related experiences.
-
-### Tests and evidence
-
-Add focused tests for:
-
-- badge and overflow separation;
-- edited/visibility metadata;
-- valid review rating;
-- absent/invalid review rating;
-- no rings for recommendation, experience, tip, comparison, or question posts;
-- text-only, media-only, and entity-tagged cards;
-- feed truncation versus detail expansion;
-- unchanged like/comment/save/share destinations.
-
-Capture representative light/dark and mobile/desktop screenshots in `docs/verification/assets/phase-5/`, and record implementation evidence in `docs/verification/phase-5-feed-card.md`.
-
-### 5.0 gate
-
-Run focused tests, full Vitest, `tsgo --noEmit`, and the production build. Stop for review after the real-card prototype is visible.
+- Add focused header tests covering badge placement semantics, owner/non-owner menu state, edited/visibility metadata, and long identity text.
+- Inspect the two supplied card cases, a long-name mobile case, desktop, dark mode, and post detail.
+- Run focused tests, full Vitest, `tsgo --noEmit`, and the production build.
+- Record screenshots and results in `docs/verification/phase-5-feed-card.md`.
+- Stop for visual approval before 5.0B.
 
 ---
 
-## 5.1 — Review and approve the card anatomy
+## 5.0B — Spacing polish only
 
-### Required visual matrix
+Begin only after 5.0A is approved.
 
-Review the real card, not a detached mock, across:
+### Changes
 
-| Dimension | Required cases |
-| --- | --- |
-| Post type | experience, review with rating, review without rating, recommendation, comparison, question, tip |
-| Content | text-only, title-only, media-only, media-heavy, title + long prose |
-| Identity | long display name, long username, missing avatar |
-| Context | no entity, one entity, multiple entities, long entity names, category shown/hidden, location tags |
-| State | edited, public, Circle-only, private, owner menu, liked, saved, non-zero comments |
-| Surface | home feed, hashtag feed, Entity V4 posts, post detail, related posts |
-| View | narrow mobile, desktop, light mode, dark mode, reduced motion |
+Tune only the vertical rhythm between sections that actually exist:
+
+- header → title/body;
+- title → body;
+- body/media → entity context;
+- final content section → actions.
+
+Use conditional gaps so absent sections create no empty space. Keep text-only cards compact.
+
+### Explicit ordering rule
+
+Preserve the current order exactly:
+
+```text
+Header
+Title
+Body
+Media
+Entity chips
+Location tags
+Actions
+```
+
+The review rating added later in 5.0C may sit between title and body, but **media must remain before entity chips**. Phase 5.1 will not reconsider this order.
+
+### Frozen areas
+
+- Do not alter the action row itself; only the separation before it may change outside the row.
+- Do not alter media sizing, aspect handling, lightbox/video behavior, borders, or placement.
+- Do not alter entity-chip styling, category rules, or navigation.
+- Do not alter typography beyond what is strictly necessary to prevent overlap from 5.0A.
+
+### Verification and stop gate
+
+Compare text-only, title-only, media-heavy, entity-tagged, and sparse cards on mobile/desktop and light/dark. Run focused tests, full Vitest, `tsgo --noEmit`, and the production build; update the evidence document and stop for approval.
+
+---
+
+## 5.0C — Review-post rating only
+
+Begin only after 5.0B is approved.
+
+### Read-only data plumbing
+
+Add `structured_fields` to every post read that supplies the shared card:
+
+- main feed query;
+- entity-post query;
+- hashtag-post queries;
+- `PostFeedItem` type and existing processor path.
+
+This is read-only frontend data propagation. It adds no migration, RPC, write path, state, or review lookup.
+
+### Rating contract
+
+Render the existing non-interactive `ConnectedRingsRating` with its numeric value only when:
+
+- `post_type === 'review'`; and
+- `structured_fields.rating` is a finite number from 1 through 5.
+
+Placement is **title → rating → body**. Missing, non-numeric, below-1, or above-5 values render nothing.
+
+Never render this row for experience, recommendation, comparison, question, or tip posts.
+
+### Detail-page reconciliation
+
+The shared card header and rating anatomy also apply in detail mode.
+
+- The separate detail badge is removed in 5.0A.
+- The shared card owns the review rating.
+- `StructuredFieldsDisplay` keeps every other detailed field but must support suppressing its rating so detail pages show exactly one rating.
+- Related-post cards use the same shared rules.
+
+### Semantic boundary
+
+The card may read only that post’s `structured_fields.rating`. It must not read or infer from:
+
+- `reviews` or `reviews.is_recommended`;
+- review timelines or updates;
+- entity ratings or aggregate statistics;
+- Circle/recommender counts;
+- recommendation intent or recommendation-post type.
+
+### Verification and stop gate
+
+Test valid and invalid ratings, review without rating, every non-review type, feed/detail non-duplication, and all feed-producing query paths. Review mobile/desktop and light/dark screenshots. Run focused tests, full Vitest, `tsgo --noEmit`, and the production build; update evidence and stop for approval.
+
+---
+
+## 5.1 — Cross-card visual acceptance
+
+Review the finished small changes on the real application.
+
+### Required cases
+
+- the supplied CeraVe text review;
+- the supplied perfume recommendation with media;
+- review with and without rating;
+- text-only and title-only cards;
+- media-heavy card;
+- one and multiple entity chips;
+- long display name and username;
+- edited, public, Circle-only, and private metadata;
+- owner and non-owner cards;
+- home, hashtag, Entity V4, related posts, and post detail;
+- narrow mobile, desktop, light mode, dark mode, and reduced motion.
 
 ### Acceptance criteria
 
-- No overlap between identity, badge, visibility, or overflow controls.
-- No clipped badge or action row on narrow screens.
-- Text-only cards do not gain unnecessary height.
-- Media cards have consistent spacing without duplicated top margin.
-- Review rings are immediately scannable but do not dominate the title/body.
-- Entity type remains out of the header; category/context stays with its entity chip.
-- Keyboard focus, card navigation, nested controls, tooltips, and screen-reader labels remain coherent.
-- The existing post-detail content, comments, and related-post sections do not regress.
+- Identity, badge, and menu never overlap.
+- Timestamp/edited/visibility read as metadata, not as part of the badge.
+- Text-only cards remain compact.
+- Media remains before entity chips.
+- The existing action row looks and behaves exactly as before.
+- Review ratings are visible only when valid and never duplicate on detail pages.
+- No regressions in media, entity/profile links, card navigation, comments, or owner actions.
 
-### Decision record
+### Decision gate
 
-At this gate, record one of two outcomes in the evidence document:
+If the card now solves the visual problem, stop visual development and proceed directly to 5.4.
 
-1. **Shared anatomy approved** — proceed to 5.2 extraction.
-2. **Type/surface divergence required** — document which layouts remain separate and why; do not force them into one shell.
-
-Any visual corrections discovered here are made to the prototype before extraction. Stop for explicit anatomy approval.
+Do not create architecture or type-specific presentation merely because it appeared in an earlier roadmap.
 
 ---
 
-## 5.2 — Extract a shared shell only if earned
+## 5.2 — Optional extraction, only if justified
 
-### Preconditions
+This phase is skipped unless 5.1 identifies concrete duplication or maintainability risk caused by the approved changes.
 
-Begin only after 5.1 approves the anatomy and identifies genuinely shared regions.
+If justified, create a small presentational extraction only for proven shared header/rating layout. It must produce no visual or behavioral change. Keep interaction state and handlers in `PostFeedItem`.
 
-### Extraction
+Do not create a broad `FeedCardShell` unless the 5.1 evidence demonstrates a real need and the extraction materially clarifies multiple shared regions.
 
-Create a fresh, presentational `FeedCardShell` from the approved anatomy. It may own only the stable layout zones:
-
-- header identity;
-- trailing badge/menu region;
-- metadata line;
-- title;
-- optional type-specific slot;
-- prose/body;
-- entity/location context;
-- media;
-- actions.
-
-Keep behavior and data ownership in `PostFeedItem`:
-
-- like/save/comment/share handlers;
-- authentication and verification gates;
-- edit/delete state and dialogs;
-- navigation;
-- comment-count loading;
-- media/lightbox behavior.
-
-Use typed optional slots/props rather than branching on post type inside the shell. Do not copy or refactor from any retired recommendation card.
-
-### Conditional outcome
-
-If 5.1 proves comparison, question, detail, or another surface genuinely needs a different anatomy, retain a separate renderer or layout variant with an explicit reason. Shared extraction is not a completion requirement by itself; avoiding a false abstraction is acceptable.
-
-### Regression checks
-
-Run the 5.0 component tests against both the prototype behavior and extracted result. Capture before/after screenshots proving visual parity. Run full Vitest, typecheck, and build, then stop for review.
+Run focused tests, full Vitest, `tsgo --noEmit`, and the production build; prove screenshot parity and stop for approval.
 
 ---
 
-## 5.3 — Add explicit per-type slots
+## 5.3 — Deferred type-specific enhancements
 
-### Shared rule
+Question- and comparison-specific sections are not part of the current visual problem and are deferred by default.
 
-Per-type presentation consumes only fields already on the post and its existing `tagged_entities`. It does not read or write endorsement truth, entity scores, review aggregates, or recommendation counts.
+Only plan or implement them later if a separate review identifies a concrete user-facing deficiency and approves the desired presentation first. Recommendation, tip, and experience remain ordinary prose posts; no type receives a rating except review.
 
-### Type contracts
-
-1. **Review**
-   - Slot: non-interactive `ConnectedRingsRating` plus numeric value.
-   - Source: only `post.structured_fields.rating`.
-   - Valid 1–5 value: render.
-   - Missing/invalid value: render no rating slot.
-   - Keep all other review structured fields in their existing detail presentation unless separately approved.
-
-2. **Comparison**
-   - Slot: compared entities from the post's existing ordered `tagged_entities`.
-   - Preserve canonical entity navigation and category rules.
-   - Do not synthesize entities from prose or `winner` text.
-   - If fewer than two entities exist, fall back to ordinary prose/entity-chip presentation rather than fabricating a comparison.
-
-3. **Question**
-   - Slot: concise question framing from existing question fields (`options_considered`, `what_matters`, `budget`) when present.
-   - Avoid duplicating identical text already shown in the title/body.
-   - Missing structured fields fall back to ordinary prose.
-
-4. **Recommendation, tip, experience**
-   - No rating row.
-   - Preserve prose, tagged entities, media, and actions.
-   - A recommendation post remains a normal post and never contributes to `reviews.is_recommended` or entity/Circle endorsement counts.
-
-### Data and safety assertions
-
-- All feed-producing queries return the same post-local structured data needed by the slots.
-- No new state, table, RPC, Edge Function, enum value, composer option, or write path is introduced.
-- Existing canonical post types and provider/offering entity vocabulary remain unchanged.
-- Add unit/component tests for each type, malformed structured data, sparse content, and no cross-type leakage.
-
-### 5.3 gate
-
-Review all six types again on mobile/desktop and light/dark. Run focused tests, full Vitest, typecheck, and build. Stop for approval.
+Skipping 5.3 is an acceptable Phase 5 outcome and is not incomplete work.
 
 ---
 
 ## 5.4 — Final verification and close-out
 
-### Runtime verification
+### Runtime checks
 
-Verify on every live card surface:
+On home, hashtag, Entity V4, related-post, and post-detail surfaces, verify:
 
-- home feed;
-- hashtag results;
-- Entity V4 posts tab;
-- standalone post detail;
-- related-experience lists.
-
-Exercise:
-
-- card navigation and keyboard activation;
-- profile/entity links without triggering card navigation;
-- owner overflow actions;
-- like, comment, save, and share;
-- image/video opening and return behavior;
+- card, profile, and entity navigation;
+- owner overflow menu;
+- like, comment, save, and share unchanged;
+- image/video behavior unchanged;
 - edited and visibility metadata;
-- review rating presence/absence;
+- review rating presence/absence and no detail duplication;
 - all six post types.
 
 ### Accessibility and responsive checks
 
-- semantic heading order remains valid on feed and detail pages;
-- icon controls have names and visible focus states;
-- nested interactive controls do not trigger the card link;
-- text and controls do not overlap at narrow widths;
-- contrast works in light/dark modes;
-- reduced-motion behavior remains respected.
+- keyboard and screen-reader behavior remains coherent;
+- icon controls retain accessible names and visible focus;
+- nested controls do not trigger card navigation;
+- long text and controls do not overlap at narrow widths;
+- light/dark contrast and reduced motion remain valid.
 
-### Technical verification
+### Technical close-out
 
-- Full Vitest suite.
-- `tsgo --noEmit`.
-- Production build and newest preview build log.
-- Browser console/runtime/network check on the exercised surfaces.
-- Repository sweep proving no generic star rating was introduced and no Phase 4 legacy route/table dependency returned.
-- Confirm no card code reads `reviews.is_recommended`, review timelines, entity aggregate ratings, or endorsement-count RPCs.
-
-### Close-out
-
-Complete `docs/verification/phase-5-feed-card.md` with:
-
-- exact files and behavior changed per sub-phase;
-- screenshot matrix;
-- test/typecheck/build results;
-- any intentionally separate layouts from the 5.1 decision;
-- preservation checks for recommendation posts, endorsements, Entity V4 counts, and Circle surfaces.
-
-Only then mark 5.0–5.4 and the Phase 5 parent complete in `roadmap.md`.
-
----
+- Run the full Vitest suite, `tsgo --noEmit`, production build, and latest preview-log check.
+- Check browser console, runtime, and network signals on exercised surfaces.
+- Sweep the repository to prove no generic star rating or Phase 4 legacy dependency was introduced.
+- Confirm no card code reads endorsement truth, review timelines, entity aggregate ratings, or recommender-count RPCs.
+- Complete `docs/verification/phase-5-feed-card.md` with exact changes, screenshots, results, and any intentionally skipped optional phases.
+- Mark only completed/explicitly skipped Phase 5 tasks in `roadmap.md`.
 
 ## Non-negotiable boundaries
 
-- Do not change `reviews.is_recommended` or its resolver/trigger path.
-- Do not connect review posts to the reviews system.
-- Do not derive ratings from entities, reviews, timelines, recommendations, or inference.
-- Do not add or widen a Postgres enum.
-- Do not change composer type choices or post write behavior.
+- Preserve the current media-before-entity-chips order.
+- Preserve the action row’s layout and behavior exactly.
+- Preserve media presentation and behavior.
+- Preserve entity/category presentation and navigation.
+- Preserve composer options and post writes.
+- Do not change or connect to `reviews.is_recommended`.
 - Do not change Entity V4 recommending/from-Circle counts or the “Recommended by Your Circle” card.
-- Do not reintroduce any retired standalone-recommendation table, routine, route, or notification path.
-- Do not use generic stars; use the existing connected-rings component.
-- Do not begin a later sub-phase before the current gate is approved.
+- Do not add/widen database enums or reintroduce retired recommendation objects.
+- Use connected rings, never generic stars.
+- Implement one approved sub-phase at a time and stop at every gate.
