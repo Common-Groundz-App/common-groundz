@@ -4,7 +4,7 @@
 
 The current post card is structurally good. Phase 5 is a controlled polish pass, not a redesign.
 
-The next approved work should be only the smallest visible change: moving the post-type badge out of the timestamp line and into the top-right header area. After that, we inspect the real app before deciding whether any spacing or rating work is still needed.
+The next approved work should be only the smallest visible change: moving the post-type badge out of the timestamp line and into the top-right header area. After that, we inspect the real app before deciding whether any spacing or rating work is still needed. Spacing polish and review ratings are independently optional future decisions; neither is automatically approved by 5.0A, and skipping spacing does not block a later rating decision.
 
 ## Verified starting point
 
@@ -42,10 +42,12 @@ Date · edited
 
 ### Required header contract
 
-- The trailing region must be stable on every card, including owner, non-owner, badged, and unbadged cards.
+- When a badge or owner menu exists, place those controls in a right-side trailing region.
+- If a card has neither a badge nor an owner menu, do not reserve an empty trailing region.
 - Avatar stays fixed and must not shrink.
-- The identity text area is the only flexible/shrinking area.
-- Use one-line identity behavior: display name and handle should truncate within the available space rather than forcing a taller header by default.
+- Preserve the current `UsernameLink` rendering and existing display-name/username wrapping or truncation behavior.
+- Constrain only the available identity layout region as minimally as needed to prevent collision with the badge/menu.
+- Do not introduce new one-line truncation or wrapping behavior unless the first implementation proves it is required to protect the trailing controls.
 - The trailing badge/menu region must not be pushed off-screen or overlapped by long names.
 - Preserve current avatar size, identity typography, timestamp typography, and overall header density unless the smallest possible adjustment is required to prevent collision.
 - The purpose is hierarchy and placement, not a header restyle.
@@ -85,9 +87,9 @@ Do not change:
 
 ---
 
-## 5.0B — Optional spacing polish, only after 5.0A approval
+## 5.0B — Optional spacing polish, independently approved after 5.0A
 
-This phase starts only if the 5.0A screenshots show that spacing still needs polish.
+This phase starts only if the 5.0A screenshots show that spacing still needs polish and the change is explicitly approved. Skipping 5.0B does not block a later 5.0C rating decision.
 
 ### Allowed changes
 
@@ -126,9 +128,9 @@ Compare text-only, title-only, media-heavy, entity-tagged, and sparse cards on m
 
 ---
 
-## 5.0C — Optional review-post rating, only after 5.0B approval
+## 5.0C — Optional review-post rating, independently approved after 5.0A
 
-This phase starts only if we still want review ratings after seeing the header and spacing work.
+This phase starts only if review ratings are explicitly approved after seeing the real 5.0A result. It may happen whether 5.0B was completed or skipped.
 
 ### Read-only data plumbing
 
@@ -281,7 +283,7 @@ If 5.0C was implemented, also verify review rating presence/absence and no detai
 ## Non-negotiable boundaries
 
 - 5.0A changes badge placement only.
-- Preserve current avatar sizing, identity typography, timestamp typography, and header density.
+- Preserve current avatar sizing, identity typography, timestamp typography, header density, and identity wrapping/truncation behavior unless minimally necessary to prevent collision.
 - Preserve the current media-before-entity-chips order.
 - Preserve the action row’s layout and behavior exactly.
 - Preserve media presentation and behavior.
