@@ -44,3 +44,48 @@ post-local review ratings, and review endorsement truth remain separate concepts
 - `/tmp/browser/phase-5-0a/screenshots/mobile-feed-card.png`
 - `/tmp/browser/phase-5-0a/screenshots/mobile-long-name-dark.png`
 - `/tmp/browser/phase-5-0a/screenshots/desktop-detail.png`
+
+## 5.0C — post-local Review rating
+
+### Implemented
+
+- Added a compact horizontal connected-rings row to Review posts only.
+- Read the value only from the post's own `structured_fields.rating`.
+- Accepted only finite numeric values from 1 through 5; strings, arrays, nulls, malformed values,
+  out-of-range numbers, and stray ratings on other post types are ignored.
+- Carried `structured_fields` through home/following, entity, hashtag, and related-post reads.
+- Made the shared post card the single rating owner in feed and detail modes.
+- Suppressed the detail structured-fields copy of the rating and collapsed that section when no
+  other structured fields remain.
+
+### Preserved boundaries
+
+- No review-table, endorsement, entity-average, Circle, or recommendation-post lookup was added.
+- The 5.0A header, title/body, media-before-entity order, chips, action row, navigation, and write
+  behavior are unchanged.
+- No schema or generated database type changed.
+
+### Verification
+
+- Focused strict-validation and detail-reconciliation tests: PASS (21 tests).
+- Full Vitest suite: PASS (40 files, 654 tests).
+- TypeScript check (`tsgo --noEmit`): PASS.
+- Preview build: PASS.
+- Real public Review detail, desktop: PASS — one compact 4.0 rating row and one Review badge.
+- Real public Review detail, mobile (390 × 844): PASS — one 102 × 20 rating row without collision.
+- Dark theme: PASS — rating remains readable and correctly positioned.
+- Rating-only Review detail: PASS — rating appears once and the suppressed detail section leaves
+  no empty wrapper or unexplained spacing.
+- Public profile default tab: the sampled Review was not exposed there, so no feed-runtime claim is made;
+  shared query propagation and card rendering are covered by source inspection and automated tests.
+- Browser console: an existing comments RPC overload error remains on public post detail; it is unrelated
+  to 5.0C and does not affect rating rendering.
+- Project-wide lint remains blocked by the established unrelated backlog. The one newly touched broad
+  value type in `StructuredFieldsDisplay` was removed; no lint-baseline cleanup was included in this scope.
+
+### Screenshots
+
+- `/tmp/browser/phase-5-0c/screenshots/desktop-review-detail.png`
+- `/tmp/browser/phase-5-0c/screenshots/desktop-review-rating.png`
+- `/tmp/browser/phase-5-0c/screenshots/mobile-review-detail.png`
+- `/tmp/browser/phase-5-0c/screenshots/mobile-review-dark.png`

@@ -25,6 +25,7 @@ export interface PostFeedItem {
   comment_count: number;
   tagged_entities?: Entity[];
   media?: MediaItem[];
+  structured_fields?: Record<string, unknown> | null;
   status?: 'draft' | 'published' | 'failed';
   tags?: string[];
 }

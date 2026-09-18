@@ -39,6 +39,8 @@ import { feedbackActions } from '@/services/feedbackService';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 import { shouldHideCategory } from '@/services/categoryService';
+import ConnectedRingsRating from '@/components/recommendations/ConnectedRingsRating';
+import { getValidReviewPostRating } from './utils/postRating';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -101,6 +103,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   const isOwner = user?.id === post.user_id;
   const showTypeBadge = shouldShowTypeBadge(post.post_type ?? 'experience');
   const showTrailingControls = showTypeBadge || isOwner;
+  const reviewRating = getValidReviewPostRating(post.post_type, post.structured_fields);
   
   React.useEffect(() => {
     const getInitialCommentCount = async () => {
@@ -501,6 +504,18 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                 ) : (
                   <h3 className="font-semibold text-base mb-1">{post.title}</h3>
                 )
+              )}
+
+              {reviewRating !== null && (
+                <div data-testid="review-post-rating" className={cn("w-fit", hasTitle && "mb-1")}>
+                  <ConnectedRingsRating
+                    value={reviewRating}
+                    variant="badge"
+                    isInteractive={false}
+                    minimal={true}
+                    showValue={true}
+                  />
+                </div>
               )}
 
               {/* Post Content — only render when there is actual content */}

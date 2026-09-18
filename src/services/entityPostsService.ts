@@ -13,6 +13,7 @@ const POST_SELECT = `
   created_at,
   updated_at,
   media,
+  structured_fields,
   view_count,
   status,
   is_deleted,
