@@ -300,10 +300,14 @@ cross-read between them.
       compact connected rings, no endorsement/review/entity lookup, exactly once in shared feed/detail
       anatomy; verified on real public Review details at desktop/mobile/dark widths, including rating-only
       detail collapse; 654/654 tests, typecheck, and preview build pass. Stopped for visual approval
-- [ ] 5.1 Cross-card visual acceptance on real feed/detail surfaces; if accepted, skip optional architecture
-- [ ] 5.2 Optional extraction only if 5.1 proves a concrete shared-layout need; no visual change
-- [ ] 5.3 Deferred type-specific enhancements; skipping this is an acceptable Phase 5 outcome
-- [ ] 5.4 Responsive, accessibility, dark mode and full check-suite verification
+- [x] 5.1 Cross-card acceptance on real feed/detail surfaces — accepted with no design change; dispositions
+      recorded as PASS / TEST-STATIC-COVERED / NOT APPLICABLE (no FAIL, no unresolved BLOCKED)
+- [x] 5.2 Explicitly skipped — the small header and rating changes did not earn a `FeedCardShell` abstraction
+- [x] 5.3 Deferred — type-specific Question/Comparison layouts are separate future product work
+- [x] 5.4 Close-out verified — 654/654 tests, typecheck, production build, zero runtime page errors, one
+      rating per eligible Review card, keyboard/responsive/dark/reduced-motion checks, post-local data
+      boundary, and a baseline-aware sweep proving no new generic-star rating or legacy dependency.
+      Evidence: `docs/verification/phase-5-feed-card.md`. PHASE 5 FULLY COMPLETE
 
 ## Deferred
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
