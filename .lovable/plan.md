@@ -12,7 +12,7 @@ Implement Phase 5.0C only, then stop for visual approval. This is not approval f
 - The shared card does not currently receive or render `structured_fields` on home, entity, hashtag, or related-post reads.
 - Post detail already reads `structured_fields` and renders `StructuredFieldsDisplay` below the shared card.
 - `StructuredFieldsDisplay` currently includes the rating, so adding the rating to the shared card without reconciliation would duplicate it on Review detail pages.
-- The existing `ConnectedRingsRating` supports the required read-only compact presentation.
+- The existing `ConnectedRingsRating` supports the required read-only compact presentation through `variant="badge"`; its default `size="xs"` presentation is 120 × 120 and would make the card too tall.
 - A Review post's rating is stored locally in `posts.structured_fields.rating`; this is separate from review endorsements and entity-level ratings.
 
 ## First implementation action
@@ -31,18 +31,22 @@ Add `structured_fields` to the post reads that feed `PostFeedItem`:
 
 Extend the shared `PostFeedItem` type with nullable structured fields and preserve the value through the existing processor. Do not add a migration, RPC, write path, review query, or entity-rating query.
 
+Use a narrowly typed JSON-object shape rather than adding another broad `any` field.
+
 ### 2. Render one compact rating row in the shared card
 
 In `PostFeedItem`, derive a valid display rating only when all conditions are true:
 
 - `post_type === 'review'`;
-- `structured_fields` is an object;
+- `structured_fields` is a non-null object and not an array;
 - `structured_fields.rating` is a finite number;
 - the value is between 1 and 5 inclusive.
 
+Keep validation strict: accept numeric values such as `4` and `4.5`, but never coerce strings such as `"4"` or malformed JSON values. Put this validation in one focused helper so rendering and tests share one contract.
+
 Render the existing `ConnectedRingsRating` with explicit read-only compact props:
 
-- `size="xs"`;
+- `variant="badge"` for its existing 72 × 20 horizontal layout;
 - `isInteractive={false}`;
 - `minimal={true}`;
 - `showValue={true}`.
@@ -70,6 +74,8 @@ Add a narrow `showRating` option to `StructuredFieldsDisplay`, defaulting to its
 
 Also restrict `StructuredFieldsDisplay`'s own rating rendering to Review posts, preventing a stray `rating` key on another editorial type from displaying elsewhere.
 
+Calculate whether any section remains visible after rating suppression. If a Review contains only a rating and `showRating={false}`, return `null` instead of rendering an empty outer wrapper and unwanted detail-page whitespace.
+
 ## Frozen areas
 
 Do not change:
@@ -95,10 +101,11 @@ Add tests for:
 - Review with ratings 1, fractional valid values, and 5;
 - Review with no rating;
 - non-numeric, `NaN`/non-finite, below-1, and above-5 values;
+- array-valued and null `structured_fields`, plus numeric strings that must not be coerced;
 - every non-Review post type with a stray rating key;
 - title + rating + body ordering;
 - feed/detail exactly-once rating behavior;
-- `StructuredFieldsDisplay` retaining all non-rating fields when detail suppresses its rating;
+- `StructuredFieldsDisplay` retaining all non-rating fields when detail suppresses its rating, and returning `null` when nothing remains;
 - all feed-producing reads selecting and preserving `structured_fields`.
 
 ## Visual and technical verification
