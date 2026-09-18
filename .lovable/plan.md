@@ -53,7 +53,19 @@ On every accessible shared-card surface, verify:
 - all available editorial post types;
 - rating presence, absence, strict Review-only behavior, and feed/detail non-duplication.
 
-Classify anything unavailable in real data or inaccessible by viewer state as **BLOCKED** or **static/test-covered**, rather than claiming a runtime pass.
+Do not create comments or other persistent user data to prove behavior, and restore any like/save toggle exercised manually.
+
+### Verification dispositions
+
+Record every check as exactly one of:
+
+- **PASS** — verified at runtime.
+- **TEST/STATIC-COVERED** — no runtime fixture exists, but focused tests and code inspection conclusively cover the behavior.
+- **NOT APPLICABLE** — the state genuinely does not exist on the available surfaces or data.
+- **BLOCKED** — required behavior cannot be verified and no adequate alternate evidence exists.
+- **FAIL** — an actual defect.
+
+Only FAIL and unresolved BLOCKED items prevent Phase 5 from closing. Never manufacture data to convert a NOT APPLICABLE or TEST/STATIC-COVERED case into a runtime pass.
 
 ### Accessibility and responsive checks
 
@@ -62,10 +74,19 @@ Confirm keyboard navigation, accessible names, visible focus, nested-control beh
 ### Technical close-out
 
 - Run the focused rating/detail tests and the complete Vitest suite.
-- Run TypeScript validation, the production build, and lint; report exact results and distinguish pre-existing lint debt from Phase 5 regressions.
+- Run TypeScript validation, the production build, and lint. Pre-existing unrelated lint debt and console noise are non-blocking; only lint or console problems introduced or worsened by Phase 5 block the close-out.
 - Inspect the latest build, browser console, runtime, and network signals for exercised surfaces.
-- Sweep the repository to confirm no generic star rating or retired Phase 4 dependency was introduced.
 - Confirm the card reads only its post-local `structured_fields.rating`, never endorsement truth, review timelines, entity aggregates, Circle counts, or recommender-count routines.
+
+### Baseline-aware repository sweep
+
+A raw text search is not the standard, because `ConnectedRingsRating` already contains a pre-existing star icon used only by its non-minimal celebration presentation, and historical Phase 4 wording still appears in migrations, docs, and tests.
+
+The sweep must instead prove:
+
+- Phase 5 introduced no new generic-star rating;
+- the feed card renders the connected-rings component with the minimal presentation, so the existing celebration star does not appear in the feed rating;
+- every remaining star or legacy-terminology match is classified as pre-existing and unrelated, judged by active dependency rather than word occurrence.
 
 ## Evidence and roadmap
 
