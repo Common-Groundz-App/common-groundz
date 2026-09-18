@@ -43,8 +43,10 @@ Only Steps 1–4 are approved implementation work. The app-wide migration is a s
   - semibold 14px text with a 180px maximum label width;
   - the same natural wrapping for multiple entities.
 - The posted version omits all editing controls and adjusts only the trailing padding needed after removing the close control.
-- Use a real accessible button for navigation. Its accessible name identifies the entity; the adjacent thumbnail is decorative so assistive technology does not announce the same name twice.
+- Use the app’s established semantic navigation primitive: prefer a link when it is valid in the current card structure; otherwise retain the accessible `type="button"` plus `navigate(getEntityUrl(entity))` pattern. Do not introduce a new navigation architecture.
+- Preserve a visible keyboard focus indicator. The interaction’s accessible name identifies the entity; the adjacent thumbnail uses `alt=""` so assistive technology does not announce the same name twice.
 - Preserve the existing `navigate(getEntityUrl(entity))` destination and stop the surrounding post-card click from firing.
+- Isolate pointer and keyboard activation from the enclosing card so using the pill never triggers both destinations.
 
 ### Step 3 — Replace shared posted-card tags and remove category rows
 
@@ -58,6 +60,7 @@ Only Steps 1–4 are approved implementation work. The app-wide migration is a s
 
 - Verify one long-name entity, multiple entities, a missing image, a deliberately broken image, and an entity with a category.
 - Check desktop/mobile and light/dark presentation for wrapping, truncation, clipping, and overlap.
+- Capture the real two-entity Review card, the perfume/media card with its long entity name, and a controlled missing/broken-image case for visual approval.
 - Confirm media remains above the entity pills and the category row is gone.
 - Confirm entity navigation, the header, Review rating, title/body, location tags, action row, counts, comments, save, and share behavior are unchanged.
 - Run focused component tests, type validation, and inspect the latest preview build signal.
