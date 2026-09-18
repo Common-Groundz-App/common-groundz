@@ -92,7 +92,7 @@ The sweep must instead prove:
 
 Update the Phase 5 verification record with:
 
-- a PASS / FAIL / BLOCKED matrix for the required cases and surfaces;
+- a disposition matrix (PASS / TEST-STATIC-COVERED / NOT APPLICABLE / BLOCKED / FAIL) for the required cases and surfaces;
 - exact test, typecheck, build, lint, runtime, and accessibility results;
 - the accepted 5.1 decision and explicit 5.2 skip / 5.3 deferral;
 - any known unrelated console or lint issue, clearly separated from Phase 5.
@@ -102,7 +102,7 @@ The current screenshot references point to temporary browser paths. Label them a
 Mark 5.1 and 5.4 complete only when their checks pass, then mark 5.2 skipped and 5.3 deferred. Conclude with exactly one outcome:
 
 - **PHASE 5 FULLY COMPLETE — safe to move to the next phase**, or
-- **PHASE 5 NOT COMPLETE** with each failed or blocked item listed.
+- **PHASE 5 NOT COMPLETE** with each FAIL or unresolved BLOCKED item listed.
 
 ## Stop boundary
 
