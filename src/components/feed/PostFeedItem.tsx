@@ -99,6 +99,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   });
   
   const isOwner = user?.id === post.user_id;
+  const showTypeBadge = shouldShowTypeBadge(post.post_type ?? 'experience');
+  const showTrailingControls = showTypeBadge || isOwner;
   
   React.useEffect(() => {
     const getInitialCommentCount = async () => {
@@ -383,13 +385,13 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     >
       <CardContent className="px-3 sm:px-4 pt-2 pb-1 sm:pb-2">
         {/* User Info and Post Meta */}
-        <div className="flex justify-between items-start">
-          <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
-            <Avatar className="h-10 w-10 border">
+        <div className="flex items-start">
+          <div className="flex min-w-0 flex-1 items-center gap-3" onClick={e => e.stopPropagation()}>
+            <Avatar className="h-10 w-10 shrink-0 border">
               <AvatarImage src={post.avatar_url || undefined} alt={post.displayName || post.username || 'User'} />
               <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(post.displayName || post.username)}</AvatarFallback>
             </Avatar>
-            <div>
+            <div className="min-w-0">
               <UsernameLink 
                 userId={post.user_id} 
                 username={post.username}
@@ -410,16 +412,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                {shouldShowTypeBadge(post.post_type ?? 'experience') && (
-                  <span
-                    className={cn(
-                      'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none',
-                      getPostTypeColors(post.post_type ?? 'experience').pill
-                    )}
-                  >
-                    {getPostTypeLabel(post.post_type ?? 'experience')}
-                  </span>
-                )}
                 {post.visibility !== 'public' && (
                   <>
                     <span>·</span>
@@ -433,46 +425,63 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             </div>
           </div>
 
-          {isOwner && (
-            <div onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
-                    <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">More options</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {editAllowed ? (
-                    <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
-                      <Pencil className="h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                  ) : (
-                    <TooltipProvider delayDuration={150}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <DropdownMenuItem
-                            onClick={(e) => e.preventDefault()}
-                            onSelect={(e) => e.preventDefault()}
-                            className="flex items-center gap-2 opacity-50 cursor-not-allowed"
-                          >
-                            <Pencil className="h-4 w-4" /> Edit
-                          </DropdownMenuItem>
-                        </TooltipTrigger>
-                        <TooltipContent side="left">
-                          Edit window closed (1 hour limit)
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+          {showTrailingControls && (
+            <div
+              data-testid="post-header-trailing"
+              className="ml-2 flex shrink-0 items-center gap-1"
+              onClick={e => e.stopPropagation()}
+              onPointerDown={e => e.stopPropagation()}
+            >
+              {showTypeBadge && (
+                <span
+                  className={cn(
+                    'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none',
+                    getPostTypeColors(post.post_type ?? 'experience').pill
                   )}
-                  <DropdownMenuItem 
-                    onClick={handleDeleteClick} 
-                    className="text-destructive focus:text-destructive flex items-center gap-2"
-                  >
-                    <Trash2 className="h-4 w-4" /> Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                >
+                  {getPostTypeLabel(post.post_type ?? 'experience')}
+                </span>
+              )}
+              {isOwner && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                      <MoreVertical className="h-4 w-4" />
+                      <span className="sr-only">More options</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {editAllowed ? (
+                      <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
+                        <Pencil className="h-4 w-4" /> Edit
+                      </DropdownMenuItem>
+                    ) : (
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <DropdownMenuItem
+                              onClick={(e) => e.preventDefault()}
+                              onSelect={(e) => e.preventDefault()}
+                              className="flex items-center gap-2 opacity-50 cursor-not-allowed"
+                            >
+                              <Pencil className="h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                          </TooltipTrigger>
+                          <TooltipContent side="left">
+                            Edit window closed (1 hour limit)
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    <DropdownMenuItem 
+                      onClick={handleDeleteClick} 
+                      className="text-destructive focus:text-destructive flex items-center gap-2"
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           )}
         </div>

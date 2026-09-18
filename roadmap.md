@@ -283,19 +283,24 @@ Boundary rule (three separate concepts, never conflated):
       Preservation verified (58 endorsements, 5 cron jobs, bucket policies, entity_stats_v2); linter 436→426,
       all deltas explained; 633/633 tests, build OK. Evidence `docs/verification/phase-4-5-removal.md`
 
-## Phase 5 — the feed card (after Phase 4)
+## Phase 5 — incremental feed-card polish (after Phase 4)
 
-- [ ] 5.0 Prototype the hierarchy on the existing post card — post-type badge top-right in a defined
-      trailing region, timestamp on its own line, real spacing between header / title / rating / body /
-      chips / media / actions. No new shared architecture yet
-- [ ] 5.1 Review across every case (text-only, media-heavy, all six types, long username, long title,
-      many chips, narrow mobile, dark mode). **Gate: agree the card anatomy**
-- [ ] 5.2 Extract `FeedCardShell` only if the prototype earned the abstraction; built fresh from the
-      design notes, never refactored out of the legacy card
-- [ ] 5.3 Per-type slots — `review` → connected rings from that post's own `structured_fields.rating`
-      only (no review lookup, no entity aggregate, no inference, no timeline query); `comparison` →
-      compared entities; `question` → question framing; `recommendation` / `tip` / `experience` → prose,
-      no rating row
+Boundary: editorial post type, a review post's own `structured_fields.rating`, and review endorsement
+truth (`reviews.is_recommended`) are three separate concepts. Feed-card presentation must not infer or
+cross-read between them.
+
+- [x] 5.0A Badge placement only — moved the existing post-type badge from the metadata line to a
+      collapsing trailing region beside the owner menu; preserve all typography, density, identity
+      behavior, body ordering and actions; removed the duplicate detail-page badge. Verified on public
+      post detail at desktop/mobile/dark widths, a simulated long identity, and an unbadged experience;
+      633/633 tests, typecheck, and production build pass. Stopped for visual review
+- [ ] 5.0B Optional spacing polish — independently approved only if 5.0A shows a need; preserve
+      title → body → media → entity chips → location tags → actions and freeze the action row internally
+- [ ] 5.0C Optional review-post rating — independently approved whether 5.0B runs or is skipped;
+      post-local `structured_fields.rating` only, connected rings only, no endorsement/review/entity lookup
+- [ ] 5.1 Cross-card visual acceptance on real feed/detail surfaces; if accepted, skip optional architecture
+- [ ] 5.2 Optional extraction only if 5.1 proves a concrete shared-layout need; no visual change
+- [ ] 5.3 Deferred type-specific enhancements; skipping this is an acceptable Phase 5 outcome
 - [ ] 5.4 Responsive, accessibility, dark mode and full check-suite verification
 
 ## Deferred

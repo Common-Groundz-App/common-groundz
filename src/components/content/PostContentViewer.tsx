@@ -5,7 +5,6 @@ import PostFeedItem from '@/components/feed/PostFeedItem';
 import FeedSkeleton from '@/components/feed/FeedSkeleton';
 import InlineCommentThread from '@/components/comments/InlineCommentThread';
 import StructuredFieldsDisplay from '@/components/content/StructuredFieldsDisplay';
-import { shouldShowTypeBadge, getPostTypeLabel, getPostTypeColors } from '@/components/feed/utils/postUtils';
 import { cn } from '@/lib/utils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
@@ -409,21 +408,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
 
       {/* Detail-only content — keeps readable side padding on mobile */}
       <div className="px-4 sm:px-0">
-      {/* Post Type Badge (detail view) */}
-      {shouldShowTypeBadge(post.post_type ?? 'experience') && (
-        <div className="mt-2 mb-1 px-1">
-
-          <span
-            className={cn(
-              'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none',
-              getPostTypeColors(post.post_type ?? 'experience').pill
-            )}
-          >
-            {getPostTypeLabel(post.post_type ?? 'experience')}
-          </span>
-        </div>
-      )}
-
       {/* Structured Experience Fields */}
       {post.structured_fields && typeof post.structured_fields === 'object' && (
         <StructuredFieldsDisplay data={post.structured_fields} postType={post.post_type ?? 'experience'} />
