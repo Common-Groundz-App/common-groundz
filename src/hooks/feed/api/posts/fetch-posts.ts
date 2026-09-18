@@ -25,6 +25,7 @@ export const fetchPosts = async (
         updated_at,
         last_edited_at,
         media,
+        structured_fields,
         view_count,
         status,
         is_deleted,

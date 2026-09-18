@@ -1,12 +1,14 @@
 import * as React from 'react';
 import { ThumbsUp, ThumbsDown, Clock, Users, RefreshCw, Trophy, HelpCircle, Lightbulb, AlertTriangle, DollarSign, Heart, CheckCircle, XCircle } from 'lucide-react';
-import { hasStructuredContent, ALLOWED_STRUCTURED_KEYS, DURATION_OPTIONS, STRUCTURED_FIELDS_BY_TYPE } from '@/types/structuredFields';
+import { ALLOWED_STRUCTURED_KEYS, DURATION_OPTIONS, STRUCTURED_FIELDS_BY_TYPE } from '@/types/structuredFields';
 import type { DatabasePostType } from '@/components/feed/utils/postUtils';
 import ConnectedRingsRating from '@/components/recommendations/ConnectedRingsRating';
+import { getValidReviewPostRating, isStructuredFieldsRecord } from '@/components/feed/utils/postRating';
 
 interface StructuredFieldsDisplayProps {
-  data: Record<string, any>;
+  data: unknown;
   postType?: string;
+  showRating?: boolean;
 }
 
 /** Map field keys to icons */
@@ -39,13 +41,15 @@ function getFieldLabel(key: string, postType: DatabasePostType): string {
   }
 }
 
-const StructuredFieldsDisplay: React.FC<StructuredFieldsDisplayProps> = ({ data, postType: postTypeProp }) => {
-  if (!data || typeof data !== 'object' || !hasStructuredContent(data)) return null;
-
+const StructuredFieldsDisplay: React.FC<StructuredFieldsDisplayProps> = ({ data, postType: postTypeProp, showRating = true }) => {
   const postType = (postTypeProp as DatabasePostType) || 'experience';
+  if (!isStructuredFieldsRecord(data)) return null;
+
+  const isDisplayValue = (value: unknown): value is string | number =>
+    typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value));
 
   // Only render allowed keys
-  const safeData: Record<string, any> = {};
+  const safeData: Record<string, unknown> = {};
   for (const key of ALLOWED_STRUCTURED_KEYS) {
     if (data[key] !== undefined && data[key] !== null && data[key] !== '') {
       safeData[key] = data[key];
@@ -54,15 +58,18 @@ const StructuredFieldsDisplay: React.FC<StructuredFieldsDisplayProps> = ({ data,
 
   // Narrative fields (textarea-type: long form text blocks)
   const narrativeKeys = ['what_worked', 'what_didnt', 'why_recommend', 'reasoning', 'options_considered', 'tip_summary', 'mistakes_to_avoid'];
-  const hasNarrative = narrativeKeys.some(k => safeData[k]);
+  const hasNarrative = narrativeKeys.some(k => isDisplayValue(safeData[k]));
 
   // Metadata fields (short inline display)
   const metadataKeys = ['duration', 'good_for', 'not_for', 'winner', 'what_matters', 'budget', 'when_to_use'];
-  const hasMetadata = metadataKeys.some(k => safeData[k]);
+  const hasMetadata = metadataKeys.some(k => isDisplayValue(safeData[k]));
 
   // Yes/No fields
   const yesNoKeys = ['reuse_intent', 'worth_it', 'recommend_intent'];
-  const hasYesNo = yesNoKeys.some(k => safeData[k]);
+  const hasYesNo = yesNoKeys.some(k => safeData[k] === 'yes' || safeData[k] === 'no');
+  const rating = showRating ? getValidReviewPostRating(postType, safeData) : null;
+
+  if (rating === null && !hasNarrative && !hasMetadata && !hasYesNo) return null;
 
   const yesNoLabels: Record<string, { yes: string; no: string }> = {
     reuse_intent: { yes: 'Would use again', no: 'Would not use again' },
@@ -73,13 +80,14 @@ const StructuredFieldsDisplay: React.FC<StructuredFieldsDisplayProps> = ({ data,
   return (
     <div className="mt-4 space-y-3">
       {/* Rating (Review) */}
-      {typeof safeData.rating === 'number' && safeData.rating >= 1 && (
+      {rating !== null && (
         <div className="flex items-center gap-2">
           <ConnectedRingsRating
-            value={safeData.rating}
-            size="xs"
+            value={rating}
+            variant="badge"
             isInteractive={false}
             minimal={true}
+            showValue={true}
           />
         </div>
       )}
@@ -88,7 +96,8 @@ const StructuredFieldsDisplay: React.FC<StructuredFieldsDisplayProps> = ({ data,
       {hasNarrative && (
         <div className="space-y-2">
           {narrativeKeys.map(key => {
-            if (!safeData[key]) return null;
+            const value = safeData[key];
+            if (!isDisplayValue(value)) return null;
             return (
               <div key={key} className="flex gap-2 items-start">
                 {FIELD_ICONS[key] || <ThumbsUp className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />}
@@ -96,7 +105,7 @@ const StructuredFieldsDisplay: React.FC<StructuredFieldsDisplayProps> = ({ data,
                   <p className="text-xs font-medium text-muted-foreground mb-0.5">
                     {getFieldLabel(key, postType)}
                   </p>
-                  <p className="text-sm text-foreground">{safeData[key]}</p>
+                  <p className="text-sm text-foreground">{value}</p>
                 </div>
               </div>
             );
@@ -107,18 +116,19 @@ const StructuredFieldsDisplay: React.FC<StructuredFieldsDisplayProps> = ({ data,
       {/* Metadata row */}
       {hasMetadata && (
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          {safeData.duration && (
+          {typeof safeData.duration === 'string' && (
             <span className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />
               {DURATION_OPTIONS[safeData.duration] || safeData.duration}
             </span>
           )}
           {metadataKeys.filter(k => k !== 'duration').map(key => {
-            if (!safeData[key]) return null;
+            const value = safeData[key];
+            if (!isDisplayValue(value)) return null;
             return (
               <span key={key} className="flex items-center gap-1">
                 {FIELD_ICONS[key] || <Users className="h-3.5 w-3.5" />}
-                {safeData[key]}
+                {value}
               </span>
             );
           })}

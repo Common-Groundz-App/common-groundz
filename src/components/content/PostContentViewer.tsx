@@ -409,9 +409,11 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
       {/* Detail-only content — keeps readable side padding on mobile */}
       <div className="px-4 sm:px-0">
       {/* Structured Experience Fields */}
-      {post.structured_fields && typeof post.structured_fields === 'object' && (
-        <StructuredFieldsDisplay data={post.structured_fields} postType={post.post_type ?? 'experience'} />
-      )}
+      <StructuredFieldsDisplay
+        data={post.structured_fields}
+        postType={post.post_type ?? 'experience'}
+        showRating={false}
+      />
 
       {/* Inline Comments */}
       <div id="comments" ref={commentsAnchorRef} className="mt-6 pt-6 border-t scroll-mt-20">

@@ -294,10 +294,12 @@ cross-read between them.
       behavior, body ordering and actions; removed the duplicate detail-page badge. Verified on public
       post detail at desktop/mobile/dark widths, a simulated long identity, and an unbadged experience;
       633/633 tests, typecheck, and production build pass. Stopped for visual review
-- [ ] 5.0B Optional spacing polish — independently approved only if 5.0A shows a need; preserve
-      title → body → media → entity chips → location tags → actions and freeze the action row internally
-- [ ] 5.0C Optional review-post rating — independently approved whether 5.0B runs or is skipped;
-      post-local `structured_fields.rating` only, connected rings only, no endorsement/review/entity lookup
+- [x] 5.0B Explicitly skipped after visual review — 5.0A already produced balanced, compact spacing;
+      the title → body → media → entity chips → location tags → actions order remains unchanged
+- [x] 5.0C Post-local Review rating — strict finite numeric `structured_fields.rating` from 1–5,
+      compact connected rings, no endorsement/review/entity lookup, exactly once in shared feed/detail
+      anatomy; verified on real public Review details at desktop/mobile/dark widths, including rating-only
+      detail collapse; 654/654 tests, typecheck, and preview build pass. Stopped for visual approval
 - [ ] 5.1 Cross-card visual acceptance on real feed/detail surfaces; if accepted, skip optional architecture
 - [ ] 5.2 Optional extraction only if 5.1 proves a concrete shared-layout need; no visual change
 - [ ] 5.3 Deferred type-specific enhancements; skipping this is an acceptable Phase 5 outcome
