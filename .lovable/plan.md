@@ -43,7 +43,7 @@ Only Steps 1–4 are approved implementation work. The app-wide migration is a s
   - semibold 14px text with a 180px maximum label width;
   - the same natural wrapping for multiple entities.
 - The posted version omits all editing controls and adjusts only the trailing padding needed after removing the close control.
-- Use the app’s established semantic navigation primitive: prefer a link when it is valid in the current card structure; otherwise retain the accessible `type="button"` plus `navigate(getEntityUrl(entity))` pattern. Do not introduce a new navigation architecture.
+- Use a real `type="button"` with the existing `navigate(getEntityUrl(entity))` behavior. Do not introduce a link or a new navigation architecture inside the interactive post card.
 - Preserve a visible keyboard focus indicator. The interaction’s accessible name identifies the entity; the adjacent thumbnail uses `alt=""` so assistive technology does not announce the same name twice.
 - Preserve the existing `navigate(getEntityUrl(entity))` destination and stop the surrounding post-card click from firing.
 - Isolate pointer and keyboard activation from the enclosing card so using the pill never triggers both destinations.
