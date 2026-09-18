@@ -106,4 +106,4 @@ Mark 5.1 and 5.4 complete only when their checks pass, then mark 5.2 skipped and
 
 ## Stop boundary
 
-Stop after the Phase 5 close-out report. Do not begin another phase and do not make speculative feed-card improvements.
+Stop after the Phase 5 close-out report. Documentation and roadmap updates are authorized; product or layout changes are not. If verification finds a real defect, stop and report it rather than fixing it quietly. Do not begin another phase.
