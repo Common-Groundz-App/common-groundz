@@ -289,9 +289,11 @@ Boundary: editorial post type, a review post's own `structured_fields.rating`, a
 truth (`reviews.is_recommended`) are three separate concepts. Feed-card presentation must not infer or
 cross-read between them.
 
-- [ ] 5.0A Badge placement only — move the existing post-type badge from the metadata line to a
+- [x] 5.0A Badge placement only — moved the existing post-type badge from the metadata line to a
       collapsing trailing region beside the owner menu; preserve all typography, density, identity
-      behavior, body ordering and actions; remove the duplicate detail-page badge; then stop for review
+      behavior, body ordering and actions; removed the duplicate detail-page badge. Verified on public
+      post detail at desktop/mobile/dark widths, a simulated long identity, and an unbadged experience;
+      633/633 tests, typecheck, and production build pass. Stopped for visual review
 - [ ] 5.0B Optional spacing polish — independently approved only if 5.0A shows a need; preserve
       title → body → media → entity chips → location tags → actions and freeze the action row internally
 - [ ] 5.0C Optional review-post rating — independently approved whether 5.0B runs or is skipped;

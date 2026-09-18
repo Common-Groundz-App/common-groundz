@@ -25,4 +25,22 @@ post-local review ratings, and review endorsement truth remain separate concepts
 
 ### Verification
 
-Pending completion of automated checks and real-app screenshots.
+- Full Vitest suite: PASS (38 files, 633 tests).
+- TypeScript check (`tsgo --noEmit`): PASS.
+- Production build: PASS.
+- Source sweep: PASS — badge helpers remain only in the shared `PostFeedItem`; the duplicate
+  detail badge and imports are gone.
+- Public post detail, desktop: PASS — badge is right-aligned in the shared header and appears once.
+- Public post detail, mobile (390 × 844): PASS — badge remains visible without colliding with content.
+- Long identity simulation at mobile width: PASS — existing wrapping remains and trailing badge stays visible.
+- Experience post: PASS — no badge and no empty trailing region for a non-owner guest.
+- Dark theme: PASS for layout and collision behavior.
+- Owner-menu adjacency: static/source-covered; authenticated runtime verification is unavailable because
+  this project uses an external Supabase session that cannot be injected into the test browser.
+
+### Screenshots
+
+- `/tmp/browser/phase-5-0a/screenshots/desktop-feed-card.png`
+- `/tmp/browser/phase-5-0a/screenshots/mobile-feed-card.png`
+- `/tmp/browser/phase-5-0a/screenshots/mobile-long-name-dark.png`
+- `/tmp/browser/phase-5-0a/screenshots/desktop-detail.png`
