@@ -309,6 +309,12 @@ cross-read between them.
       boundary, and a baseline-aware sweep proving no new generic-star rating or legacy dependency.
       Evidence: `docs/verification/phase-5-feed-card.md`. PHASE 5 FULLY COMPLETE
 
+## Post–Phase 5 follow-up — posted entity-pill polish
+
+- [ ] Share one local missing/broken-image fallback between the composer and posted entity pills
+- [ ] Replace shared posted-card entity tags with read-only composer-style pills and remove only their category row
+- [ ] Verify long, multiple, missing/broken-image, responsive, and dark-mode states; stop for visual approval
+
 ## Deferred
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
 - [ ] Manual remediation of legacy unlinked reviews
