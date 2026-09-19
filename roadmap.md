@@ -314,6 +314,7 @@ cross-read between them.
 - [x] Share one local missing/broken-image fallback between the composer and posted entity pills
 - [x] Replace shared posted-card entity tags with read-only composer-style pills and remove only their category row
 - [x] Verify long, multiple, missing/broken-image, responsive, and dark-mode states; stopped for visual approval
+- [x] Refine the posted-only pill to a quieter stable 36px treatment with available-width truncation and measured-overflow tooltip; add interaction tests and refresh visual evidence
 
 ## Deferred
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)

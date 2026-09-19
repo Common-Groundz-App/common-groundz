@@ -8,6 +8,8 @@
 - Missing and broken sources now use the same fallback without a second image request.
 - Added the read-only `PostedEntityPill`, preserving the existing entity destination through a real button.
 - Replaced only the shared post card's entity tags and removed only its category row.
+- Refined only the posted version to a quieter 36px neutral pill while retaining its 28px image and readable 14px label.
+- Removed the fixed 180px label cap: posted pills now use the available card width and expose a measured-overflow-only full-name tooltip on hover or keyboard focus.
 
 ## Preserved boundaries
 
@@ -18,8 +20,8 @@
 
 ## Verification
 
-- Focused entity-image tests: PASS (5 tests).
-- Full Vitest suite: PASS (41 files, 659 tests).
+- Focused entity-image and posted-pill tests: PASS (10 tests).
+- Full Vitest suite: PASS (42 files, 664 tests).
 - TypeScript validation: PASS.
 - Preview build: PASS.
 - Two-entity Review card: PASS at desktop/mobile and light/dark; both pills wrap naturally.
@@ -27,11 +29,13 @@
 - Missing and deliberately broken sources: PASS; both render the same local fallback.
 - Entity navigation: PASS; pill opens `/entity/:slug` without firing the surrounding post destination.
 - Keyboard focus: PASS; the posted pill retains a visible focus ring.
+- Long-name disclosure: PASS; the tooltip appears only for measured overflow and the pill remains the same size on hover/focus.
+- Reduced motion: PASS; no pill width or layout animation is introduced.
 - Runtime page errors introduced by this follow-up: none.
 
 ## Session-local screenshots
 
-`/tmp/browser/entity-pill/screenshots/`
+`/tmp/browser/entity-pill-refinement/screenshots/`
 
 ## Status
 
