@@ -50,7 +50,7 @@ export const PostedEntityPill: React.FC<PostedEntityPillProps> = ({ entity }) =>
       type="button"
       variant="outline"
       aria-label={`View ${entity.name}`}
-      className="h-[34px] w-fit max-w-full min-w-0 gap-1 overflow-hidden rounded-full border-primary/20 bg-primary/5 py-0 pl-1 pr-2.5 text-sm font-medium text-foreground hover:bg-primary/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="h-[30px] w-fit max-w-full min-w-0 gap-[3px] overflow-hidden rounded-full border-primary/20 bg-primary/5 py-0 pl-[3px] pr-2 text-[13px] font-medium text-foreground hover:bg-primary/10 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       onPointerDown={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
       onClick={(event) => {
@@ -58,7 +58,7 @@ export const PostedEntityPill: React.FC<PostedEntityPillProps> = ({ entity }) =>
         navigate(getEntityUrl(entity));
       }}
     >
-      <EntityImage entity={entity} decorative className="h-6 w-6" />
+      <EntityImage entity={entity} decorative className="h-[22px] w-[22px]" />
       <span ref={labelRef} className="min-w-0 truncate">
         {entity.name}
       </span>

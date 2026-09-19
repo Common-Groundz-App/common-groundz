@@ -316,6 +316,7 @@ cross-read between them.
 - [x] Verify long, multiple, missing/broken-image, responsive, and dark-mode states; stopped for visual approval
 - [x] Refine the posted-only pill to a quieter stable 36px treatment with available-width truncation and measured-overflow tooltip; add interaction tests and refresh visual evidence
 - [x] Final posted-only visual refinement — 34px pill, 24px thumbnail, soft semantic orange tint, unchanged fluid truncation and behavior; verified at desktop/mobile in light/dark
+- [x] Posted-only type/scale pass — 13px label, 30px pill, 22px thumbnail; verified on real cards at desktop/mobile in light/dark and reduced motion
 
 ## Deferred
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
