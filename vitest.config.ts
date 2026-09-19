@@ -94,6 +94,7 @@ export default defineConfig({
             'src/components/media/MuxOwnerHint.test.tsx',
             'src/components/content/StructuredFieldsDisplay.test.tsx',
             'src/components/common/EntityImage.test.tsx',
+            'src/components/feed/PostedEntityPill.test.tsx',
             'src/components/profile/reviews/__tests__/ReviewTimelineViewer.test.tsx',
             'src/components/profile/reviews/__tests__/ReviewFormSubjectReset.test.tsx',
           ],
