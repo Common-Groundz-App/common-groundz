@@ -28,20 +28,20 @@ Use the chosen restrained, fluid posted-pill direction. Keep the composer pill u
 - Reduce height from 40px to 36px.
 - Keep a 28px circular thumbnail so real images and local fallbacks remain legible.
 - Replace the peach/primary emphasis with a quieter semantic neutral border and background.
-- Use a restrained 13px medium-weight label so the entity remains readable but secondary to the post.
+- Keep the existing readable 14px label. Use medium weight, with the quieter container—not smaller text—creating the secondary emphasis.
 - Preserve circular shape, image crop, surrounding spacing, multiple-pill wrapping, button semantics, focus visibility, and navigation.
 - Do not add category/type text back into the pill.
 
 ### Long-name behavior
 
 - Remove the fixed 180px label bottleneck from the posted version.
-- Let the pill use more of the available feed width before truncating.
-- On pointer hover or keyboard focus, animate the pill’s maximum width to the available row width and reveal as much of the name as the card permits.
-- If the name still overflows at the expanded width, show the existing accessible tooltip with the full entity name on hover/focus.
+- Let the pill use the available row width naturally, bounded by the feed card, before truncating.
+- Keep the pill width stable on hover and keyboard focus. Do not animate or expand it, reflow neighboring pills, or shift the pointer/focus target.
+- When the stable label still overflows, show the existing accessible tooltip with the full entity name on hover/focus.
 - Show the tooltip only when truncation is real, determined from the rendered label rather than name length.
 - On touch layouts, use the available card width immediately; tapping still opens the entity page. Do not add a separate disclosure control.
-- Respect reduced-motion preferences by expanding without animation.
-- Ensure width expansion causes only orderly flex reflow and never overlaps another pill, card edge, post text, or actions.
+- Keep tooltip timing restrained and use the existing tooltip behavior rather than adding custom animation.
+- Ensure the stable responsive width never overlaps another pill, the card edge, post text, or actions.
 
 ## Implementation scope
 
@@ -58,7 +58,7 @@ Use the chosen restrained, fluid posted-pill direction. Keep the composer pill u
    - the two-entity Review card;
    - the long perfume/media card;
    - missing and broken image fallbacks;
-   - multiple pills before, during, and after width expansion;
+   - multiple pills with stable wrapping before, during, and after hover/focus;
    - keyboard focus and reduced motion.
 6. Update only the post–Phase 5 verification record and its follow-up roadmap entry, then stop for visual approval.
 
@@ -72,4 +72,4 @@ Use the chosen restrained, fluid posted-pill direction. Keep the composer pill u
 
 ## Completion rule
 
-Complete only when the refinement passes automated checks and the refreshed visual evidence shows a quieter pill, understandable long names, stable wrapping, and no regressions. Any visual or interaction defect stops the work for review rather than triggering broader changes.
+Complete only when the refinement passes automated checks and the refreshed visual evidence shows a quieter pill, understandable long names, no hover/focus layout shift, stable wrapping, and no regressions. Any visual or interaction defect stops the work for review rather than triggering broader changes.
