@@ -39,6 +39,15 @@ const setLabelDimensions = (scrollWidth: number, clientWidth: number) => {
   fireEvent(window, new Event('resize'));
 };
 
+const setButtonDimensions = (scrollWidth: number, clientWidth: number) => {
+  const button = screen.getByRole('button', { name: `View ${entity.name}` });
+  Object.defineProperties(button, {
+    scrollWidth: { configurable: true, value: scrollWidth },
+    clientWidth: { configurable: true, value: clientWidth },
+  });
+  fireEvent(window, new Event('resize'));
+};
+
 describe('PostedEntityPill', () => {
   it('navigates to the entity without firing the enclosing card click', async () => {
     const parentClick = vi.fn();
@@ -60,7 +69,8 @@ describe('PostedEntityPill', () => {
 
   it('shows the full-name tooltip only when the rendered label overflows', async () => {
     renderPill();
-    setLabelDimensions(320, 180);
+    setLabelDimensions(320, 320);
+    setButtonDimensions(380, 360);
 
     const button = screen.getByRole('button', { name: `View ${entity.name}` });
     await userEvent.hover(button);
@@ -71,6 +81,7 @@ describe('PostedEntityPill', () => {
   it('does not add a tooltip when the rendered label fits', async () => {
     renderPill();
     setLabelDimensions(160, 180);
+    setButtonDimensions(220, 220);
 
     await userEvent.hover(screen.getByRole('button', { name: `View ${entity.name}` }));
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());

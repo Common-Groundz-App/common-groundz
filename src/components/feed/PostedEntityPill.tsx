@@ -17,13 +17,17 @@ interface PostedEntityPillProps {
 
 export const PostedEntityPill: React.FC<PostedEntityPillProps> = ({ entity }) => {
   const navigate = useNavigate();
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const labelRef = useRef<HTMLSpanElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
   const measureTruncation = useCallback(() => {
     const label = labelRef.current;
-    if (!label) return;
-    setIsTruncated(label.scrollWidth > label.clientWidth);
+    const button = buttonRef.current;
+    if (!label || !button) return;
+    setIsTruncated(
+      label.scrollWidth > label.clientWidth || button.scrollWidth > button.clientWidth,
+    );
   }, []);
 
   useEffect(() => {
@@ -42,10 +46,11 @@ export const PostedEntityPill: React.FC<PostedEntityPillProps> = ({ entity }) =>
 
   const pill = (
     <Button
+      ref={buttonRef}
       type="button"
       variant="outline"
       aria-label={`View ${entity.name}`}
-      className="h-9 w-fit max-w-full min-w-0 gap-1.5 rounded-full border-border/70 bg-muted/40 py-0 pl-1 pr-3 text-sm font-medium text-foreground hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="h-9 w-fit max-w-full min-w-0 gap-1.5 overflow-hidden rounded-full border-border/70 bg-muted/40 py-0 pl-1 pr-3 text-sm font-medium text-foreground hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       onPointerDown={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
       onClick={(event) => {
