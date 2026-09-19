@@ -36,11 +36,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { getPostTypeLabel, shouldShowTypeBadge, getPostTypeColors } from './utils/postUtils';
 import TagBadge from './TagBadge';
 import { feedbackActions } from '@/services/feedbackService';
-import { getEntityUrl } from '@/utils/entityUrlUtils';
-import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
-import { shouldHideCategory } from '@/services/categoryService';
 import ConnectedRingsRating from '@/components/recommendations/ConnectedRingsRating';
 import { getValidReviewPostRating } from './utils/postRating';
+import { PostedEntityPill } from './PostedEntityPill';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -254,43 +252,13 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     }
   };
 
-  const getEntityTypeColor = (type: string): string => {
-    switch(type) {
-      case 'book': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-      case 'movie': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
-      case 'place': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      case 'product': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
-      case 'food': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-      default: return '';
-    }
-  };
-
-  const handleEntityClick = (entity: Entity) => {
-    navigate(getEntityUrl(entity));
-  };
-
   const renderTaggedEntities = (entities: Entity[]) => {
     if (!entities || entities.length === 0) return null;
     
     return (
       <div className="flex flex-wrap gap-2">
         {entities.map(entity => (
-          <div key={entity.id} className="flex flex-col gap-1">
-            <TagBadge
-              type="entity"
-              label={entity.name}
-              entityType={entity.type as any}
-              onClick={() => handleEntityClick(entity)}
-            />
-            {entity.category_id && !shouldHideCategory(entity.category_id) && (
-              <EntityCategoryBadge 
-                categoryId={entity.category_id} 
-                showFullPath={false}
-                variant="outline"
-                className="text-xs"
-              />
-            )}
-          </div>
+          <PostedEntityPill key={entity.id} entity={entity} />
         ))}
       </div>
     );
