@@ -1,8 +1,8 @@
 import React from 'react';
 import { Tag, X, ChevronDown, Plus } from 'lucide-react';
 import type { Entity } from '@/services/recommendation/types';
-import { getOptimalEntityImageUrl, getEntityTypeFallbackImage } from '@/utils/entityImageUtils';
 import type { DatabasePostType } from '@/components/feed/utils/postUtils';
+import { EntityImage } from '@/components/common/EntityImage';
 
 interface EntityHeroPillProps {
   entities: Entity[];
@@ -19,25 +19,6 @@ const PILL_LABEL_BY_TYPE: Record<DatabasePostType, string> = {
   comparison: "Tag what you're comparing",
   question: 'Tag options, if you have any',
   tip: 'Tag an entity if specific',
-};
-
-const getEntityEmoji = (type: string) => {
-  switch (type) {
-    case 'place': return '🏠';
-    case 'food': return '🍽️';
-    case 'movie': return '🎬';
-    case 'book': return '📚';
-    case 'product': return '💄';
-    default: return '🏷️';
-  }
-};
-
-const TYPE_BG: Record<string, string> = {
-  place: 'bg-emerald-100 dark:bg-emerald-900/40',
-  food: 'bg-orange-100 dark:bg-orange-900/40',
-  movie: 'bg-violet-100 dark:bg-violet-900/40',
-  book: 'bg-blue-100 dark:bg-blue-900/40',
-  product: 'bg-pink-100 dark:bg-pink-900/40',
 };
 
 // Shared pill sizing so empty state, selected chips, and "Add more" share one visual family.
@@ -73,27 +54,12 @@ export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      {entities.map((entity) => {
-        const imageUrl = getOptimalEntityImageUrl(entity as any);
-        return (
+      {entities.map((entity) => (
           <span
             key={entity.id}
             className={`${PILL_BASE} border-primary/20 bg-primary/5 text-foreground pl-1.5 pr-1.5`}
           >
-            {/* Circular entity image – Reddit-style avatar */}
-            {imageUrl ? (
-              <img
-                src={imageUrl}
-                alt=""
-                className="h-7 w-7 rounded-full object-cover flex-shrink-0"
-              />
-            ) : (
-              <span
-                className={`inline-flex items-center justify-center h-7 w-7 rounded-full flex-shrink-0 text-xs ${TYPE_BG[entity.type] || 'bg-muted'}`}
-              >
-                {getEntityEmoji(entity.type)}
-              </span>
-            )}
+            <EntityImage entity={entity} decorative className="h-7 w-7" />
             <span className="font-semibold text-sm truncate max-w-[180px]">{entity.name}</span>
             <button
               type="button"
@@ -104,8 +70,7 @@ export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
               <X size={12} />
             </button>
           </span>
-        );
-      })}
+      ))}
       {entities.length < maxEntities && (
         <button
           type="button"
