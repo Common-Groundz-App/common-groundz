@@ -18,7 +18,14 @@ describe('EntityImage', () => {
       <EntityImage
         entity={makeEntity({
           image_url: 'https://example.com/direct.jpg',
-          metadata: { stored_photo_urls: [{ storedUrl: 'https://example.com/stored.jpg' }] },
+          metadata: {
+            stored_photo_urls: [{
+              storedUrl: 'https://example.com/stored.jpg',
+              reference: 'stored-photo',
+              width: 200,
+              height: 200,
+            }],
+          },
         })}
       />,
     );
