@@ -43,7 +43,7 @@ const FALLBACK_ICONS: Record<CanonicalEntityType, LucideIcon> = {
   others: Tag,
 };
 
-export const getEntityFallbackIcon = (type: unknown): LucideIcon => {
+const getEntityFallbackIcon = (type: unknown): LucideIcon => {
   const canonicalType = parseEntityType(type);
   return canonicalType ? FALLBACK_ICONS[canonicalType] : Tag;
 };

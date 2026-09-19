@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { EntityImage, getEntityFallbackIcon } from './EntityImage';
+import { EntityImage } from './EntityImage';
 import { CANONICAL_ENTITY_TYPES } from '@/services/entityType';
 import { EntityType, type Entity } from '@/services/recommendation/types';
 
@@ -66,9 +66,17 @@ describe('EntityImage', () => {
 
   it('defines a fallback for every canonical type and unknown input', () => {
     for (const type of CANONICAL_ENTITY_TYPES) {
-      expect(getEntityFallbackIcon(type)).toBeTypeOf('object');
+      const { unmount } = render(
+        <EntityImage entity={makeEntity({ id: type, type: type as EntityType })} />,
+      );
+      expect(screen.getByRole('img', { name: 'Test entity' })).toBeInTheDocument();
+      unmount();
     }
-    expect(getEntityFallbackIcon('not-a-real-type')).toBe(getEntityFallbackIcon(undefined));
+
+    render(
+      <EntityImage entity={makeEntity({ type: 'not-a-real-type' as EntityType })} />,
+    );
+    expect(screen.getByRole('img', { name: 'Test entity' })).toBeInTheDocument();
   });
 
   it('supports decorative and informative accessibility modes', () => {
