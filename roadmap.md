@@ -317,6 +317,7 @@ cross-read between them.
 - [x] Refine the posted-only pill to a quieter stable 36px treatment with available-width truncation and measured-overflow tooltip; add interaction tests and refresh visual evidence
 - [x] Final posted-only visual refinement — 34px pill, 24px thumbnail, soft semantic orange tint, unchanged fluid truncation and behavior; verified at desktop/mobile in light/dark
 - [x] Posted-only type/scale pass — 13px label, 30px pill, 22px thumbnail; verified on real cards at desktop/mobile in light/dark and reduced motion
+- [x] Step 5 inventory gate — app-wide entity-image fallback audit (read-only); matrix, helper classification and migration groups in docs/verification/entity-image-fallback-inventory.md; no surface migrated
 
 ## Deferred
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
