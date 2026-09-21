@@ -53,9 +53,10 @@ There is no separate large desktop banner. The image beside the title is the **r
   - existing entity + new real image found → update to the new real image;
   - existing entity + no newly resolved image or lookup failure → preserve the existing valid image;
   - known legacy stock placeholder → normalize only through the explicitly approved exact-placeholder logic.
+- Do not opportunistically clear a known legacy placeholder during an unrelated update, such as an edit to description or metadata. Existing placeholder URLs change only when an approved image-writing/resolution path is actually processing that entity image.
 - Replace known write-time stock fallbacks with `null`; preserve genuine external, stored, or already-valid existing images.
 - Add a centralized exact legacy-placeholder registry using normalized URL identity so query parameters do not defeat recognition.
-- Treat only directly identifiable known placeholders as missing. Never classify all Unsplash URLs as placeholders, never infer based on visual similarity, and do not guess copied stock images stored under new Supabase Storage URLs.
+- Keep URL normalization conservative: recognize only exact known host/path placeholder identities while ignoring irrelevant query variation. Never classify all Unsplash URLs as placeholders, never broadly rewrite URLs before comparison, never infer based on visual similarity, and do not guess copied stock images stored under new Supabase Storage URLs.
 - Do not wire that legacy-placeholder recognition into all current `getOptimalEntityImageUrl` callers during this phase; broad display-time behavior changes happen only in their approved migration groups.
 - Record every entity-creation/write path changed, and verify one representative path for each changed category where a safe test fixture exists.
 - No database row cleanup, schema change, or generated-type edit.
