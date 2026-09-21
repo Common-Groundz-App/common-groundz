@@ -25,6 +25,7 @@ There is no separate large desktop banner. The image beside the title is the **r
 ## Approved policy
 
 - Stop saving stock/Unsplash fallback URLs as entity images. If no real image exists, persist `null`.
+- Do not overwrite an existing valid real entity image with `null` just because a later lookup fails or returns no new image.
 - At display time, treat only exact known hard-coded legacy fallback URL identities as missing. Do not classify all Unsplash URLs as placeholders.
 - During this proof phase, do **not** change `getOptimalEntityImageUrl` globally. Legacy-placeholder recognition is introduced behind the new shared fallback contract and consumed only by `EntityImage` and the Group 1 proof surface until each broader caller group is migrated.
 - Do not clean existing entity rows in this phase.
@@ -46,9 +47,15 @@ There is no separate large desktop banner. The image beside the title is the **r
 ### Group 0B — source hygiene
 
 - Trace and verify every active entity-creation write path before editing, including the quick-create path and any database function it invokes.
-- Replace known write-time stock fallbacks with `null`; preserve genuine external or stored images.
+- Apply separate write rules for new and existing entities:
+  - new entity + real image found → persist the real image;
+  - new entity + no real image found → persist `null`;
+  - existing entity + new real image found → update to the new real image;
+  - existing entity + no newly resolved image or lookup failure → preserve the existing valid image;
+  - known legacy stock placeholder → normalize only through the explicitly approved exact-placeholder logic.
+- Replace known write-time stock fallbacks with `null`; preserve genuine external, stored, or already-valid existing images.
 - Add a centralized exact legacy-placeholder registry using normalized URL identity so query parameters do not defeat recognition.
-- Treat only directly identifiable known placeholders as missing. A copied stock image stored under a new Supabase Storage URL cannot safely be identified from its URL alone and will not be guessed or removed.
+- Treat only directly identifiable known placeholders as missing. Never classify all Unsplash URLs as placeholders, never infer based on visual similarity, and do not guess copied stock images stored under new Supabase Storage URLs.
 - Do not wire that legacy-placeholder recognition into all current `getOptimalEntityImageUrl` callers during this phase; broad display-time behavior changes happen only in their approved migration groups.
 - Record every entity-creation/write path changed, and verify one representative path for each changed category where a safe test fixture exists.
 - No database row cleanup, schema change, or generated-type edit.
