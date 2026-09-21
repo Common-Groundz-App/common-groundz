@@ -41,7 +41,7 @@ There is no separate large desktop banner. The image beside the title is the **r
 - Unknown or malformed types resolve to the neutral generic icon, never Product or Place.
 - Add shared source/failure state keyed by entity and resolved source so missing and broken images have the same outcome and state resets when the source changes.
 - Preserve `EntityImage`’s current circular appearance and behavior.
-- Remove the second network retry only in the path exercised by the proof surface; broader `ImageWithFallback` migration remains later.
+- Do not touch `ImageWithFallback` in this proof phase; its broad retry/fallback behavior remains for later approved surface groups.
 
 ### Group 0B — source hygiene
 
@@ -50,6 +50,7 @@ There is no separate large desktop banner. The image beside the title is the **r
 - Add a centralized exact legacy-placeholder registry using normalized URL identity so query parameters do not defeat recognition.
 - Treat only directly identifiable known placeholders as missing. A copied stock image stored under a new Supabase Storage URL cannot safely be identified from its URL alone and will not be guessed or removed.
 - Do not wire that legacy-placeholder recognition into all current `getOptimalEntityImageUrl` callers during this phase; broad display-time behavior changes happen only in their approved migration groups.
+- Record every entity-creation/write path changed, and verify one representative path for each changed category where a safe test fixture exists.
 - No database row cleanup, schema change, or generated-type edit.
 
 ### Group 1 — one low-risk proof surface
@@ -58,6 +59,7 @@ Migrate only the selected entity chip in `UnifiedEntitySelector`:
 
 - keep its existing 20px circular frame, pill dimensions, spacing, typography, remove control, navigation, and accessibility;
 - keep valid real images visually unchanged;
+- attempt the resolved real source once, then switch directly to the local fallback on failure;
 - make missing and broken images show the shared canonical local icon;
 - verify unknown types use the neutral icon and source changes clear stale failure state.
 
@@ -65,6 +67,7 @@ Migrate only the selected entity chip in `UnifiedEntitySelector`:
 
 - Focused tests for all 15 canonical mappings, unknown types, exact legacy URL recognition, legitimate Unsplash preservation, missing/broken parity, and source reset.
 - Verify changed write paths persist `null` only when no real image exists.
+- Report any additional server-side writer discovered during tracing instead of silently expanding implementation scope.
 - Verify the legacy-placeholder registry does not change unapproved surfaces that already call `getOptimalEntityImageUrl`.
 - Verify the selected chip at desktop and mobile sizes with no layout shift.
 - Run the full test suite, typecheck, focused lint, and preview build.
@@ -72,4 +75,4 @@ Migrate only the selected entity chip in `UnifiedEntitySelector`:
 
 ## Explicitly unchanged
 
-Every existing image frame’s dimensions, aspect ratio, shape, border radius, object-fit, spacing, position, surrounding layout, navigation, and accessible labeling, including the responsive entity header’s mobile full-width 192px design. `MyStuffItemCard`, `SavedEntityCard`, the responsive entity header image, all broad surface migrations, database contents, and suspected dead helpers are not changed in this phase.
+Every existing image frame’s dimensions, aspect ratio, shape, border radius, object-fit, spacing, position, surrounding layout, navigation, and accessible labeling, including the responsive entity header’s mobile full-width 192px design. `ImageWithFallback`, `MyStuffItemCard`, `SavedEntityCard`, the responsive entity header image, all broad surface migrations, database contents, and suspected dead helpers are not changed in this phase.
