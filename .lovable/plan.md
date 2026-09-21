@@ -18,14 +18,15 @@ The screenshot is **My Stuff → Saved**, rendered by `SavedEntityCard`, not `My
 There is no separate large desktop banner. The image beside the title is the **responsive header image** rendered by `EntityHeader`.
 
 - Desktop: 96×96 rounded square beside the title.
-- Mobile: the same slot becomes full-width and 192px tall above the title.
+- Mobile: the same slot intentionally becomes full-width and 192px tall above the title. This is the approved mobile design and will not be changed.
 - Madagascar Centella Travel Kit has no stored image, so `EntityV4` currently substitutes the Product Unsplash fallback before rendering. The shoes image visible in the screenshot is that fallback, not a real entity image.
-- Because the slot becomes large on mobile and its error path also controls the refresh-image action, it remains separately gated. “Responsive header image” replaces the misleading “hero” label.
+- Because this image slot is prominent on mobile and its error path also controls the refresh-image action, only the fallback content choice remains separately gated. “Responsive header image” replaces the misleading “hero” label.
 
 ## Approved policy
 
 - Stop saving stock/Unsplash fallback URLs as entity images. If no real image exists, persist `null`.
 - At display time, treat only exact known hard-coded legacy fallback URL identities as missing. Do not classify all Unsplash URLs as placeholders.
+- During this proof phase, do **not** change `getOptimalEntityImageUrl` globally. Legacy-placeholder recognition is introduced behind the new shared fallback contract and consumed only by `EntityImage` and the Group 1 proof surface until each broader caller group is migrated.
 - Do not clean existing entity rows in this phase.
 - Preserve `SavedEntityCard`’s fixed 64×64 frame; migrate it in a later card group so missing and broken both use the canonical Product icon.
 - Leave `MyStuffItemCard` unchanged for now because adding an image region would alter its layout.
@@ -48,6 +49,7 @@ There is no separate large desktop banner. The image beside the title is the **r
 - Replace known write-time stock fallbacks with `null`; preserve genuine external or stored images.
 - Add a centralized exact legacy-placeholder registry using normalized URL identity so query parameters do not defeat recognition.
 - Treat only directly identifiable known placeholders as missing. A copied stock image stored under a new Supabase Storage URL cannot safely be identified from its URL alone and will not be guessed or removed.
+- Do not wire that legacy-placeholder recognition into all current `getOptimalEntityImageUrl` callers during this phase; broad display-time behavior changes happen only in their approved migration groups.
 - No database row cleanup, schema change, or generated-type edit.
 
 ### Group 1 — one low-risk proof surface
@@ -63,10 +65,11 @@ Migrate only the selected entity chip in `UnifiedEntitySelector`:
 
 - Focused tests for all 15 canonical mappings, unknown types, exact legacy URL recognition, legitimate Unsplash preservation, missing/broken parity, and source reset.
 - Verify changed write paths persist `null` only when no real image exists.
+- Verify the legacy-placeholder registry does not change unapproved surfaces that already call `getOptimalEntityImageUrl`.
 - Verify the selected chip at desktop and mobile sizes with no layout shift.
 - Run the full test suite, typecheck, focused lint, and preview build.
 - Stop for approval before any list thumbnail, Saved card, grid, carousel, responsive header, admin, helper deletion, or data-cleanup work.
 
 ## Explicitly unchanged
 
-Every existing image frame’s dimensions, aspect ratio, shape, border radius, object-fit, spacing, position, surrounding layout, navigation, and accessible labeling. `MyStuffItemCard`, `SavedEntityCard`, the responsive entity header image, all broad surface migrations, database contents, and suspected dead helpers are not changed in this phase.
+Every existing image frame’s dimensions, aspect ratio, shape, border radius, object-fit, spacing, position, surrounding layout, navigation, and accessible labeling, including the responsive entity header’s mobile full-width 192px design. `MyStuffItemCard`, `SavedEntityCard`, the responsive entity header image, all broad surface migrations, database contents, and suspected dead helpers are not changed in this phase.
