@@ -122,6 +122,12 @@ export const validateImageUrlForStorage = (
   }
   
   const persistableImageUrl = getPersistableEntityImageUrl(newImageUrl);
+  const persistableExistingImageUrl = getPersistableEntityImageUrl(existingImageUrl);
+
+  // Existing entities keep a valid image when a later lookup has no usable replacement.
+  if (!persistableImageUrl && persistableExistingImageUrl) {
+    return persistableExistingImageUrl;
+  }
 
   // Don't let proxy URLs overwrite existing stored URLs
   if (persistableImageUrl && isProxyUrl(persistableImageUrl) && existingImageUrl && isStoredImageUrl(existingImageUrl)) {

@@ -22,6 +22,9 @@ describe('entity image fallback contract', () => {
     expect(isKnownLegacyEntityPlaceholderUrl(
       'https://images.unsplash.com/photo-1560769629-975ec94e6a86?crop=faces&q=40',
     )).toBe(true);
+    expect(isKnownLegacyEntityPlaceholderUrl(
+      'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&w=1000',
+    )).toBe(true);
   });
 
   it('preserves legitimate Unsplash and stored images', () => {
@@ -44,5 +47,6 @@ describe('entity image fallback contract', () => {
     const existing = 'https://example.supabase.co/storage/v1/object/public/entity/real.jpg';
     const temporaryProxy = 'https://example.supabase.co/functions/v1/proxy-google-image?ref=abc';
     expect(validateImageUrlForStorage(temporaryProxy, undefined, existing)).toBe(existing);
+    expect(validateImageUrlForStorage(null, undefined, existing)).toBe(existing);
   });
 });
