@@ -4,7 +4,8 @@ import { X, Check, PlusCircle } from 'lucide-react';
 import { UnifiedEntitySelector } from '@/components/feed/UnifiedEntitySelector';
 import { EntityAdapter } from '@/components/profile/circles/types';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
+import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
 import SubjectQuickCreate from './SubjectQuickCreate';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 import {
@@ -27,6 +28,28 @@ interface SubjectSelectStepProps {
   contextLine?: string | null;
   isResolvingContext?: boolean;
 }
+
+const SubjectThumbnail = ({ subject }: { subject: EntityAdapter }) => {
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(subject);
+  const FallbackIcon = getEntityFallbackIcon(subject.type);
+  return (
+    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+      {showFallback ? (
+        <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+          <FallbackIcon className="h-1/2 w-1/2" aria-hidden="true" />
+        </div>
+      ) : (
+        <img
+          src={imageUrl ?? undefined}
+          alt={subject.name}
+          className="h-full w-full object-cover"
+          loading="lazy"
+          onError={markImageFailed}
+        />
+      )}
+    </div>
+  );
+};
 
 /**
  * Step 2 — "What are you reviewing?"
@@ -58,16 +81,7 @@ const SubjectSelectStep = ({
 
       {subject ? (
         <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3">
-          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
-            {getOptimalEntityImageUrl(subject) && (
-              <img
-                src={getOptimalEntityImageUrl(subject)}
-                alt={subject.name}
-                className="h-full w-full object-cover"
-                loading="lazy"
-              />
-            )}
-          </div>
+          <SubjectThumbnail subject={subject} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
