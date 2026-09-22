@@ -86,13 +86,6 @@ const imagelessProduct = {
   image_url: null,
 };
 
-const imagelessUser = {
-  id: 'user-1',
-  username: 'rishab.devp',
-  avatar_url: null,
-};
-
-
 const asSearchResult = (value: Record<string, unknown>) =>
   value as unknown as EntitySearchResult;
 const asAdapter = (value: Record<string, unknown>) =>
