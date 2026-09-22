@@ -8,8 +8,8 @@ import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 import { shouldHideCategory } from '@/services/categoryService';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
+import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 
 interface EntityResultItemProps {
@@ -30,7 +30,8 @@ export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
   const reviewCount = entity.review_count ?? 0;
   const reviewLabel = reviewCount === 1 ? 'review' : 'reviews';
 
-  const imageUrl = getOptimalEntityImageUrl(entity);
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(entity);
+  const FallbackIcon = getEntityFallbackIcon(entity.type);
 
   return (
     <Link
@@ -40,17 +41,17 @@ export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
     >
       {/* Square thumbnail to match All Items rows */}
       <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative">
-        {imageUrl ? (
-          <ImageWithFallback
-            src={imageUrl}
-            alt={entity.name}
-            entityType={entity.type}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-            {entity.name[0]?.toUpperCase() || 'E'}
+        {showFallback ? (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+            <FallbackIcon className="h-1/2 w-1/2" aria-hidden="true" />
           </div>
+        ) : (
+          <img
+            src={imageUrl ?? undefined}
+            alt={entity.name}
+            className="w-full h-full object-cover"
+            onError={markImageFailed}
+          />
         )}
       </div>
 
