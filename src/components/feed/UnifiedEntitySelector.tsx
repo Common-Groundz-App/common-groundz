@@ -6,9 +6,9 @@ import { X, Loader2, Search, Plus, Navigation, ChevronDown, ChevronUp } from 'lu
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { EntityAdapter } from '@/components/profile/circles/types';
 import type { Entity } from '@/services/recommendation/types';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { EntityImage } from '@/components/common/EntityImage';
-import { getOptimalEntityImageUrl, getEntityTypeFallbackImage } from '@/utils/entityImageUtils';
+import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
+import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
 import { useLocation } from '@/contexts/LocationContext';
 import { CreateEntityDialog } from '@/components/admin/CreateEntityDialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -105,6 +105,31 @@ function HighlightMatch({ text, query }: { text: string; query: string }) {
     </>
   );
 }
+
+/**
+ * Entity dropdown-row thumbnail. Preserves the caller's exact size/radius via
+ * `className`; missing or broken images render the canonical entity-type icon
+ * centred inside the same box (never initials, never a stock photo).
+ */
+const EntityRowThumbnail = ({ entity, className }: { entity: any; className: string }) => {
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(entity);
+  const FallbackIcon = getEntityFallbackIcon(entity?.type);
+  if (showFallback) {
+    return (
+      <div className={`${className} bg-muted flex items-center justify-center text-muted-foreground`}>
+        <FallbackIcon className="h-1/2 w-1/2" aria-hidden="true" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={imageUrl ?? undefined}
+      alt={entity?.name ?? ''}
+      className={`${className} object-cover`}
+      onError={markImageFailed}
+    />
+  );
+};
 
 function getEntityIcon(type: string) {
   switch (type) {
@@ -425,13 +450,6 @@ export function UnifiedEntitySelector({
     setShowResults(false);
   };
 
-  // Get image URL for entity
-  const getImageUrl = (item: any) => {
-    const optimalUrl = getOptimalEntityImageUrl(item);
-    if (optimalUrl) return optimalUrl;
-    return getEntityTypeFallbackImage(item.type || 'product');
-  };
-
   // Raw category buckets from backend
   const localEntities = results.entities || [];
   const books = results.categorized?.books || [];
@@ -618,15 +636,9 @@ export function UnifiedEntitySelector({
       onClick={isDisabled ? undefined : onClick}
     >
       <div className="flex-shrink-0">
-        <ImageWithFallback
-          src={getImageUrl(entity)}
-          alt={entity.name}
-          className={`object-cover ${
-            isModal ? 'w-11 h-11 rounded-lg' : 'w-8 h-8 rounded'
-          }`}
-          fallbackSrc={getEntityTypeFallbackImage(entity.type || 'product')}
-          entityType={entity.type}
-          suppressConsoleErrors
+        <EntityRowThumbnail
+          entity={entity}
+          className={isModal ? 'w-11 h-11 rounded-lg' : 'w-8 h-8 rounded'}
         />
       </div>
       <div className="flex-1 min-w-0">
