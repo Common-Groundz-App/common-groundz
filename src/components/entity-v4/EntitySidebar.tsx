@@ -17,8 +17,8 @@ import { useNavigate } from 'react-router-dom';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
+import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
+import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { 
   shouldShowBusinessHours, 
@@ -37,6 +37,46 @@ interface EntitySidebarProps {
   parentEntity?: Entity | null;
   isLoadingParent?: boolean;
 }
+
+export const ParentEntityThumbnail: React.FC<{ parentEntity: Entity }> = ({ parentEntity }) => {
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(parentEntity);
+  const FallbackIcon = getEntityFallbackIcon(parentEntity.type);
+
+  return (
+    <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center p-1">
+      {showFallback ? (
+        <FallbackIcon className="h-1/2 w-1/2 text-muted-foreground" aria-hidden="true" />
+      ) : (
+        <img
+          src={imageUrl || ''}
+          alt={parentEntity.name}
+          className="w-full h-full object-contain"
+          onError={markImageFailed}
+        />
+      )}
+    </div>
+  );
+};
+
+export const RelatedEntityThumbnail: React.FC<{ relatedEntity: Entity }> = ({ relatedEntity }) => {
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(relatedEntity);
+  const FallbackIcon = getEntityFallbackIcon(relatedEntity.type);
+
+  return (
+    <div className="w-8 h-8 rounded overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
+      {showFallback ? (
+        <FallbackIcon className="h-1/2 w-1/2 text-muted-foreground" aria-hidden="true" />
+      ) : (
+        <img
+          src={imageUrl || ''}
+          alt={relatedEntity.name}
+          className="w-full h-full object-cover"
+          onError={markImageFailed}
+        />
+      )}
+    </div>
+  );
+};
 
 export const EntitySidebar: React.FC<EntitySidebarProps> = ({ 
   entity, 
@@ -120,14 +160,7 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
               className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors group"
               onClick={() => navigate(getEntityUrlWithParent(parentEntity))}
             >
-              <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center p-1">
-                <ImageWithFallback
-                  src={parentEntity.image_url}
-                  alt={parentEntity.name}
-                  fallbackSrc={getEntityTypeFallbackImage(parentEntity.type)}
-                  className="w-full h-full object-contain"
-                />
-              </div>
+              <ParentEntityThumbnail parentEntity={parentEntity} />
               <div className="flex-1 min-w-0">
                 <h4 className="font-medium text-sm truncate group-hover:text-primary transition-colors">
                   {parentEntity.name}
@@ -283,11 +316,7 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
                     onClick={() => handleEntityClick(relatedEntity)}
                   >
-                    <img 
-                      src={relatedEntity.image_url || '/placeholder.svg'} 
-                      alt={relatedEntity.name} 
-                      className="w-8 h-8 rounded object-cover" 
-                    />
+                    <RelatedEntityThumbnail relatedEntity={relatedEntity} />
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-sm truncate">{relatedEntity.name}</h4>
                       <div className="text-xs text-muted-foreground">

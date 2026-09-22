@@ -9,7 +9,8 @@ import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 import { Badge } from '@/components/ui/badge';
 import { shouldHideCategory } from '@/services/categoryService';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
+import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
 
 interface RecommendationData {
   id: string;
@@ -34,6 +35,28 @@ interface RecommendationEntityCardProps {
   recommendation: RecommendationData;
   isNetworkRecommendation: boolean;
 }
+
+export const RecommendationEntityThumbnail: React.FC<{ recommendation: RecommendationData }> = ({
+  recommendation,
+}) => {
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(recommendation);
+  const FallbackIcon = getEntityFallbackIcon(recommendation.type);
+
+  return (
+    <div className="w-16 h-16 bg-muted relative overflow-hidden rounded-md flex-shrink-0 flex items-center justify-center">
+      {showFallback ? (
+        <FallbackIcon className="h-1/2 w-1/2 text-muted-foreground" aria-hidden="true" />
+      ) : (
+        <img
+          src={imageUrl || ''}
+          alt={recommendation.name}
+          className="w-full h-full object-cover"
+          onError={markImageFailed}
+        />
+      )}
+    </div>
+  );
+};
 
 export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> = ({
   recommendation,
@@ -94,21 +117,7 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
       className="group cursor-pointer bg-card border border-border rounded-lg overflow-hidden hover:shadow-md transition-all duration-200 flex gap-3 p-3"
     >
       {/* Image */}
-      <div className="w-16 h-16 bg-muted relative overflow-hidden rounded-md flex-shrink-0">
-        {getOptimalEntityImageUrl(recommendation) ? (
-          <img 
-            src={getOptimalEntityImageUrl(recommendation) || ''} 
-            alt={recommendation.name}
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-            <span className="text-sm font-bold text-muted-foreground">
-              {recommendation.name.charAt(0).toUpperCase()}
-            </span>
-          </div>
-        )}
-      </div>
+      <RecommendationEntityThumbnail recommendation={recommendation} />
       
       {/* Content */}
       <div className="flex-1 min-w-0 space-y-1">
