@@ -153,3 +153,17 @@ Verification:
 - Typecheck: `bunx tsgo --noEmit` passed.
 - Focused ESLint for the new contract, hook, component, and tests passed.
 - Preview build watcher reported `build OK`; no new runtime console errors were recorded.
+
+## Groups 0A/0B/1 close-out evidence (proof gate)
+
+Direct write-path regression tests now assert the persisted payload itself, not just the shared sanitizer.
+
+- `src/services/__tests__/entityImageWritePaths.test.ts` — `createEntityQuick` and the `createEntity` basic-insert fallback: a valid real image is persisted unchanged; no image persists `image_url: null` exactly (asserted as present-and-null, never `''`, `undefined`, or omitted); an exact registered legacy placeholder also persists `image_url: null`; a legitimate unregistered Unsplash image is preserved. `findOrCreateEntity` reuse of an existing entity performs no insert and no image update. `validateImageUrlForStorage` keeps a stored valid image when the new candidate is missing, empty, or a registered placeholder.
+- `src/hooks/useEntitySearchWritePaths.test.tsx` — the same four-case contract for `createEntityFromExternal` and `createEntityFromUrl`.
+- `src/components/feed/SelectedEntityChipProof.test.tsx` — controlled fixture reproducing the selected-chip markup exactly: 32px pill retained, 20×20 circular image frame retained, missing and broken sources render the identical circular fallback with no pill height change, and switching from a failed entity to a valid entity renders the new real image without inheriting the previous failure.
+
+Runtime capture limitation, stated plainly: the browser auth status for this project is `external_unmanaged`, so no authenticated composer session can be established in the sandbox and desktop/mobile screenshots of the live chip could not be taken. The controlled fixture above is used instead, as the approved plan allows; the chip's presentation contract is asserted from rendered output, not inferred from styles alone.
+
+Verification run: Vitest 47 files / 694 tests passed; `bunx tsgo --noEmit` clean; focused ESLint on the three new test files clean; preview build watcher reported `build OK`.
+
+Group 2A (search and selection rows) has not been started.

@@ -319,6 +319,7 @@ cross-read between them.
 - [x] Posted-only type/scale pass — 13px label, 30px pill, 22px thumbnail; verified on real cards at desktop/mobile in light/dark and reduced motion
 - [x] Step 5 inventory gate — app-wide entity-image fallback audit (read-only); matrix, helper classification and migration groups in docs/verification/entity-image-fallback-inventory.md; no surface migrated
 - [x] Step 5 Groups 0A/0B/1 — canonical fallback contract, future-write stock-placeholder hygiene, and selected composer-chip proof; stopped before Group 2
+- [x] Step 5 Groups 0A/0B/1 proof gate closed — direct write-path regression tests (explicit `image_url: null`, legitimate Unsplash preserved, reuse writes nothing) plus controlled selected-chip fixture (32px pill, 20×20 frame, missing/broken parity, source reset); authenticated runtime capture unavailable (`external_unmanaged`); stopped before Group 2A
 
 ## Deferred
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
