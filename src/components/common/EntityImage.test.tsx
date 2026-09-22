@@ -64,6 +64,29 @@ describe('EntityImage', () => {
     );
   });
 
+  it('treats an exact legacy placeholder as missing without filtering other Unsplash images', () => {
+    const { rerender } = render(
+      <EntityImage
+        entity={makeEntity({
+          image_url: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=400',
+        })}
+      />,
+    );
+    expect(screen.getByTestId('entity-image-fallback')).toBeInTheDocument();
+
+    rerender(
+      <EntityImage
+        entity={makeEntity({
+          image_url: 'https://images.unsplash.com/photo-a-real-entity-photo?w=400',
+        })}
+      />,
+    );
+    expect(screen.getByTestId('entity-image')).toHaveAttribute(
+      'src',
+      'https://images.unsplash.com/photo-a-real-entity-photo?w=400',
+    );
+  });
+
   it('defines a fallback for every canonical type and unknown input', () => {
     for (const type of CANONICAL_ENTITY_TYPES) {
       const { unmount } = render(

@@ -6,6 +6,7 @@ import { X, Loader2, Search, Plus, Navigation, ChevronDown, ChevronUp } from 'lu
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { EntityAdapter } from '@/components/profile/circles/types';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EntityImage } from '@/components/common/EntityImage';
 import { getOptimalEntityImageUrl, getEntityTypeFallbackImage } from '@/utils/entityImageUtils';
 import { useLocation } from '@/contexts/LocationContext';
 import { CreateEntityDialog } from '@/components/admin/CreateEntityDialog';
@@ -685,33 +686,16 @@ export function UnifiedEntitySelector({
       {/* Selected entities – compact pills matching composer's EntityHeroPill style */}
       {selectedEntities.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {selectedEntities.map(entity => {
-            const imgUrl = entity.image_url || getOptimalEntityImageUrl(entity as any);
-            const typeBg: Record<string, string> = {
-              place: 'bg-emerald-100 dark:bg-emerald-900/40',
-              food: 'bg-orange-100 dark:bg-orange-900/40',
-              movie: 'bg-violet-100 dark:bg-violet-900/40',
-              book: 'bg-blue-100 dark:bg-blue-900/40',
-              product: 'bg-pink-100 dark:bg-pink-900/40',
-            };
-            return (
+          {selectedEntities.map(entity => (
               <span
                 key={entity.id}
                 className="inline-flex items-center gap-1.5 h-8 rounded-full border border-primary/20 bg-primary/5 text-foreground pl-1 pr-1 text-xs transition-colors"
               >
-                {imgUrl ? (
-                  <img
-                    src={imgUrl}
-                    alt=""
-                    className="h-5 w-5 rounded-full object-cover flex-shrink-0"
-                  />
-                ) : (
-                  <span
-                    className={`inline-flex items-center justify-center h-5 w-5 rounded-full flex-shrink-0 text-[10px] ${typeBg[entity.type] || 'bg-muted'}`}
-                  >
-                    {getEntityIcon(entity.type)}
-                  </span>
-                )}
+                <EntityImage
+                  entity={entity as any}
+                  className="h-5 w-5 flex-shrink-0"
+                  decorative
+                />
                 <span className="font-semibold truncate max-w-[160px]">{entity.name}</span>
                 <button
                   type="button"
@@ -722,8 +706,7 @@ export function UnifiedEntitySelector({
                   <X size={10} />
                 </button>
               </span>
-            );
-          })}
+          ))}
         </div>
       )}
 

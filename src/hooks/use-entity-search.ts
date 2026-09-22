@@ -4,10 +4,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { useToast } from './use-toast';
 import type { Entity as ServiceEntity } from '@/services/recommendation/types';
 import { EntityTypeString } from '@/hooks/feed/api/types';
-import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
 import { saveExternalImageToStorage, isValidImageUrl, isGooglePlacesImage } from '@/utils/imageUtils';
 import { ensureBucketPolicies } from '@/services/storageService';
+import { getPersistableEntityImageUrl } from '@/utils/entityImageFallback';
 
 // Define a simplified entity structure for the component's internal use
 interface Entity {
@@ -226,8 +226,8 @@ export function useEntitySearch(type: EntityTypeString) {
       // Ensure the entity-images bucket exists with proper policies
       await ensureBucketPolicies('entity-images');
       
-      // Set initial image URL from external data or use fallback
-      let imageUrl = externalData.image_url || getEntityTypeFallbackImage(type);
+      // Persist only a real image. Presentation fallbacks belong to the UI.
+      let imageUrl = getPersistableEntityImageUrl(externalData.image_url);
       let storedImageUrl = null;
       
       console.log(`Processing image for entity: ${externalData.name}`, { originalUrl: imageUrl });
@@ -355,8 +355,8 @@ export function useEntitySearch(type: EntityTypeString) {
       // Generate a new entity ID
       const entityId = uuidv4();
       
-      // Get appropriate image or fallback
-      let imageUrl = data.metadata.og_image || data.metadata.image || getEntityTypeFallbackImage(type);
+      // Persist only a real image. Presentation fallbacks belong to the UI.
+      let imageUrl = getPersistableEntityImageUrl(data.metadata.og_image || data.metadata.image);
       let storedImageUrl = null;
       
       // If we have a valid image URL, try to save it to our storage
