@@ -134,3 +134,22 @@ Some entities already have an Unsplash URL persisted in `entities.image_url` (wr
 3. Entity hero: icon, keep stock photography, or a neutral branded placeholder?
 4. `entityTaxonomyCompatibility.test.ts:55` asserts fallbacks are `http(s)` URLs — that contract inverts when helpers become local icons.
 5. `getCategoryFallbackImage` / `getRecommendationFallbackImage` look dead but are left in place pending explicit proof.
+
+## Groups 0A/0B/1 implementation evidence
+
+Implemented only the approved prerequisite contract, future-write hygiene, and selected composer-chip proof. Group 2 and all broader surface migrations remain untouched.
+
+- Shared contract: `src/utils/entityImageFallback.ts` owns the 15 canonical local-icon mappings, neutral unknown fallback, and conservative exact Unsplash placeholder identities. Query-string differences are ignored; unrelated Unsplash URLs remain valid.
+- Shared state: `src/hooks/useEntityImageFallback.ts` gives missing and broken sources the same local fallback, attempts a real source once, and resets failure behavior when the entity/source key changes.
+- Circular convenience renderer: `EntityImage` now consumes the shared contract without changing its circular markup, dimensions, crop, accessibility, or navigation responsibilities.
+- Proof surface: only the `UnifiedEntitySelector` selected chip now uses `EntityImage`; its pill remains 32px high and its circular image frame remains 20×20px. The selector dropdown still uses `ImageWithFallback` unchanged.
+- Future-write hygiene: the three traced client stock-write paths now persist a real URL or `null`. New entities without a real image write `null`; existing valid images are retained when a later lookup supplies no usable replacement.
+- Legacy-row boundary: no database cleanup or broad URL rewrite was performed. Exact known legacy placeholders are recognized only by the new contract/write validation. Unrelated metadata updates do not clear them.
+- Explicitly unchanged: `ImageWithFallback`, `getOptimalEntityImageUrl`, My Stuff cards, Saved cards, entity headers, admin/legacy surfaces, dimensions, shapes, object-fit, spacing, and all Group 2+ surfaces.
+
+Verification:
+
+- Vitest: 44 files, 672 tests passed.
+- Typecheck: `bunx tsgo --noEmit` passed.
+- Focused ESLint for the new contract, hook, component, and tests passed.
+- Preview build watcher reported `build OK`; no new runtime console errors were recorded.

@@ -1,52 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import {
-  AppWindow,
-  BookOpen,
-  BriefcaseBusiness,
-  Building2,
-  CalendarDays,
-  Clapperboard,
-  Gamepad2,
-  GraduationCap,
-  MapPin,
-  Package,
-  Sparkles,
-  Tag,
-  Tv,
-  Utensils,
-  Wrench,
-  type LucideIcon,
-} from 'lucide-react';
+import React from 'react';
 import { cn } from '@/lib/utils';
 import type { Entity } from '@/services/recommendation/types';
-import {
-  parseEntityType,
-  type CanonicalEntityType,
-} from '@/services/entityType';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
-
-const FALLBACK_ICONS: Record<CanonicalEntityType, LucideIcon> = {
-  movie: Clapperboard,
-  book: BookOpen,
-  tv_show: Tv,
-  course: GraduationCap,
-  app: AppWindow,
-  game: Gamepad2,
-  experience: Sparkles,
-  food: Utensils,
-  product: Package,
-  place: MapPin,
-  brand: Building2,
-  event: CalendarDays,
-  service: Wrench,
-  professional: BriefcaseBusiness,
-  others: Tag,
-};
-
-const getEntityFallbackIcon = (type: unknown): LucideIcon => {
-  const canonicalType = parseEntityType(type);
-  return canonicalType ? FALLBACK_ICONS[canonicalType] : Tag;
-};
+import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
+import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
 
 interface EntityImageProps {
   entity: Entity;
@@ -61,11 +17,8 @@ export const EntityImage: React.FC<EntityImageProps> = ({
   fallbackClassName,
   decorative = false,
 }) => {
-  const imageUrl = useMemo(() => getOptimalEntityImageUrl(entity), [entity]);
-  const sourceKey = `${entity.id}:${imageUrl ?? ''}`;
-  const [failedSourceKey, setFailedSourceKey] = useState<string | null>(null);
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(entity);
   const FallbackIcon = getEntityFallbackIcon(entity.type);
-  const showFallback = !imageUrl || failedSourceKey === sourceKey;
   const accessibleLabel = decorative ? undefined : entity.name;
 
   if (showFallback) {
@@ -88,11 +41,10 @@ export const EntityImage: React.FC<EntityImageProps> = ({
 
   return (
     <img
-      key={sourceKey}
       src={imageUrl}
       alt={decorative ? '' : entity.name}
       className={cn('shrink-0 rounded-full object-cover', className)}
-      onError={() => setFailedSourceKey(sourceKey)}
+      onError={markImageFailed}
       data-testid="entity-image"
     />
   );

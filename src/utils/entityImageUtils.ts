@@ -18,6 +18,8 @@
  * - Never gate external APIs by local result count
  */
 
+import { getPersistableEntityImageUrl } from '@/utils/entityImageFallback';
+
 // Debug flag for logging - only warn in development to avoid production log spam
 const DEBUG_IMAGE_UTILS = import.meta.env.DEV;
 
@@ -119,8 +121,16 @@ export const validateImageUrlForStorage = (
     return existingStoredPhotoUrls[0].storedUrl;
   }
   
+  const persistableImageUrl = getPersistableEntityImageUrl(newImageUrl);
+  const persistableExistingImageUrl = getPersistableEntityImageUrl(existingImageUrl);
+
+  // Existing entities keep a valid image when a later lookup has no usable replacement.
+  if (!persistableImageUrl && persistableExistingImageUrl) {
+    return persistableExistingImageUrl;
+  }
+
   // Don't let proxy URLs overwrite existing stored URLs
-  if (newImageUrl && isProxyUrl(newImageUrl) && existingImageUrl && isStoredImageUrl(existingImageUrl)) {
+  if (persistableImageUrl && isProxyUrl(persistableImageUrl) && existingImageUrl && isStoredImageUrl(existingImageUrl)) {
     if (DEBUG_IMAGE_UTILS) {
       console.warn(`🛡️ Blocking proxy URL from overwriting stored URL`);
     }
@@ -128,13 +138,13 @@ export const validateImageUrlForStorage = (
   }
   
   // Warn if writing a proxy URL (dev only)
-  if (newImageUrl && isProxyUrl(newImageUrl)) {
+  if (persistableImageUrl && isProxyUrl(persistableImageUrl)) {
     if (DEBUG_IMAGE_UTILS) {
-      console.warn(`⚠️ Writing proxy URL - should be temporary: ${newImageUrl.substring(0, 50)}...`);
+      console.warn(`⚠️ Writing proxy URL - should be temporary: ${persistableImageUrl.substring(0, 50)}...`);
     }
   }
   
-  return newImageUrl;
+  return persistableImageUrl;
 };
 
 /**

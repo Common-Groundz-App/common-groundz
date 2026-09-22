@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 import { Entity, EntityType } from './types';
 import { EntityTypeString, mapStringToEntityType, mapEntityTypeToString } from '@/hooks/feed/api/types';
-import { getEntityTypeFallbackImage, saveExternalImageToStorage } from '@/utils/imageUtils';
+import { saveExternalImageToStorage } from '@/utils/imageUtils';
+import { getPersistableEntityImageUrl } from '@/utils/entityImageFallback';
 import { deferEntityImageRefresh } from '@/utils/imageRefresh';
 import { createEnhancedEntity, queueEntityForEnrichment } from '@/services/enhancedEntityService';
 
@@ -137,8 +138,8 @@ export const createEntity = async (entity: Omit<Entity, 'id' | 'created_at' | 'u
   // Fallback to basic entity creation if quick service fails
   console.log(`⚠️ Enhanced service failed, falling back to basic entity creation`);
   
-  // Ensure we have a valid image URL or use fallback based on type
-  const imageUrl = entity.image_url || getEntityTypeFallbackImage(typeAsString);
+  // Persist only a real image. Presentation fallbacks belong to the UI.
+  const imageUrl = getPersistableEntityImageUrl(entity.image_url);
   
   // Don't generate slug manually - let database trigger handle it based on parent relationship
   

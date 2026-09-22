@@ -41,6 +41,7 @@ const nodeIncludes = [
   'src/components/comments/useMentionAutocomplete.test.ts',
   'src/components/comments/composerDocking.test.ts',
   'src/utils/dockCorrection.test.ts',
+  'src/utils/entityImageFallback.test.ts',
 
   'src/services/__tests__/entityType.test.ts',
   'src/services/__tests__/entitySlug.test.ts',
@@ -91,6 +92,7 @@ export default defineConfig({
             'src/hooks/useSoftwareKeyboardOpen.test.tsx',
             'src/hooks/useBlurComposerOnKeyboardDismiss.test.tsx',
             'src/hooks/useDockCorrection.test.tsx',
+            'src/hooks/useEntityImageFallback.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
             'src/components/content/StructuredFieldsDisplay.test.tsx',
             'src/components/common/EntityImage.test.tsx',
