@@ -249,9 +249,16 @@ describe('EntityRowThumbnail (entity picker dropdown rows)', () => {
 
 describe('mixed search results — initials boundary', () => {
   it('image-less entities use the type icon while image-less people keep their initials', async () => {
+    // Stable reference: the selector syncs `initialEntities` in an effect, so a
+    // fresh `[]` literal each render would loop forever.
+    const stableInitialEntities: EntityAdapter[] = [];
     const { container } = render(
       <MemoryRouter>
-        <UnifiedEntitySelector onEntitiesChange={() => {}} initialQuery="centella" />
+        <UnifiedEntitySelector
+          onEntitiesChange={() => {}}
+          initialQuery="centella"
+          initialEntities={stableInitialEntities}
+        />
       </MemoryRouter>,
     );
 
