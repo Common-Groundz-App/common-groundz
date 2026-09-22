@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { X, Loader2, Search, Plus, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { EntityAdapter } from '@/components/profile/circles/types';
+import type { Entity } from '@/services/recommendation/types';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { EntityImage } from '@/components/common/EntityImage';
 import { getOptimalEntityImageUrl, getEntityTypeFallbackImage } from '@/utils/entityImageUtils';
@@ -692,7 +693,7 @@ export function UnifiedEntitySelector({
                 className="inline-flex items-center gap-1.5 h-8 rounded-full border border-primary/20 bg-primary/5 text-foreground pl-1 pr-1 text-xs transition-colors"
               >
                 <EntityImage
-                  entity={entity as any}
+                  entity={entity as unknown as Entity}
                   className="h-5 w-5 flex-shrink-0"
                   decorative
                 />

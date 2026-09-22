@@ -5,6 +5,7 @@ import {
   getPersistableEntityImageUrl,
   isKnownLegacyEntityPlaceholderUrl,
 } from './entityImageFallback';
+import { validateImageUrlForStorage } from './entityImageUtils';
 
 describe('entity image fallback contract', () => {
   it('defines an icon for every canonical type and a neutral unknown type', () => {
@@ -37,5 +38,11 @@ describe('entity image fallback contract', () => {
     expect(getPersistableEntityImageUrl(
       'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
     )).toBeNull();
+  });
+
+  it('keeps an existing stored image when a later temporary lookup is unusable', () => {
+    const existing = 'https://example.supabase.co/storage/v1/object/public/entity/real.jpg';
+    const temporaryProxy = 'https://example.supabase.co/functions/v1/proxy-google-image?ref=abc';
+    expect(validateImageUrlForStorage(temporaryProxy, undefined, existing)).toBe(existing);
   });
 });
