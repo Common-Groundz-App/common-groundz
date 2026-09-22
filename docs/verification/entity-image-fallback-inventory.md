@@ -183,4 +183,18 @@ Verification run: Vitest 48 files / 710 tests passed; `bunx tsgo --noEmit` clean
 
 Authenticated runtime capture remains unavailable (`external_unmanaged`), so live screenshots could not be taken; rendered-output assertions stand in, as in Group 1.
 
-Group 2B (EntityChildrenCard, entity sidebar parent/related rows, RecommendationEntityCard) has not been started. The EntityChildrenCard child → parent → stock source rule must be documented and approved in writing before 2B begins.
+## Group 2B close-out evidence (relationship and recommendation thumbnails)
+
+Source-rule decision, documented and approved before implementation: `EntityChildrenCard`'s child → parent → stock precedence was an undocumented fallback shortcut, not intentional child identity or relationship context. Child rows now resolve only the child's real image, then the canonical child-type icon (neutral Tag for unknown types). This change applies only to the child thumbnail source; the parent relationship, parent navigation, parent metadata usage, and parent-description fallback remain unchanged.
+
+Migrated surfaces:
+
+- `src/components/entity/EntityChildrenCard.tsx` — child rows preserve the 48×48 `rounded-md` `object-cover` frame. The old parent-image substitution and remote type-stock fallback are removed; missing, registered-placeholder, or broken child images render the same canonical local icon. Row click behavior and accessible labels are unchanged.
+- `src/components/entity-v4/EntitySidebar.tsx` — the parent row now resolves through the shared contract instead of raw `image_url`, preserving the 48×48 `rounded-lg`, padded, `object-contain` frame. Related rows now resolve through the shared contract instead of raw `image_url || '/placeholder.svg'`, preserving the 32×32 `rounded` `object-cover` frame. Row navigation and current accessibility behavior are unchanged.
+- `src/components/entity/RecommendationEntityCard.tsx` — the 64×64 `rounded-md` `object-cover` frame is preserved. The entity first-letter fallback is replaced by the canonical entity-type icon; recommender `ProfileAvatar` elements and all user initials remain unchanged. Card navigation and analytics are unchanged.
+
+Tests: `src/components/entity/group2bEntityThumbnails.test.tsx` (14 tests) — exact frame/radius/crop preservation; valid child, parent, related, and recommendation images render unchanged; missing and broken sources converge on the same canonical icon; exact registered legacy placeholders render the canonical icon; unknown types render neutral Tag; entity-switch source reset; child-with-no-image does not render the parent's valid image; parent-description fallback remains; recommendation avatar boundary remains; child-row callback, sidebar parent/related navigation, and recommendation analytics/navigation remain intact.
+
+Verification run: Vitest 49 files / 724 tests passed; `bunx tsgo --noEmit` clean; focused ESLint on the changed files reports only pre-existing `no-explicit-any` errors on untouched `EntitySidebar` lines; preview production build passed. Authenticated runtime capture remains unavailable (`external_unmanaged`), so rendered-output assertions are the approved substitute for live screenshots.
+
+Stopped after Group 2B. No card/grid/header/admin migration was started.
