@@ -21,8 +21,8 @@ Two verification leftovers remain, so the groups are not yet formally closed:
 
 - Add focused mocked-write tests for each of the three changed creation paths, asserting the actual saved payload:
   - new entity with a valid real image saves that image;
-  - new entity with no image saves an explicit empty image value, not an omitted or undefined field;
-  - new entity whose only image is an exact registered legacy placeholder also saves that explicit empty value;
+  - new entity with no image saves `image_url: null` exactly — never an empty string, whitespace, `undefined`, or an omitted field;
+  - new entity whose only image is an exact registered legacy placeholder also saves `image_url: null` under the same strict assertion;
   - new entity with a legitimate Unsplash image that is not in the registry keeps and saves that image;
   - an existing entity is reused and receives no image update at all;
   - a failed image lookup never clears an existing valid image.
