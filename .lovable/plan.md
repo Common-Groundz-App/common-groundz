@@ -19,14 +19,17 @@ Two verification leftovers remain, so the groups are not yet formally closed:
 
 ## Step 1 — close the prerequisite proof gate (no Group 2 work)
 
-- Add focused mocked-write tests for each changed creation path:
+- Add focused mocked-write tests for each of the three changed creation paths, asserting the actual saved payload:
   - new entity with a valid real image saves that image;
-  - new entity with no image, or only an exact known placeholder, saves nothing;
-  - an existing entity is reused rather than overwritten;
+  - new entity with no image saves an explicit empty image value, not an omitted or undefined field;
+  - new entity whose only image is an exact registered legacy placeholder also saves that explicit empty value;
+  - new entity with a legitimate Unsplash image that is not in the registry keeps and saves that image;
+  - an existing entity is reused and receives no image update at all;
   - a failed image lookup never clears an existing valid image.
 - Capture the selected composer chip at desktop and mobile widths. If authentication prevents a real capture, use a controlled component fixture and state plainly that the authenticated runtime capture was unavailable, rather than inferring the result from styles.
 - Confirm the pill stays 32px high, the circular image stays 20×20px, and missing and broken images produce the same icon.
-- Record the evidence, then stop. If anything fails, fix only Groups 0A/0B/1 and stop again.
+- In the same chip proof, verify source reset end to end: an entity whose image fails shows the fallback, and switching to a different entity with a valid image renders that real image instead of inheriting the previous failure.
+- Record the evidence, then stop. If anything fails, fix only Groups 0A/0B/1 and stop again. Step 1 touches no rendering surface, no shared image resolver, no `ImageWithFallback`, no helper cleanup, and no existing data.
 
 ## Step 2 — Group 2A: search and selection rows (only after Step 1 passes)
 
