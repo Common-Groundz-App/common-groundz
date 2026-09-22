@@ -28,16 +28,18 @@ For each child row, the current code resolves images in this exact order:
 
 ### Evidence and classification
 
-The only explanation in the component calls this “fallback image using parent if needed.” No product copy, relationship registry, caller, or test documents the parent photo as intentional child identity or relationship context. Both live callers pass the current entity as the parent solely to render its child list. The same component separately inherits the parent description when the child description is absent, but that does not establish a product requirement for image inheritance.
+The only explanation in the component calls this “fallback image using parent if needed.” The audit traced the component's history and found no product copy, relationship registry, caller, design note, or test documenting the parent photo as intentional child identity or relationship context. Both live callers pass the current entity as the parent solely to render its child list. The same component separately inherits the parent description when the child description is absent, but that does not establish a product requirement for image inheritance.
 
-**Proposed decision:** classify parent-image substitution as a fallback shortcut, not intentional product behavior. Group 2B will therefore change child rows to:
+**Approved decision to record:** parent-image substitution is a fallback shortcut, not intentional product behavior. Group 2B will therefore change child-row image selection to:
 
 ```text
 child real image → canonical icon for child type
                  → neutral icon for unknown/malformed child type
 ```
 
-The parent image will no longer appear as the child's image. Approving this plan explicitly approves that source-rule change. If this decision is not approved, Group 2B must pause and the child-row rule must be revised before implementation.
+The parent image will no longer appear as the child's image.
+
+**Scope boundary for that decision:** removing parent-image substitution applies only to the child thumbnail's image-source precedence. Do not change the parent relationship itself, parent navigation, parent metadata usage, parent-description fallback, or any other relationship behavior in `EntityChildrenCard`.
 
 ## Implementation
 
@@ -76,7 +78,7 @@ The parent image will no longer appear as the child's image. Approving this plan
 - Add small file-local thumbnail components where needed so hook state is isolated per row and resets when entity/source changes.
 - Keep each existing outer frame and real-image classes unchanged. Center the local icon inside that same frame at a proportional size without changing dimensions, radius, crop, spacing, or layout.
 - One real-source attempt, then a local icon. No remote stock fallback, `/placeholder.svg`, entity initials, parent-photo substitution, or second request.
-- Remove only imports made obsolete in the two migrated files; do not delete shared legacy helpers while other callers remain.
+- Remove only imports made obsolete in the three migrated files (`EntityChildrenCard.tsx`, `EntitySidebar.tsx`, `RecommendationEntityCard.tsx`); do not delete shared legacy helpers while other callers remain.
 - Leave `getOptimalEntityImageUrl`, `ImageWithFallback`, the canonical registry, database rows, write paths, schema, and generated types unchanged.
 
 ## Verification
