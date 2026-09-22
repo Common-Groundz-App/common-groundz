@@ -111,7 +111,13 @@ function HighlightMatch({ text, query }: { text: string; query: string }) {
  * `className`; missing or broken images render the canonical entity-type icon
  * centred inside the same box (never initials, never a stock photo).
  */
-export const EntityRowThumbnail = ({ entity, className }: { entity: any; className: string }) => {
+export const EntityRowThumbnail = ({
+  entity,
+  className,
+}: {
+  entity: { id?: string; name?: string; type?: string; image_url?: string | null; metadata?: unknown };
+  className: string;
+}) => {
   const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(entity);
   const FallbackIcon = getEntityFallbackIcon(entity?.type);
   if (showFallback) {
