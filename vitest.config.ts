@@ -97,6 +97,7 @@ export default defineConfig({
             'src/hooks/useEntitySearchWritePaths.test.tsx',
             'src/components/feed/SelectedEntityChipProof.test.tsx',
             'src/components/search/group2aEntityThumbnails.test.tsx',
+            'src/components/entity/group2bEntityThumbnails.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
             'src/components/content/StructuredFieldsDisplay.test.tsx',
             'src/components/common/EntityImage.test.tsx',
