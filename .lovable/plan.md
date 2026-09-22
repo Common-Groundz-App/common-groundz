@@ -1,4 +1,4 @@
-# Entity fallback consistency — close Groups 0A/0B/1, then Group 2
+# Entity fallback consistency — close Groups 0A/0B/1, then Group 2A
 
 ## Audit verdict
 
@@ -7,74 +7,76 @@ Groups 0A/0B/1 are correctly implemented and stayed within scope:
 - all 15 canonical entity types use the shared local-icon mapping, while unknown types use the neutral icon;
 - exact known legacy stock URLs are recognized without treating all Unsplash images as placeholders;
 - missing and broken images converge on the same fallback and reset when the entity or source changes;
-- `getOptimalEntityImageUrl` and `ImageWithFallback` were not globally changed;
+- the global image resolver and `ImageWithFallback` were not changed;
 - only the selected composer chip adopted the shared fallback, retaining its 32px pill and 20px circular frame;
-- the three traced client creation paths now save a real image or `null`, while existing valid images are preserved;
-- no data cleanup, helper deletion, or Group 2+ migration leaked into the completed work.
+- the three traced creation paths now save a real image or nothing, while existing valid images are preserved;
+- no data cleanup, helper deletion, or later-group migration leaked into the completed work.
 
-Two verification leftovers prevent a literal “nothing remains” close-out:
+Two verification leftovers remain, so the groups are not yet formally closed:
 
-1. write behavior is tested at the shared-helper level, but the changed creation paths do not yet have direct regression tests;
-2. the selected chip’s desktop/mobile presentation is documented from its preserved classes, but authenticated runtime screenshots were not successfully captured.
+1. write behavior is tested at the shared-helper level, but the changed creation paths have no direct regression tests;
+2. the selected chip's presentation is documented from its preserved styles, not from runtime evidence.
 
-## Step 1 — close the prerequisite proof gate
+## Step 1 — close the prerequisite proof gate (no Group 2 work)
 
-- Add focused mocked-write tests for the changed creation paths:
+- Add focused mocked-write tests for each changed creation path:
   - new entity with a valid real image saves that image;
-  - new entity with no image or an exact known placeholder saves `null`;
-  - an existing entity is returned unchanged rather than being overwritten;
-  - an image-resolution failure does not clear an existing valid image.
-- Capture the selected composer chip in the authenticated create flow at desktop and mobile widths.
-- Confirm the pill remains 32px high, the circular image remains 20×20px, missing/broken states use the same icon, and no surrounding layout shifts.
-- If either proof fails, fix only Groups 0A/0B/1 and stop before Group 2.
+  - new entity with no image, or only an exact known placeholder, saves nothing;
+  - an existing entity is reused rather than overwritten;
+  - a failed image lookup never clears an existing valid image.
+- Capture the selected composer chip at desktop and mobile widths. If authentication prevents a real capture, use a controlled component fixture and state plainly that the authenticated runtime capture was unavailable, rather than inferring the result from styles.
+- Confirm the pill stays 32px high, the circular image stays 20×20px, and missing and broken images produce the same icon.
+- Record the evidence, then stop. If anything fails, fix only Groups 0A/0B/1 and stop again.
 
-## Step 2 — migrate active small-thumbnail surfaces
+## Step 2 — Group 2A: search and selection rows (only after Step 1 passes)
 
-Adopt the shared image-source/failure contract in these active surfaces only:
+Adopt the shared image-source/failure contract in these four surfaces only:
 
-1. Search result rows (`EntityResultItem`) — retain the 48×48 rounded-square frame and cover crop.
-2. Product-search rows — retain the 48×48 rounded-square frame and cover crop.
-3. Review subject selection — retain the 48×48 rounded-square frame, cover crop, and lazy loading.
-4. Entity child rows (`EntityChildrenCard`) — retain the 48×48 rounded frame and cover crop.
-5. Entity sidebar parent row — retain the 48×48 rounded frame, inner padding, and contain fit.
-6. Entity sidebar related rows — retain the 32×32 rounded frame and cover crop.
-7. Circle-recommending entity cards (`RecommendationEntityCard`) — retain the 64×64 rounded frame and cover crop.
-8. Composer/review selector dropdown rows — retain both existing variants: 44×44 rounded-square in the modal and 32×32 rounded in the inline selector.
+1. Search result rows — keep the 48×48 rounded-square frame and cover crop.
+2. Product-search rows — keep the 48×48 rounded-square frame and cover crop.
+3. Review subject selection — keep the 48×48 rounded-square frame, cover crop, and lazy loading.
+4. Composer/review selector dropdown rows — keep both variants: 44×44 rounded-square in the modal and 32×32 rounded inline.
 
-For each migrated surface:
+For each surface:
 
-- keep the existing wrapper, dimensions, shape, crop mode, spacing, loading behavior, text, navigation, and accessibility unchanged;
-- resolve a valid real image through `getOptimalEntityImageUrl`;
+- keep the wrapper, dimensions, shape, crop mode, spacing, loading behavior, text, navigation, and accessibility exactly as they are;
+- resolve a real image through the existing shared resolver;
 - treat only exact registered legacy placeholders as missing;
-- attempt the real source once, then render the canonical local icon in the same frame;
+- attempt the real source once, then show the canonical local icon in the same frame;
 - make missing and broken sources produce the identical local fallback;
 - use the neutral icon for unknown or malformed types, never Product or Place;
-- do not add remote stock fallbacks, `/placeholder.svg`, initials, a second request, or a second type map.
+- add no remote stock fallback, no `/placeholder.svg`, no initials, no second request, no second type map.
 
-`EntityChildrenCard` will no longer substitute the parent’s image when the child has no usable image; it will show the child type’s canonical fallback in the unchanged frame. This is a source-only correction.
+Remove now-unused fallback imports from these four files only; shared helpers stay in place for unmigrated callers.
+
+Then verify and stop for visual approval before Group 2B.
+
+## Step 3 — Group 2B: entity-context rows (separately approved later)
+
+Deferred to its own gate: entity child rows, the entity sidebar parent row, the entity sidebar related rows, and the circle recommendation thumbnail.
+
+Group 2B also carries one product decision that will not ride along silently. Entity child rows currently resolve the child's own image, then substitute the parent entity's image, then a stock type image. The surrounding code treats this as a convenience shortcut — the same pattern also borrows the parent's description — but that reading will be documented explicitly before anything changes. If it is only a fallback shortcut, the child's canonical type fallback replaces it. If it turns out to be intentional relationship context, the parent substitution is preserved and raised as a separate product decision. Either way it is approved in writing before implementation.
 
 ## Explicit exclusions
 
-- `EntityTabsContent` children cards: these use an optional full-width 128px image region, not a small list thumbnail. Showing a fallback when the region is currently absent would alter card layout, so defer it to the grid/card group.
-- `EntityRelatedCard`: its image-row example is commented out and nothing live can be migrated; leave it untouched.
-- `RelatedEntitiesSection`, Saved cards, My Stuff cards, recommendation/review cards, chat cards, carousels, explore grids, entity headers, admin surfaces, and version-gated legacy pages.
-- `ImageWithFallback`, broad helper cleanup, database row cleanup, schema changes, and generated types.
-- Pre-existing keyboard behavior on clickable rows; accessibility refactoring is separate because this pass freezes interaction markup.
+- Entity tab child cards: their image region is optional, so adding a fallback would change card layout. Deferred to the card/grid group.
+- The related-entities card: its image row exists only as commented-out example code; nothing live to migrate.
+- Related-entities sections, Saved cards, My Stuff cards, recommendation/review cards, chat cards, carousels, explore grids, entity headers, admin surfaces, and version-gated legacy pages.
+- `ImageWithFallback`, shared helper deletion, database row cleanup, schema changes, and generated types.
+- Existing keyboard behavior on clickable rows; this pass is source-only and freezes interaction markup.
 
 ## Technical approach
 
-- Reuse `useEntityImageFallback` and `getEntityFallbackIcon` inside each surface’s existing image wrapper rather than forcing square and rectangular surfaces through circular `EntityImage`.
+- Reuse the shared fallback hook and canonical icon resolver inside each surface's existing image wrapper, rather than routing square frames through the circular `EntityImage`.
 - Keep `EntityImage` as the circular convenience renderer.
-- Do not change `getOptimalEntityImageUrl` globally.
-- Remove legacy stock-helper imports only from the migrated call sites after proving those imports have no other use in the same file; do not delete shared helpers yet.
-- Add focused renderer tests for representative sizes/crop modes plus missing, broken, valid, exact-placeholder, unknown-type, and source-change behavior.
+- Leave the global image resolver unchanged.
+- Add focused renderer tests per migrated surface covering valid, missing, broken, exact-placeholder, unknown-type, and source-change cases.
 
-## Verification and stop gate
+## Verification and stop gates
 
-- Run focused fallback, write-path, and migrated-surface tests, then the full test suite and typecheck.
-- Run focused lint on new/shared files and record any pre-existing issues separately.
-- Verify live desktop and mobile views for search rows, review subject selection, entity sidebar rows, and both selector-dropdown variants where fixtures are available.
-- Confirm valid real images are visually unchanged and each frame’s computed dimensions, radius, and object-fit match its pre-migration contract.
+- Run focused tests, the full suite, typecheck, and focused lint; report pre-existing issues separately.
+- Check desktop and mobile views for each migrated surface.
+- Confirm real images look identical to before and each frame's computed size, radius, and crop match its pre-migration values.
 - Confirm one real-image request only, followed directly by a local icon on failure.
-- Update the verification matrix and roadmap with exact evidence.
-- Stop after these eight active surfaces; do not begin the card/grid group.
+- Update the inventory document and roadmap with exact evidence.
+- Stop after Step 1. Stop again after Group 2A. Do not start Group 2B or the card/grid group.
