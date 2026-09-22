@@ -4,11 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight, Package } from 'lucide-react';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Entity } from '@/services/recommendation/types';
-import { getEntityTypeFallbackImage, getEntityTypeLabel } from '@/services/entityTypeHelpers';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
+import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
 import {
   GENERIC_CHILDREN_LABEL,
   getChildPresentation,
@@ -26,6 +26,26 @@ interface EntityChildrenCardProps {
   onAddChild?: () => void;
   canAddChildren?: boolean;
 }
+
+export const EntityChildThumbnail: React.FC<{ child: Entity }> = ({ child }) => {
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(child);
+  const FallbackIcon = getEntityFallbackIcon(child.type);
+
+  return (
+    <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center">
+      {showFallback ? (
+        <FallbackIcon className="h-1/2 w-1/2 text-muted-foreground" aria-hidden="true" />
+      ) : (
+        <img
+          src={imageUrl || ''}
+          alt={child.name}
+          className="w-full h-full object-cover"
+          onError={markImageFailed}
+        />
+      )}
+    </div>
+  );
+};
 
 export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
   children,
@@ -56,15 +76,6 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
     presentation.mode === 'single' && presentation.groups[0]?.registered
       ? `View all ${children.length} ${sectionLabel.toLowerCase()}`
       : `View all ${children.length} items`;
-
-  // Helper function to get fallback image using parent if needed - now uses optimal URL helper
-  const getChildImage = (child: Entity) => {
-    const optimalUrl = getOptimalEntityImageUrl(child);
-    if (optimalUrl) return optimalUrl;
-    const parentOptimalUrl = getOptimalEntityImageUrl(parentEntity);
-    if (parentOptimalUrl) return parentOptimalUrl;
-    return getEntityTypeFallbackImage(child.type);
-  };
 
   // Helper function to get fallback description using parent if needed
   const getChildDescription = (child: Entity) => {
@@ -170,14 +181,7 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
             className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
             onClick={() => onViewChild?.(child)}
           >
-            <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
-              <ImageWithFallback
-                src={getChildImage(child)}
-                alt={child.name}
-                className="w-full h-full object-cover"
-                fallbackSrc={getEntityTypeFallbackImage(child.type)}
-              />
-            </div>
+            <EntityChildThumbnail child={child} />
             
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
