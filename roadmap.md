@@ -320,6 +320,7 @@ cross-read between them.
 - [x] Step 5 inventory gate — app-wide entity-image fallback audit (read-only); matrix, helper classification and migration groups in docs/verification/entity-image-fallback-inventory.md; no surface migrated
 - [x] Step 5 Groups 0A/0B/1 — canonical fallback contract, future-write stock-placeholder hygiene, and selected composer-chip proof; stopped before Group 2
 - [x] Step 5 Groups 0A/0B/1 proof gate closed — direct write-path regression tests (explicit `image_url: null`, legitimate Unsplash preserved, reuse writes nothing) plus controlled selected-chip fixture (32px pill, 20×20 frame, missing/broken parity, source reset); authenticated runtime capture unavailable (`external_unmanaged`); stopped before Group 2A
+- [x] Step 5 Group 2A — search/selection thumbnails (EntityResultItem, ProductSearch, SubjectSelectStep, UnifiedEntitySelector modal+inline entity rows) on the shared fallback contract; frames/sizes/crops preserved verbatim; entity initials replaced by canonical type icons while user avatar initials untouched (People branch verified in mixed-view test); 710 tests, typecheck, build OK; stopped before Group 2B (EntityChildrenCard parent-image source rule needs documentation and written approval first)
 
 ## Deferred
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)

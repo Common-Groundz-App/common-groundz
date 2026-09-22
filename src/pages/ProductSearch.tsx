@@ -9,7 +9,29 @@ import { useUnifiedSearch } from '@/hooks/use-unified-search';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
+import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
+
+export const EntityResultThumbnail = ({ entity }: { entity: { id?: string; name?: string; type?: string; image_url?: string | null; metadata?: unknown } }) => {
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(entity);
+  const FallbackIcon = getEntityFallbackIcon(entity.type);
+  return (
+    <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+      {showFallback ? (
+        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+          <FallbackIcon className="h-1/2 w-1/2" aria-hidden="true" />
+        </div>
+      ) : (
+        <img
+          src={imageUrl ?? undefined}
+          alt={entity.name ?? ''}
+          className="w-full h-full object-cover"
+          onError={markImageFailed}
+        />
+      )}
+    </div>
+  );
+};
 
 export default function ProductSearch() {
   const { query } = useParams<{ query: string }>();
@@ -105,19 +127,7 @@ export default function ProductSearch() {
                       className="flex items-center gap-3 p-3 hover:bg-muted/50 cursor-pointer rounded-lg transition-colors"
                       onClick={() => navigate(getEntityUrlWithParent(entity))}
                     >
-                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                        {getOptimalEntityImageUrl(entity) ? (
-                          <img 
-                            src={getOptimalEntityImageUrl(entity) || ''} 
-                            alt={entity.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-                            {entity.type[0]?.toUpperCase()}
-                          </div>
-                        )}
-                      </div>
+                      <EntityResultThumbnail entity={entity} />
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-sm truncate">{entity.name}</h3>
                         <p className="text-xs text-muted-foreground truncate">{entity.venue}</p>

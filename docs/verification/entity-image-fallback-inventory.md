@@ -166,4 +166,21 @@ Runtime capture limitation, stated plainly: the browser auth status for this pro
 
 Verification run: Vitest 47 files / 694 tests passed; `bunx tsgo --noEmit` clean; focused ESLint on the three new test files clean; preview build watcher reported `build OK`.
 
-Group 2A (search and selection rows) has not been started.
+## Group 2A close-out evidence (search and selection rows)
+
+Group 2A migrated five thumbnail slots in four files to the shared fallback contract. Every surface kept its existing wrapper classes, size, radius, crop, spacing and layout; only the image source decision changed. Real images render byte-identically (same `src`, `object-cover`, `loading="lazy"` where it existed). Missing or broken images now render the canonical entity-type icon centered in the unchanged frame; unknown types render the neutral Tag icon. One real source attempt, then the local icon — no stock photo, no `/placeholder.svg`, no initials, no second network request.
+
+- `src/components/search/EntityResultItem.tsx` — 48×48 rounded square; the old first-letter initial block removed.
+- `src/pages/ProductSearch.tsx` — 48×48 square; exports `EntityResultThumbnail` for tests.
+- `src/components/profile/reviews/steps/SubjectSelectStep.tsx` — 48×48 lazy square; exports `SubjectThumbnail`.
+- `src/components/feed/UnifiedEntitySelector.tsx` — modal 44×44 and inline 32×32 entity-result rows via exported `EntityRowThumbnail`; the People branch and its avatar/initials fallback are untouched, as are every other avatar/initials surface (ProfileAvatar, AvatarFallback, ProfileDisplay, UserResultItem).
+
+Initiаls boundary held: entity first-letter initials were replaced by canonical type icons; user initials remain everywhere.
+
+Tests: `src/components/search/group2aEntityThumbnails.test.tsx` (16 tests) — real image unchanged per surface; missing → canonical icon; broken (error event) → identical icon; registered legacy placeholder → icon; unknown type (`hovercraft`) → neutral Tag icon; entity-switch source reset; modal/inline frame sizes preserved; and a mixed search-results view proving an image-less product shows the Package icon with no "M" initial while an image-less person still shows the "R" initial.
+
+Verification run: Vitest 48 files / 710 tests passed; `bunx tsgo --noEmit` clean; focused ESLint on the five changed files reports only pre-existing `no-explicit-any` errors on untouched lines (search callbacks, categorized spreads, funnel logging); preview build watcher reported `build OK`.
+
+Authenticated runtime capture remains unavailable (`external_unmanaged`), so live screenshots could not be taken; rendered-output assertions stand in, as in Group 1.
+
+Group 2B (EntityChildrenCard, entity sidebar parent/related rows, RecommendationEntityCard) has not been started. The EntityChildrenCard child → parent → stock source rule must be documented and approved in writing before 2B begins.
