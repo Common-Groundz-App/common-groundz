@@ -92,17 +92,6 @@ const imagelessUser = {
   avatar_url: null,
 };
 
-// Assigned before each selector test; referenced by the hoisted hook mock.
-let mockSearchResults: Record<string, unknown> = {};
-
-beforeEach(() => {
-  mockSearchResults = {
-    entities: [imagelessProduct],
-    users: [imagelessUser],
-    categorized: { books: [], movies: [], places: [] },
-    hashtags: [],
-  };
-});
 
 const asSearchResult = (value: Record<string, unknown>) =>
   value as unknown as EntitySearchResult;
