@@ -256,7 +256,9 @@ describe('mixed search results — initials boundary', () => {
     );
 
     // Entity row: canonical Product icon, and the old "M" initial is gone.
-    const entityName = await screen.findByText('Madagascar Centella Travel Kit');
+    // HighlightMatch splits the name around the query term, so match the
+    // highlighted fragment instead of the full string.
+    const entityName = await screen.findByText('Centella');
     const entityRow = entityName.closest('div[class*="cursor-pointer"]') as HTMLElement;
     expect(entityRow.querySelector('svg.lucide-package')).not.toBeNull();
     expect(entityRow.textContent).not.toContain('M ');
