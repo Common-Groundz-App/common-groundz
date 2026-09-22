@@ -25,9 +25,20 @@ vi.mock('@/components/admin/CreateEntityDialog', () => ({
 vi.mock('@/components/search/RecentSearchesPanel', () => ({
   RecentSearchesPanel: () => null,
 }));
+const selectorSearchResults = vi.hoisted(() => ({
+  entities: [
+    { id: 'entity-1', name: 'Madagascar Centella Travel Kit', type: 'product', image_url: null },
+  ],
+  users: [{ id: 'user-1', username: 'rishab.devp', avatar_url: null }],
+  categorized: { books: [], movies: [], places: [] },
+  hashtags: [],
+}));
+
 vi.mock('@/hooks/use-enhanced-realtime-search', () => ({
+  // Stable `results` reference: effects in the selector depend on it, so a
+  // fresh object per render would loop forever.
   useEnhancedRealtimeSearch: () => ({
-    results: mockSearchResults,
+    results: selectorSearchResults,
     isLoading: false,
     loadingStates: {},
   }),
