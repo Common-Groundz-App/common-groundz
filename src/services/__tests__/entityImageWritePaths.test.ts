@@ -12,34 +12,50 @@
  * - a failed lookup never clears an existing valid image.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Entity } from '@/services/recommendation/types';
 
-const insertCalls: Array<{ table: string; payload: any }> = [];
-const updateCalls: Array<{ table: string; payload: any }> = [];
-let existingEntityRow: any = null;
+type Row = Record<string, unknown>;
+
+const insertCalls: Array<{ table: string; payload: Row }> = [];
+const updateCalls: Array<{ table: string; payload: Row }> = [];
+let existingEntityRow: Row | null = null;
 
 vi.mock('@/integrations/supabase/client', () => {
-  const makeResult = (row: any) => {
-    const thenable: any = {
-      select: () => thenable,
-      limit: () => thenable,
-      eq: () => thenable,
+  interface QueryResult {
+    select: () => QueryResult;
+    limit: () => QueryResult;
+    eq: () => QueryResult;
+    order: () => QueryResult;
+    maybeSingle: () => Promise<{ data: Row | null; error: null }>;
+    single: () => Promise<{ data: Row | null; error: null }>;
+    then: (
+      onFulfilled: (value: { data: Row[]; error: null }) => unknown,
+      onRejected?: (reason: unknown) => unknown,
+    ) => Promise<unknown>;
+  }
+
+  const makeResult = (row: Row | null): QueryResult => {
+    const result: QueryResult = {
+      select: () => result,
+      limit: () => result,
+      eq: () => result,
+      order: () => result,
       maybeSingle: async () => ({ data: row, error: null }),
       single: async () => ({ data: row, error: null }),
-      order: () => thenable,
-      then: (onFulfilled: any, onRejected: any) =>
+      then: (onFulfilled, onRejected) =>
         Promise.resolve({ data: row ? [row] : [], error: null }).then(onFulfilled, onRejected),
     };
-    return thenable;
+    return result;
   };
 
   const from = (table: string) => ({
-    insert: (payload: any) => {
+    insert: (payload: Row | Row[]) => {
       const flat = Array.isArray(payload) ? payload[0] : payload;
       insertCalls.push({ table, payload: flat });
       return makeResult({ id: 'new-entity-id', slug: 'new-entity', ...flat });
     },
-    update: (payload: any) => ({
-      eq: async (_col: string, _val: string) => {
+    update: (payload: Row) => ({
+      eq: async () => {
         updateCalls.push({ table, payload });
         return { data: null, error: null };
       },
@@ -89,7 +105,7 @@ const REAL_IMAGE = 'https://cdn.example.com/photos/real-product.jpg';
 const REGISTERED_PLACEHOLDER = 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400';
 const LEGITIMATE_UNSPLASH = 'https://images.unsplash.com/photo-1700000000000-abcdefabcdef?w=400';
 
-const expectExplicitNullImage = (payload: any) => {
+const expectExplicitNullImage = (payload: Row) => {
   expect(Object.prototype.hasOwnProperty.call(payload, 'image_url')).toBe(true);
   expect(payload.image_url).toBeNull();
   expect(payload.image_url).not.toBe('');
@@ -136,9 +152,9 @@ describe('createEntity basic-insert fallback write path', () => {
   const create = async (imageUrl: string | null) => {
     forceQuickFailure = true;
     const { createEntity } = await import('@/services/recommendation/entityOperations');
-    await createEntity({
+    const draft = {
       name: 'Fallback entity',
-      type: 'product' as any,
+      type: 'product',
       venue: null,
       description: null,
       image_url: imageUrl,
@@ -146,7 +162,9 @@ describe('createEntity basic-insert fallback write path', () => {
       api_ref: null,
       metadata: {},
       website_url: null,
-    } as any);
+    } as unknown as Parameters<typeof createEntity>[0];
+
+    await createEntity(draft);
     expect(insertCalls).toHaveLength(1);
     return insertCalls[0].payload;
   };
@@ -179,9 +197,9 @@ describe('existing entity reuse', () => {
     };
 
     const { findOrCreateEntity } = await import('@/services/recommendation/entityOperations');
-    const result = await findOrCreateEntity(
+    const result: Entity | null = await findOrCreateEntity(
       'Existing entity',
-      'product' as any,
+      'product',
       'amazon',
       'ASIN123',
       null,

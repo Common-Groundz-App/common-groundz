@@ -6,31 +6,44 @@
  * image persists `image_url: null` exactly, exact registered legacy
  * placeholders persist null, and legitimate Unsplash images are preserved.
  */
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 
-const insertCalls: Array<{ table: string; payload: any }> = [];
-let urlMetadata: any = {};
+type Row = Record<string, unknown>;
+
+const insertCalls: Array<{ table: string; payload: Row }> = [];
+let urlMetadata: Row = {};
 
 vi.mock('@/integrations/supabase/client', () => {
-  const makeResult = (row: any) => {
-    const thenable: any = {
-      select: () => thenable,
-      limit: () => thenable,
-      eq: () => thenable,
+  interface QueryResult {
+    select: () => QueryResult;
+    limit: () => QueryResult;
+    eq: () => QueryResult;
+    maybeSingle: () => Promise<{ data: Row | null; error: null }>;
+    single: () => Promise<{ data: Row | null; error: null }>;
+    then: (
+      onFulfilled: (value: { data: Row[]; error: null }) => unknown,
+      onRejected?: (reason: unknown) => unknown,
+    ) => Promise<unknown>;
+  }
+
+  const makeResult = (row: Row | null): QueryResult => {
+    const result: QueryResult = {
+      select: () => result,
+      limit: () => result,
+      eq: () => result,
       maybeSingle: async () => ({ data: row, error: null }),
       single: async () => ({ data: row, error: null }),
-      then: (onFulfilled: any, onRejected: any) =>
+      then: (onFulfilled, onRejected) =>
         Promise.resolve({ data: row ? [row] : [], error: null }).then(onFulfilled, onRejected),
     };
-    return thenable;
+    return result;
   };
 
   return {
     supabase: {
       from: (table: string) => ({
-        insert: (payload: any) => {
+        insert: (payload: Row | Row[]) => {
           const flat = Array.isArray(payload) ? payload[0] : payload;
           insertCalls.push({ table, payload: flat });
           return makeResult({ id: 'inserted-id', ...flat });
@@ -73,7 +86,7 @@ const REAL_IMAGE = 'https://cdn.example.com/photos/real-product.jpg';
 const REGISTERED_PLACEHOLDER = 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400';
 const LEGITIMATE_UNSPLASH = 'https://images.unsplash.com/photo-1700000000000-abcdefabcdef?w=400';
 
-const expectExplicitNullImage = (payload: any) => {
+const expectExplicitNullImage = (payload: Row) => {
   expect(Object.prototype.hasOwnProperty.call(payload, 'image_url')).toBe(true);
   expect(payload.image_url).toBeNull();
   expect(payload.image_url).not.toBe('');
@@ -86,7 +99,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-const renderSearch = () => renderHook(() => useEntitySearch('product' as any)).result;
+const renderSearch = () => renderHook(() => useEntitySearch('product')).result;
 
 describe('createEntityFromExternal write path', () => {
   const create = async (imageUrl: string | null) => {
