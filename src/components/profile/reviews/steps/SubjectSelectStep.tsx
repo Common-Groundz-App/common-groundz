@@ -29,7 +29,7 @@ interface SubjectSelectStepProps {
   isResolvingContext?: boolean;
 }
 
-const SubjectThumbnail = ({ subject }: { subject: EntityAdapter }) => {
+export const SubjectThumbnail = ({ subject }: { subject: EntityAdapter }) => {
   const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(subject);
   const FallbackIcon = getEntityFallbackIcon(subject.type);
   return (

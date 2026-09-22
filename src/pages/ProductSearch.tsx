@@ -12,7 +12,7 @@ import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
 import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
 
-const EntityResultThumbnail = ({ entity }: { entity: { id?: string; name?: string; type?: string; image_url?: string | null; metadata?: unknown } }) => {
+export const EntityResultThumbnail = ({ entity }: { entity: { id?: string; name?: string; type?: string; image_url?: string | null; metadata?: unknown } }) => {
   const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(entity);
   const FallbackIcon = getEntityFallbackIcon(entity.type);
   return (
