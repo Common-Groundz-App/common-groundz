@@ -1,35 +1,57 @@
-# Group 3B — large photo areas on review and recommendation cards
+# Group 3B — large subject-image area on profile review and recommendation cards
 
-Final step of the fallback-consistency work. Two cards still fall back to remote stock photographs when neither the review/recommendation nor its subject has a real image. They will use the same shared fallback contract as every migrated surface.
+Closes the large-fallback group for the profile Reviews and Recs cards. The wider fallback programme stays open: explore grids, carousels, entity headers, skeletons, admin, version-gated legacy pages, `ImageWithFallback` and the legacy fallback helpers remain deferred or intentionally exempt.
 
 ## What changes for the user
 
-On a review card and a recommendation card, when there is no real photo:
+These cards can show four different things in the large image area today. Only one of them changes:
 
-- Today: a generic stock photograph of food / a shop / a book, fetched from the internet and unrelated to the actual subject.
-- After: the same large area, same size and rounded corners, soft neutral background, with a centered icon for the subject's type (film, book, place, product...). Unknown type gets a neutral tag icon.
+- Photos the author uploaded — unchanged.
+- An older single uploaded photo — unchanged.
+- The subject's own picture, used when the author uploaded nothing — still shown, unchanged when it loads.
+- A generic stock photograph from the internet when nothing above exists — this disappears.
 
-A missing image and a broken image now look identical. Real photos are untouched — where a review has its own photos, or the subject has a real image, nothing changes at all.
+In its place, the same large area keeps its size, rounded corners and spacing, with a soft neutral background and a centred icon for the subject's type. A subject picture that is missing, broken, or one of the known old stock placeholders now all look the same. On entity pages, where these cards deliberately show no filler image at all, nothing appears — exactly as today.
 
 ## Scope
 
-Two files:
+- `src/components/profile/reviews/ReviewCard.tsx` (live via `ProfileReviews`; entity-detail callers pass `hideEntityFallbacks` + `compact`)
+- `src/components/recommendations/RecommendationCard.tsx` (live via `ProfileRecommendations`)
 
-- `src/components/profile/reviews/ReviewCard.tsx` — the `h-48` fallback block (around line 646) and its `getFallbackImage` helper
-- `src/components/recommendations/RecommendationCard.tsx` — the `h-48` fallback block (around line 362) and its `getFallbackImage` helper
-
-Untouched in both: the `PostMediaDisplay` path for real user media, `shouldShowMedia` / `hideEntityFallbacks` logic, the entity-image-as-fallback step, badges, labels, rating rings, user avatars and initials, spacing, navigation, timelines, menus, and the compact variant's media block.
-
-Everything previously declared out of scope stays out of scope: `MyStuffItemCard`, explore grids, carousels, entity headers, skeletons, admin, `ImageWithFallback` itself, `getOptimalEntityImageUrl`, the legacy stock-photo helpers, database rows, schema, generated types.
+Not touched: `src/components/ReviewCard.tsx` (Entity V4 reviews), `PostFeedItem` recommendation posts, `RecommendationEntityCard`, journey and chat cards, `MyStuffItemCard`, explore grids, carousels, headers, skeletons, admin, `ImageWithFallback`, `getOptimalEntityImageUrl`, legacy stock helpers, database rows, schema, generated types. Badges, labels, rating rings, timelines, menus, avatars and initials, navigation and all spacing stay as they are.
 
 ## Technical detail
 
-1. Add one small local thumbnail component per card (mirroring `EntityChildThumbnail` / `RecommendationEntityThumbnail`) that:
-   - resolves the single real source in the existing precedence — review/recommendation media, then legacy `image_url`, then the subject's image via the shared resolver — through `useEntityImageFallback` semantics (one real source, no second network request);
-   - on missing or failed load renders the preserved wrapper `rounded-md overflow-hidden relative bg-gray-50 mt-2 mb-3 h-48` with a centered `getEntityFallbackIcon(resolvedType)` at proportional size (`h-12 w-12`), `role="img"` and an `aria-label` naming the subject so the missing-image state keeps accessible meaning.
-2. Remove from both files: `ImageWithFallback` usage in this block, `getEntityTypeFallbackImage` in the fallback path, and the `'/placeholder.svg'` literal in `ReviewCard.getFallbackImage`. Keep `getEntityTypeLabel` / `getCanonicalType` imports, which serve the badges.
-3. Type resolution stays strict: `resolvedType` from `resolveReviewDisplayType` in `ReviewCard`, `recommendation.category` parsed canonically in `RecommendationCard`. No coercion to `product`/`place`; unknown → neutral icon.
-4. Tests: a new focused file `src/components/profile/reviews/group3bLargeThumbnails.test.tsx` registered in `vitest.config.ts`, covering — real image renders unchanged; missing image renders the type icon inside the preserved `h-48` frame; broken image converges to the same fallback; unknown type gets the neutral icon; no stock URL appears in either card's output.
-5. Verification: focused tests, full suite, `bunx tsgo --noEmit`, focused lint on the two files (pre-existing findings reported separately), preview build, then close-out lines in `docs/verification/entity-image-fallback-inventory.md` and `roadmap.md`.
+### 1. Separate author media from the subject-image fallback
 
-This closes the app-wide entity-image fallback consistency work.
+Today `mediaItems` merges author media, legacy `image_url` **and** the entity image, so a broken entity URL renders inside `PostMediaDisplay` and can never reach a fallback. Fix the classification in both cards:
+
+- `mediaItems` keeps only author-authored sources (`review.media` / `recommendation.media`, then legacy `image_url`). The entity image is removed from this array.
+- `shouldShowMedia` is derived from author media only, preserving today's outcome for those cases.
+- A new local component (`ReviewEntityFallbackImage` / `RecommendationEntityFallbackImage`) renders the subject image when there is no author media and entity fallbacks are allowed (`!hideEntityFallbacks`). It uses `useEntityImageFallback`, so valid / missing / broken / registered-placeholder sources converge: one real source, then `getEntityFallbackIcon(resolvedType)` centred in the preserved wrapper `rounded-md overflow-hidden relative bg-gray-50 mt-2 mb-3 h-48`, icon `h-12 w-12`, `role="img"` with an `aria-label` naming the subject.
+- When `hideEntityFallbacks` is true, neither the subject image nor the icon renders — the current suppression is preserved exactly.
+- Remove from these paths: `ImageWithFallback`, `getEntityTypeFallbackImage` in the fallback, the `'/placeholder.svg'` literal in `ReviewCard.getFallbackImage`, and the `getFallbackImage` helpers themselves. `getEntityTypeLabel` / `getCanonicalType` stay for the badges.
+- Strict types: `resolvedType` from `resolveReviewDisplayType`; `recommendation.category` parsed canonically. No coercion to `product`/`place`; unknown → neutral tag icon.
+
+Visual note: where the entity image loads, the large area renders the same real image through the same frame and `object-cover` as today.
+
+### 2. Tests
+
+New focused file `src/components/profile/reviews/group3bLargeFallback.test.tsx`, registered in `vitest.config.ts`, covering both cards:
+
+- author media present → author media still wins, entity fallback absent
+- no author media + valid entity image → entity image renders in the preserved frame
+- no author media + no entity image → type icon in the preserved frame
+- entity image present but broken (error event) → same type icon, no second request, no stock URL
+- registered legacy placeholder as entity image → same type icon
+- unknown / unresolvable type → neutral icon
+- `hideEntityFallbacks` true → no entity image and no icon block at all
+- no stock photo URL appears in either card's rendered output
+
+### 3. Visual fixture before close-out
+
+Render a controlled desktop and mobile fixture of the empty state, capture both, and review the balance of the neutral background plus centred icon in the ~192px-tall area. If it reads too sparse, adjust only fallback presentation (icon size, background tone) — never the frame, card structure, or spacing — and re-capture. Then stop for visual approval.
+
+### 4. Verification
+
+Focused tests, full suite, `bunx tsgo --noEmit`, focused lint on the two files (pre-existing findings reported separately), preview build, then close-out lines in `docs/verification/entity-image-fallback-inventory.md` and `roadmap.md` recording this as the profile review/recommendation large-fallback group, with the remaining deferred groups still listed as open.
