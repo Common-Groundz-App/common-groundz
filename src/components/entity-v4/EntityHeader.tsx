@@ -10,7 +10,7 @@ import { useEntitySave } from '@/hooks/use-entity-save';
 import { useEntityShare } from '@/hooks/use-entity-share';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTapDetection } from '@/hooks/use-tap-detection';
-import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal, RefreshCw, ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { Link, useLocation } from 'react-router-dom';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
