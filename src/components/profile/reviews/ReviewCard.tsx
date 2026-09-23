@@ -104,13 +104,13 @@ const ReviewCard = ({
   });
   const resolvedType = displayTypeValue(displayType);
 
-  // Get a fallback image using canonical helper — only ever with a verified type.
-  const getFallbackImage = (): string => {
-    if (entityImageUrl) {
-      return entityImageUrl;
-    }
-    return resolvedType ? getEntityTypeFallbackImage(resolvedType) : '/placeholder.svg';
-  };
+  // Group 3B: the large subject area renders only where it renders today.
+  const showEntityFallbackArea = shouldRenderEntityFallbackArea({
+    authorMediaCount: mediaItems.length,
+    hideEntityFallbacks,
+    compact,
+  });
+  
   
   const getBadgeColor = (category: string) => {
     const canonical = getCanonicalType(category);
@@ -617,17 +617,15 @@ const ReviewCard = ({
             </div>
           )}
           
-          {/* Fallback when no media should be shown */}
-          {!shouldShowMedia && !hideEntityFallbacks && mediaItems.length === 0 && (
+          {/* Subject image area — real subject image, else canonical type icon */}
+          {showEntityFallbackArea && (
             <div className="mt-3">
-              <div className="rounded-md overflow-hidden relative bg-gray-50 mt-2 mb-3 h-48">
-                <ImageWithFallback
-                  src={getFallbackImage()}
-                  alt={`${review.title} - ${resolvedType ? getEntityTypeLabel(resolvedType) : 'Review'}`}
-                  className="w-full h-full object-cover"
-                  fallbackSrc={resolvedType ? getEntityTypeFallbackImage(resolvedType) : undefined}
-                />
-              </div>
+              <EntityCardFallbackImage
+                entity={review.entity}
+                type={resolvedType}
+                imageAlt={`${review.title} - ${resolvedType ? getEntityTypeLabel(resolvedType) : 'Review'}`}
+                fallbackLabel={`No image available for ${review.title}`}
+              />
             </div>
           )}
           
