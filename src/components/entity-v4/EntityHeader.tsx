@@ -10,15 +10,15 @@ import { useEntitySave } from '@/hooks/use-entity-save';
 import { useEntityShare } from '@/hooks/use-entity-share';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTapDetection } from '@/hooks/use-tap-detection';
-import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal, RefreshCw, ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal, ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { Link, useLocation } from 'react-router-dom';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EntityHeaderImage } from '@/components/entity-v4/EntityHeaderImage';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityFollowersCount } from '@/components/entity/EntityFollowersCount';
@@ -32,7 +32,8 @@ import { getOfferingContextLine } from '@/services/entityRelationshipRegistry';
 interface EntityHeaderProps {
   entity: Entity;
   stats: EntityStats | null;
-  entityImage: string;
+  /** The entity's own image source, or null when it has none. Never ''. */
+  entityImage: string | null;
   entityData: {
     name: string;
     description: string;
@@ -79,18 +80,9 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
     }
   }, [user, entity?.id]);
   
-  // State for image refresh functionality
-  const [isImageExpired, setIsImageExpired] = useState(false);
-  
   // State for expandable description
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const shouldTruncateDescription = entityData.description && entityData.description.length > 200;
-
-  // Reset expiration flag when entityImage prop changes (after successful refresh)
-  useEffect(() => {
-    console.log('EntityHeader: entityImage prop changed, resetting expiration flag');
-    setIsImageExpired(false);
-  }, [entityImage]);
   
   // Fetch entity hierarchy data
   const {
@@ -165,48 +157,16 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
             {/* Mobile: Stack image above content, Desktop: side-by-side */}
             <div className={`${isMobile ? 'flex flex-col' : 'flex gap-6'}`}>
               {/* Image with refresh capability */}
-              <div className={`${
-                isMobile 
-                  ? 'w-full h-48 mb-4 rounded-lg overflow-hidden' 
-                  : 'flex-shrink-0 h-24 w-24 min-w-[96px] rounded-lg overflow-hidden'
-                } relative group ${entity.type === 'brand' ? 'bg-muted' : ''}`}>
-                <ImageWithFallback
-                  src={entityImage}
-                  alt={entityData.name}
-                  entityType={entity.type}
-                  className={`h-full w-full ${entity.type === 'brand' ? 'object-contain' : 'object-cover'}`}
-                  onError={() => {
-                    console.log('EntityHeader: Hero image failed to load (expired/403), showing refresh button');
-                    setIsImageExpired(true);
-                  }}
-                  suppressConsoleErrors={false}
-                />
-
-                
-                {/* Refresh Button - Only shown when image is expired AND user is authenticated */}
-                {user && isImageExpired && onRefreshHeroImage && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm animate-in fade-in duration-300">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="default"
-                            size="icon"
-                            onClick={() => onRefreshHeroImage?.()}
-                            disabled={isRefreshingImage}
-                            className="bg-white/90 hover:bg-white text-gray-900 shadow-lg"
-                          >
-                            <RefreshCw className={`w-5 h-5 ${isRefreshingImage ? 'animate-spin' : ''}`} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{isRefreshingImage ? 'Refreshing...' : 'Refresh Image'}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                )}
-              </div>
+              <EntityHeaderImage
+                entityId={entity?.id}
+                entityType={entity?.type}
+                entityImage={entityImage}
+                name={entityData.name}
+                isMobile={isMobile}
+                isSignedIn={!!user}
+                onRefreshHeroImage={onRefreshHeroImage}
+                isRefreshingImage={isRefreshingImage}
+              />
               
               {/* Content */}
               <div className="flex-1 relative">

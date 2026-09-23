@@ -7,7 +7,6 @@ import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
 import SEOHead from '@/components/seo/SEOHead';
 import EntityStructuredData from '@/components/seo/EntityStructuredData';
 import PublicContentNotFound from '@/components/content/PublicContentNotFound';
-import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageSquare } from "lucide-react";
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
@@ -18,7 +17,7 @@ import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
 import { useToast } from '@/hooks/use-toast';
 import { EntityFollowerModal } from '@/components/entity/EntityFollowerModal';
 import { EntityRecommendationModal } from '@/components/entity/EntityRecommendationModal';
-import { EntityType, Entity } from '@/services/recommendation/types';
+import { Entity } from '@/services/recommendation/types';
 import { useUserFollowing } from '@/hooks/useUserFollowing';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { useEntitySiblings } from '@/hooks/use-entity-siblings';
@@ -469,7 +468,9 @@ const EntityV4 = () => {
   }
 
   // Get entity image with fallback
-  const entityImage = entity?.image_url || getEntityTypeFallbackImage(entity?.type || EntityType.Product);
+  // Group 5: no stock substitution — the header receives only the entity's own
+  // image source and renders the canonical local fallback when there is none.
+  const entityImage = entity?.image_url ?? null;
   
   // Prepare entity data using real data (for EntityHeader only)
   const entityData = {
@@ -478,7 +479,6 @@ const EntityV4 = () => {
     rating: stats?.averageRating || 0,
     totalReviews: stats?.reviewCount || 0,
     claimed: entity?.is_claimed || false,
-    image: entityImage,
     website: entity?.website_url || '',
     location: entity?.venue || '',
     email: '',
