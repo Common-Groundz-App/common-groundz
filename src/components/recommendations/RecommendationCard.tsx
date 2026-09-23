@@ -52,16 +52,6 @@ const RecommendationCard = ({
   const [likes, setLikes] = useState(recommendation.likes || 0);
   
 
-  // Get optimal entity image URL - prioritizes stored photos over proxy URLs
-  const entityImageUrl = getOptimalEntityImageUrl(recommendation.entity);
-
-  console.log(`RecommendationCard - Recommendation ${recommendation.id} entity data:`, {
-    hasEntity: !!recommendation.entity,
-    entityId: recommendation.entity?.id,
-    entityName: recommendation.entity?.name,
-    entityImageUrl: entityImageUrl
-  });
-
   // Canonical entity destination. Phase 4.3 Gate 6: the app serves entity pages
   // only under `/entity/:slug` (and `/entity/:parentSlug/:childSlug`), so the
   // canonical helper is the single source of truth here — type-prefixed paths
@@ -73,66 +63,34 @@ const RecommendationCard = ({
     return getEntityUrlWithParent(entity);
   };
 
-  // Process media items for proper fallback handling
-  const mediaItems = React.useMemo(() => {
-    console.log(`Processing media for recommendation ${recommendation.id}:`, {
-      hasMedia: Boolean(recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0),
-      hasImageUrl: Boolean(recommendation.image_url),
-      hasEntityImage: Boolean(entityImageUrl),
-      entityId: recommendation.entity?.id
-    });
-    
-    // If media array is already provided (user uploads)
-    if (recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0) {
-      console.log(`Using ${recommendation.media.length} media items from recommendation.media`);
-      return recommendation.media as MediaItem[];
-    }
-    
-    // If we have a legacy image_url (user upload)
-    if (recommendation.image_url) {
-      console.log(`Using legacy image_url: ${recommendation.image_url}`);
-      return [{
-        url: recommendation.image_url,
-        type: 'image' as const,
-        order: 0,
-        id: recommendation.id
-      }] as MediaItem[];
-    }
-    
-    // If we have an entity with an image, use it as fallback
-    if (entityImageUrl) {
-      console.log(`Using entity image as fallback: ${entityImageUrl}`);
-      return [{
-        url: entityImageUrl,
-        type: 'image' as const,
-        order: 0,
-        id: `entity-${recommendation.entity?.id}`,
-        source: 'entity' // Mark as entity fallback
-      }] as MediaItem[];
-    }
-    
-    console.log(`No media found for recommendation ${recommendation.id}, using empty array`);
-    return [] as MediaItem[];
-  }, [recommendation, entityImageUrl]);
+  // Group 3B: author-authored media only. The subject (entity) image is no
+  // longer merged in here, so a broken subject image can reach the shared
+  // fallback contract instead of failing silently inside PostMediaDisplay.
+  const mediaItems = React.useMemo<MediaItem[]>(
+    () => getAuthorMediaItems({
+      id: recommendation.id,
+      media: recommendation.media,
+      image_url: recommendation.image_url,
+    }),
+    [recommendation.id, recommendation.media, recommendation.image_url],
+  );
 
   // Determine if media should be shown based on hideEntityFallbacks setting
-  const shouldShowMedia = React.useMemo(() => {
-    if (!hideEntityFallbacks) {
-      return mediaItems.length > 0; // Show everything normally (profile/feed pages)
-    }
-    
-    // On entity pages: only show if there's actual user content in media array
-    const hasUserMediaArray = recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0;
-    return hasUserMediaArray;
-  }, [recommendation.media, hideEntityFallbacks, mediaItems.length]);
+  const shouldShowMedia = React.useMemo(() => shouldShowAuthorMedia({
+    hasMediaArray: Boolean(
+      recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0,
+    ),
+    authorMediaCount: mediaItems.length,
+    hideEntityFallbacks,
+  }), [recommendation.media, hideEntityFallbacks, mediaItems.length]);
 
-  // Get a fallback image using canonical helper
-  const getFallbackImage = (): string => {
-    if (entityImageUrl) {
-      return entityImageUrl;
-    }
-    return recommendation.category ? getEntityTypeFallbackImage(recommendation.category) : getEntityTypeFallbackImage(EntityType.Product);
-  };
+  // Group 3B: the large subject area renders only where it renders today.
+  const showEntityFallbackArea = shouldRenderEntityFallbackArea({
+    authorMediaCount: mediaItems.length,
+    hideEntityFallbacks,
+    compact,
+  });
+
 
   const handleLike = async () => {
     if (!requireAuth({ action: 'like', surface: 'recommendation_card', recommendationId: recommendation?.id, entityName: recommendation?.entity?.name })) return;
