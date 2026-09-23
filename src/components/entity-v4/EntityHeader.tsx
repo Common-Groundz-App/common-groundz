@@ -178,64 +178,16 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
             {/* Mobile: Stack image above content, Desktop: side-by-side */}
             <div className={`${isMobile ? 'flex flex-col' : 'flex gap-6'}`}>
               {/* Image with refresh capability */}
-              <div className={`${
-                isMobile 
-                  ? 'w-full h-48 mb-4 rounded-lg overflow-hidden' 
-                  : 'flex-shrink-0 h-24 w-24 min-w-[96px] rounded-lg overflow-hidden'
-                } relative group ${entity.type === 'brand' ? 'bg-muted' : ''}`}>
-                {showHeroFallback ? (
-                  <span
-                    role="img"
-                    aria-label={`No image available for ${entityData.name}`}
-                    className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground"
-                    data-testid="entity-header-image-fallback"
-                  >
-                    <HeroFallbackIcon
-                      className={isMobile ? 'h-12 w-12' : 'h-10 w-10'}
-                      aria-hidden="true"
-                    />
-                  </span>
-                ) : (
-                  <img
-                    src={heroImageUrl ?? undefined}
-                    alt={entityData.name}
-                    className={`h-full w-full ${entity.type === 'brand' ? 'object-contain' : 'object-cover'}`}
-                    onError={() => {
-                      markHeroImageFailed();
-                      setIsImageExpired(true);
-                    }}
-                    data-testid="entity-header-image"
-                  />
-                )}
-
-                
-                {/* Refresh Button - Only shown when a real image was attempted and
-                    genuinely failed to load, AND the user is authenticated. A missing
-                    or registered legacy-placeholder source never reaches the <img>,
-                    so it can never surface this overlay. */}
-                {user && isImageExpired && heroImageUrl && onRefreshHeroImage && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg backdrop-blur-sm animate-in fade-in duration-300">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="default"
-                            size="icon"
-                            onClick={() => onRefreshHeroImage?.()}
-                            disabled={isRefreshingImage}
-                            className="bg-white/90 hover:bg-white text-gray-900 shadow-lg"
-                          >
-                            <RefreshCw className={`w-5 h-5 ${isRefreshingImage ? 'animate-spin' : ''}`} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{isRefreshingImage ? 'Refreshing...' : 'Refresh Image'}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                )}
-              </div>
+              <EntityHeaderImage
+                entityId={entity?.id}
+                entityType={entity?.type}
+                entityImage={entityImage}
+                name={entityData.name}
+                isMobile={isMobile}
+                isSignedIn={!!user}
+                onRefreshHeroImage={onRefreshHeroImage}
+                isRefreshingImage={isRefreshingImage}
+              />
               
               {/* Content */}
               <div className="flex-1 relative">
