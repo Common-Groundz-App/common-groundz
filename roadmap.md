@@ -326,7 +326,12 @@ cross-read between them.
 
 - [x] Group 3B — profile review/recommendation large subject-image area on the shared fallback contract (author media separated from subject image; hideEntityFallbacks and compact semantics preserved; 750 tests)
 
+- [x] Group 4 — explore grids and entity collections (FeaturedEntities, all three CategoryHighlights branches, SiblingCarousel, RelatedEntitiesSection) on the shared fallback contract via EntityCollectionImage; per-surface real-image precedence preserved (optimal resolution on explore, raw image_url on siblings/related); hover zoom only where it exists; non-live EntityRelatedCard example and the loading skeleton excluded; 759 tests, typecheck, build clean
+
 ## Deferred
+- [ ] Group 5 — responsive entity header / large entity placeholders (outstanding visual decision; frame unchanged)
+- [ ] Group 6 — admin surfaces plus SearchResultHandler, ProductResultItem and EntitySearch (incl. its external-result write path), and any live version-gated legacy pages
+- [ ] Post-group cleanup — ImageWithFallback simplification, legacy stock-helper deletion once zero active callers are proven, optional historical database cleanup of known stock placeholder rows, the getOptimalEntityImageUrl resolver decision, final inventory audit
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
 - [ ] Manual remediation of legacy unlinked reviews
 
