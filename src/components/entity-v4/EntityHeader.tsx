@@ -14,8 +14,7 @@ import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Na
 import { Link, useLocation } from 'react-router-dom';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
-import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
+import { EntityHeaderImage } from '@/components/entity-v4/EntityHeaderImage';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
@@ -81,29 +80,9 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
     }
   }, [user, entity?.id]);
   
-  // State for image refresh functionality
-  const [isImageExpired, setIsImageExpired] = useState(false);
-  
   // State for expandable description
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const shouldTruncateDescription = entityData.description && entityData.description.length > 200;
-
-  // Reset the expiration flag whenever the entity identity or its image source
-  // changes, so a failed image on one entity can never leave a refresh overlay
-  // on the next one (same URL, or no URL on either side).
-  useEffect(() => {
-    setIsImageExpired(false);
-  }, [entity?.id, entityImage]);
-
-  // Shared fallback contract: missing, broken and registered legacy-placeholder
-  // sources all converge on the canonical local type icon. Only the entity's own
-  // image_url is passed, so today's real-image precedence is unchanged.
-  const {
-    imageUrl: heroImageUrl,
-    showFallback: showHeroFallback,
-    markImageFailed: markHeroImageFailed,
-  } = useEntityImageFallback({ id: entity?.id, image_url: entityImage });
-  const HeroFallbackIcon = getEntityFallbackIcon(entity?.type);
   
   // Fetch entity hierarchy data
   const {
