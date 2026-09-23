@@ -319,17 +319,15 @@ const RecommendationCard = ({
           </div>
         )}
         
-        {/* Fallback when no media should be shown */}
-        {!shouldShowMedia && !hideEntityFallbacks && mediaItems.length === 0 && (
+        {/* Subject image area — real subject image, else canonical type icon */}
+        {showEntityFallbackArea && (
           <div className="mt-3">
-            <div className="rounded-md overflow-hidden relative bg-gray-50 mt-2 mb-3 h-48">
-              <ImageWithFallback
-                src={getFallbackImage()}
-                alt={`${recommendation.title} - ${recommendation.category || 'Recommendation'}`}
-                className="w-full h-full object-cover"
-                fallbackSrc={recommendation.category ? getEntityTypeFallbackImage(recommendation.category) : undefined}
-              />
-            </div>
+            <EntityCardFallbackImage
+              entity={recommendation.entity}
+              type={recommendation.category}
+              imageAlt={`${recommendation.title} - ${recommendation.category || 'Recommendation'}`}
+              fallbackLabel={`No image available for ${recommendation.title}`}
+            />
           </div>
         )}
         
