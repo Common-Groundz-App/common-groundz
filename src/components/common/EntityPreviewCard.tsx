@@ -1,7 +1,8 @@
 
 import React from "react";
 import { cn } from "@/lib/utils";
-import { ImageWithFallback } from "./ImageWithFallback";
+import { useEntityImageFallback } from "@/hooks/useEntityImageFallback";
+import { getEntityFallbackIcon } from "@/utils/entityImageFallback";
 import { MapPin } from "lucide-react";
 
 interface EntityPreviewCardProps {
@@ -34,6 +35,9 @@ export const EntityPreviewCard = ({
   onChange,
   disableChange = false, // Default to false to maintain backward compatibility
 }: EntityPreviewCardProps) => {
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(entity);
+  const FallbackIcon = getEntityFallbackIcon(type);
+
   if (!entity) return null;
 
   // Get address from metadata if available (for Google Places)
@@ -92,18 +96,21 @@ export const EntityPreviewCard = ({
       )}>
         {/* Image section */}
         <div className="flex-shrink-0">
-          {entity.image_url ? (
-            <ImageWithFallback
-              src={entity.image_url}
+          {showFallback ? (
+            <div
+              className="w-full sm:w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center text-muted-foreground text-sm font-semibold border"
+              role="img"
+              aria-label={entity.name || entity.title || "Preview"}
+            >
+              <FallbackIcon className="h-8 w-8" aria-hidden="true" />
+            </div>
+          ) : (
+            <img
+              src={imageUrl || ''}
               alt={entity.name || entity.title || "Preview"}
               className="w-full sm:w-24 h-24 object-cover rounded-lg border bg-gray-100"
-              fallbackSrc="https://images.unsplash.com/photo-1495195134817-aeb325a55b65?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1776&q=80"
-              onError={(e) => console.error("Image failed to load:", entity.image_url)}
+              onError={markImageFailed}
             />
-          ) : (
-            <div className="w-full sm:w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center text-muted-foreground text-sm font-semibold border">
-              No image
-            </div>
           )}
         </div>
         

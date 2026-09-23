@@ -198,3 +198,19 @@ Tests: `src/components/entity/group2bEntityThumbnails.test.tsx` (14 tests) — e
 Verification run: Vitest 49 files / 724 tests passed; `bunx tsgo --noEmit` clean; focused ESLint on the changed files reports only pre-existing `no-explicit-any` errors on untouched `EntitySidebar` lines; preview production build passed. Authenticated runtime capture remains unavailable (`external_unmanaged`), so rendered-output assertions are the approved substitute for live screenshots.
 
 Stopped after Group 2B. No card/grid/header/admin migration was started.
+
+## Group 3A close-out evidence (card thumbnails)
+
+Group 3A migrated three card surfaces to the shared fallback contract. Every surface kept its existing wrapper classes, size, radius, crop, spacing and layout; only the image-source decision changed. Real images render byte-identically. Missing and broken images now converge on the canonical entity-type icon; unknown types render the neutral Tag icon. One real-source attempt, then the local icon — no stock photo, no `/placeholder.svg`, no initials, no second network request.
+
+- `src/components/mystuff/saved/SavedEntityCard.tsx` — 64×64 `rounded-lg` `object-cover` frame preserved. Its file-local 6-type icon map was deleted in favour of the 15-type canonical map; the image now resolves through the shared contract instead of raw `image_url`, and broken images converge on the same icon as missing ones (previously a remote stock photo via `ImageWithFallback`).
+- `src/components/chat/ChatEntityCard.tsx` — 48×48 `rounded-md` `object-cover` frame preserved. Both stock helpers and the `onError` stock reassignment were removed; the silent `unknown → product` type coercion is gone — unknown types render the neutral Tag icon.
+- `src/components/common/EntityPreviewCard.tsx` — the responsive `w-full sm:w-24 h-24` bordered `rounded-lg` frame preserved verbatim. The inline hard-coded Unsplash literal is removed. Approved one-time fallback-content change: the visible "No image" text block is replaced by the canonical type icon, and the fallback element carries `role="img"` with an `aria-label` naming the entity so the missing-image state keeps accessible meaning. Its only live caller (`profile/reviews/steps/StepThree.tsx`) is entity-only.
+
+Explicitly unchanged: `ImageWithFallback`, `getOptimalEntityImageUrl`, the shared legacy helpers (still used by unmigrated surfaces), `RecommendationCard`/`ReviewCard` h-48 blocks (Group 3B, separate approval), `MyStuffItemCard` (no image block when no image, as agreed), explore grids, carousels, headers, skeletons, admin, database rows, schema, generated types, keyboard markup, and every user/profile avatar or initials fallback.
+
+Tests: `src/components/mystuff/saved/group3aCardThumbnails.test.tsx` (14 tests) — real image unchanged per surface with exact frame classes; missing → canonical icon; broken (error event) → identical icon; registered legacy placeholder → icon; unknown type → neutral Tag (and no product icon in the chat card); entity-switch source reset; EntityPreviewCard fallback exposes an accessible label and no "No image" text remains.
+
+Verification run: Vitest 50 files / 738 tests passed; `bunx tsgo --noEmit` clean; focused ESLint on the four files reports only three pre-existing `no-explicit-any` errors on untouched `ChatEntityCard` lines (metadata/rating casts); preview build watcher reported `build OK`. Authenticated runtime capture remains unavailable (`external_unmanaged`), so rendered-output assertions stand in, as in earlier groups.
+
+Stopped after Group 3A. No Group 3B, explore-grid, carousel, header, or admin migration was started.

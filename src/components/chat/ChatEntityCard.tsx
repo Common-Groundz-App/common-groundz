@@ -2,8 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { Users } from 'lucide-react';
 import { Entity } from '@/services/recommendation/types';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
-import { getEntityTypeFallbackImage as getTypeHelperFallback } from '@/services/entityTypeHelpers';
-import { getOptimalEntityImageUrl, getEntityTypeFallbackImage } from '@/utils/entityImageUtils';
+import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
+import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { cn } from '@/lib/utils';
 
@@ -204,9 +204,10 @@ export function ChatEntityCard({
   // Explicit guard for valid rating display
   const hasValidRating = typeof displayRating === 'number' && displayRating > 0 && !isNaN(displayRating);
   
-  // Get image URL with optimal helper - prioritizes stored photos over proxy URLs
-  const imageUrl = getOptimalEntityImageUrl(entity) || getEntityTypeFallbackImage(entityType || entity?.type || 'product');
-  
+  // Shared fallback contract: real image once, then the canonical type icon
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(entity);
+  const FallbackIcon = getEntityFallbackIcon(entityType || entity?.type);
+
   // Get smart subtitle for card (replaces verbose description)
   const subtitle = getSmartSubtitle(entity, entityType, reason);
   
@@ -238,15 +239,17 @@ export function ChatEntityCard({
         </div>
       )}
       {/* Entity Image */}
-      <div className="w-12 h-12 rounded-md overflow-hidden shrink-0 bg-muted">
-        <img
-          src={imageUrl}
-          alt={entityName}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = getEntityTypeFallbackImage(entityType || 'product');
-          }}
-        />
+      <div className="w-12 h-12 rounded-md overflow-hidden shrink-0 bg-muted flex items-center justify-center">
+        {showFallback ? (
+          <FallbackIcon className="h-1/2 w-1/2 text-muted-foreground" aria-hidden="true" />
+        ) : (
+          <img
+            src={imageUrl || ''}
+            alt={entityName}
+            className="w-full h-full object-cover"
+            onError={markImageFailed}
+          />
+        )}
       </div>
       
       {/* Content */}
