@@ -29,7 +29,10 @@ Today `mediaItems` merges author media, legacy `image_url` **and** the entity im
 - `mediaItems` keeps only author-authored sources (`review.media` / `recommendation.media`, then legacy `image_url`). The entity image is removed from this array.
 - `shouldShowMedia` is derived from author media only, preserving today's outcome for those cases.
 - A new local component (`ReviewEntityFallbackImage` / `RecommendationEntityFallbackImage`) renders the subject image when there is no author media and entity fallbacks are allowed (`!hideEntityFallbacks`). It uses `useEntityImageFallback`, so valid / missing / broken / registered-placeholder sources converge: one real source, then `getEntityFallbackIcon(resolvedType)` centred in the preserved wrapper `rounded-md overflow-hidden relative bg-gray-50 mt-2 mb-3 h-48`, icon `h-12 w-12`, `role="img"` with an `aria-label` naming the subject.
-- When `hideEntityFallbacks` is true, neither the subject image nor the icon renders — the current suppression is preserved exactly.
+- Visibility rules are preserved verbatim, not re-derived:
+  - `hideEntityFallbacks` false → explicit media array or legacy `image_url` may display; otherwise the subject image / icon fallback renders.
+  - `hideEntityFallbacks` true → only the explicit user-media array displays under today's rule; legacy `image_url` stays suppressed exactly as now, and neither the subject image nor the icon renders.
+- The compact variant gains nothing: no large `h-48` subject block is added to compact mode, which keeps legacy entity-detail callers (`compact` + `hideEntityFallbacks`) visually identical.
 - Remove from these paths: `ImageWithFallback`, `getEntityTypeFallbackImage` in the fallback, the `'/placeholder.svg'` literal in `ReviewCard.getFallbackImage`, and the `getFallbackImage` helpers themselves. `getEntityTypeLabel` / `getCanonicalType` stay for the badges.
 - Strict types: `resolvedType` from `resolveReviewDisplayType`; `recommendation.category` parsed canonically. No coercion to `product`/`place`; unknown → neutral tag icon.
 
@@ -46,6 +49,8 @@ New focused file `src/components/profile/reviews/group3bLargeFallback.test.tsx`,
 - registered legacy placeholder as entity image → same type icon
 - unknown / unresolvable type → neutral icon
 - `hideEntityFallbacks` true → no entity image and no icon block at all
+- `hideEntityFallbacks` true with only a legacy `image_url` → still suppressed, matching today's behaviour
+- `compact` variant (with and without `hideEntityFallbacks`) → no large `h-48` subject block appears
 - no stock photo URL appears in either card's rendered output
 
 ### 3. Visual fixture before close-out
