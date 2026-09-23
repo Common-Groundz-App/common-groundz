@@ -8,7 +8,7 @@ import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
-import { getEntityTypeLabel, getEntityTypeFallbackImage, getCanonicalType } from '@/services/entityTypeHelpers';
+import { getEntityTypeLabel, getCanonicalType } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
 import { 
   DropdownMenu,
@@ -17,10 +17,13 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { MediaItem } from '@/types/media';
-import { ensureHttps } from '@/utils/urlUtils';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import {
+  EntityCardFallbackImage,
+  getAuthorMediaItems,
+  shouldShowAuthorMedia,
+  shouldRenderEntityFallbackArea,
+} from '@/components/cards/EntityCardFallbackImage';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ProfileDisplay } from '@/components/common/ProfileDisplay';
