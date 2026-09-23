@@ -14,7 +14,8 @@ import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Na
 import { Link, useLocation } from 'react-router-dom';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
+import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,8 @@ import { getOfferingContextLine } from '@/services/entityRelationshipRegistry';
 interface EntityHeaderProps {
   entity: Entity;
   stats: EntityStats | null;
-  entityImage: string;
+  /** The entity's own image source, or null when it has none. Never ''. */
+  entityImage: string | null;
   entityData: {
     name: string;
     description: string;
@@ -86,11 +88,22 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const shouldTruncateDescription = entityData.description && entityData.description.length > 200;
 
-  // Reset expiration flag when entityImage prop changes (after successful refresh)
+  // Reset the expiration flag whenever the entity identity or its image source
+  // changes, so a failed image on one entity can never leave a refresh overlay
+  // on the next one (same URL, or no URL on either side).
   useEffect(() => {
-    console.log('EntityHeader: entityImage prop changed, resetting expiration flag');
     setIsImageExpired(false);
-  }, [entityImage]);
+  }, [entity?.id, entityImage]);
+
+  // Shared fallback contract: missing, broken and registered legacy-placeholder
+  // sources all converge on the canonical local type icon. Only the entity's own
+  // image_url is passed, so today's real-image precedence is unchanged.
+  const {
+    imageUrl: heroImageUrl,
+    showFallback: showHeroFallback,
+    markImageFailed: markHeroImageFailed,
+  } = useEntityImageFallback({ id: entity?.id, image_url: entityImage });
+  const HeroFallbackIcon = getEntityFallbackIcon(entity?.type);
   
   // Fetch entity hierarchy data
   const {
