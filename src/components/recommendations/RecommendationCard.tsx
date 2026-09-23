@@ -18,12 +18,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
 import { MediaItem } from '@/types/media';
+import { EntityCardFallbackImage } from '@/components/cards/EntityCardFallbackImage';
 import {
-  EntityCardFallbackImage,
   getAuthorMediaItems,
   shouldShowAuthorMedia,
   shouldRenderEntityFallbackArea,
-} from '@/components/cards/EntityCardFallbackImage';
+} from '@/components/cards/entityCardMediaSources';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ProfileDisplay } from '@/components/common/ProfileDisplay';

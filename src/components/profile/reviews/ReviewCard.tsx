@@ -21,12 +21,12 @@ import ReviewForm from './ReviewForm';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { MediaItem } from '@/types/media';
+import { EntityCardFallbackImage } from '@/components/cards/EntityCardFallbackImage';
 import {
-  EntityCardFallbackImage,
   getAuthorMediaItems,
   shouldShowAuthorMedia,
   shouldRenderEntityFallbackArea,
-} from '@/components/cards/EntityCardFallbackImage';
+} from '@/components/cards/entityCardMediaSources';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import UsernameLink from '@/components/common/UsernameLink';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';

@@ -2,12 +2,12 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import { EntityCardFallbackImage } from '@/components/cards/EntityCardFallbackImage';
 import {
-  EntityCardFallbackImage,
   getAuthorMediaItems,
   shouldShowAuthorMedia,
   shouldRenderEntityFallbackArea,
-} from '@/components/cards/EntityCardFallbackImage';
+} from '@/components/cards/entityCardMediaSources';
 
 /**
  * Group 3B — the large subject-image area on the profile review and
