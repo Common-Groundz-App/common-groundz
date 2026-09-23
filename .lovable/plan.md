@@ -1,68 +1,88 @@
-# Group 6 — finish the live pickers, retire the old entity pages and the dead rows, migrate admin by image role
+# Group 6 — the last picture areas, the old entity pages, and unused code
 
-Both reviews are right, and I agree with your two decisions. Group 6 should not be one batch: it mixes live user-facing screens, admin screens where a missing picture means something different, and code that is simply no longer used. I already ran the liveness checks they asked for, so this plan states what is true today rather than guessing.
+Both reviews are right, and so is your worry. The confusion comes from one thing: **the same search box shows two different kinds of rows**, and only one kind was fixed earlier.
 
-## What the checks found
+## Why the search box still has work (your Explore example)
 
-- The old entity pages are reachable only for internal accounts (`@lovable.dev`) through `?v=1`, `?v=2`, `?v=3`; everyone else always gets V4. There are three of them, not two: v1 lives inside `src/pages/EntityDetail.tsx` itself, v2 is `src/pages/EntityDetailV2.tsx`, and v3 is `src/components/entity-v3/`. You want them retired — agreed, and it removes their old picture behaviour instead of maintaining it.
-- `src/components/search/ProductResultItem.tsx` has no importer anywhere in the project. Same for `src/components/recommendations/RecommendationForm.tsx`. Nothing renders either one — so they get retired, not migrated.
-- The "add to My Stuff" picker is genuinely live (through the My Stuff filters bar), and the header/search/product-search rows are live in three places. Those two are the real user-facing work.
-- The admin area has a dozen picture areas, and they do not all mean the same thing: some show an entity's own picture, others show candidate pictures under review, upload previews and duplicate records. Replacing a broken candidate with a tidy icon would hide exactly the evidence an admin needs, so only the entity's-own-picture slots migrate.
+When you type in a search box, the dropdown has sections:
 
-Group 6 therefore runs as four gates, each finished and checked before the next.
+- **"Already on Groundz"** — things already saved in the app. These rows were fixed in Group 2A. That is the icon you already see. **Nothing here changes.**
+- **"Books", "Movies", "Places", "All Items"** — results fetched from outside sources (book, film and map services). These are drawn by a different piece of code that was never touched. Today, when one of them has no picture it shows the words **"No Image"**, and when its picture breaks it shows a random stock photo.
 
-## Gate 6A — the two live pickers
+So Group 6 fixes the outside-result rows sitting next to the rows you already approved — not the same rows again.
 
-- `src/components/search/SearchResultHandler.tsx` — the 48×48 row used by the header search, the search page and the product search page. The "No Image" words and the stock-photo path are both replaced by the same neutral panel with the canonical type icon the rest of the app uses; unknown types get the neutral icon. Frame, rounding, crop, the processing overlay, the text lines, badges and navigation are untouched. Replacing visible text with an icon is recorded as the one deliberate content change, carrying an accessible missing-picture label.
-- `src/components/recommendations/EntitySearch.tsx` — the 40×40 rows for both previously-recommended entities and outside search results. The six hard-coded stock addresses go; real sources (a stored picture, and the Google Places photo proxy for places and food) are preserved exactly. Both frames stay 40×40.
-- Write path in the same file: when an outside result is picked, the item it builds stores a genuine picture or nothing at all — `image_url: null` exactly, never an empty value, never a stock address. A real picture is preserved; a registered legacy placeholder counts as none; an existing valid picture is never overwritten by a failed lookup.
+## Screen map — where every Group 6 change happens
 
-## Gate 6B — retire the old entity pages (destructive, separately approved)
+| Part | What you see | How to get there | Today | After |
+|---|---|---|---|---|
+| 6A | Outside-result rows in the search dropdown (Books / Movies / Places) | Home feed or Explore → type in the search box | "No Image" text, or stock photo if broken | Type icon on soft panel |
+| 6A | Outside-result rows in the search popup | Header search button → type | Same | Same fix |
+| 6A | "All Items" and category rows on the full search page | Search → press Enter, or open /search | Same | Same fix |
+| 6A | Result rows on the product search page | Search for a product → product results page | Same | Same fix |
+| 6A | "Add to My Stuff" picker — both "Previous Recommendations" and outside rows | My Stuff → **Add Item** → search | A hard-coded stock photo per type | Type icon on soft panel |
+| 6A | What gets saved when you pick an outside result | Picking any outside row in the two places above | The picker can save the stock photo address onto your new item | Real picture saved, or no picture — never a fake one |
+| 6B | Old entity pages v1, v2, v3 | Only internal team accounts, by adding `?v=1`, `?v=2`, `?v=3` or `?preview=true` to an entity link | Three old copies of the entity page | Deleted; every link shows the V4 page you use today |
+| 6C | Nothing visible | — | Two unused files nobody opens | Deleted |
+| 6D | Admin screens only | Admin area | Mixed old behaviour | Only the admin rows that show an entity's own saved picture change; decided row by row with you first |
+| 6E | Small child cards in an entity page tab | Entity page with sub-items → the tab that lists them | No picture → no picture area (fine). Picture exists but breaks → stock photo | No picture → still no area. Broken → type icon inside the existing area |
 
-Only V4 remains. This gate deletes, it does not migrate:
+Every row keeps its exact size, corners, crop, spacing, text and tap behaviour. Only the empty or broken picture changes.
 
-- `src/pages/EntityDetailV2.tsx` and `src/components/entity-v3/` (`EntityV3.tsx`, `EntityV3Header.tsx`) are removed.
-- `src/pages/EntityDetail.tsx` keeps only its role as the route for `/entity/...`: the v1 page defined inside it (lines 56–999) is removed along with the version branching, so the file simply renders V4 with its existing loading wrapper. Everything V4 needs stays; imports that only the old page used are removed.
-- `src/utils/entityVersionUtils.ts` and its callers go with the branching; the `?v=` and `?preview=true` overrides stop existing, so any such link just shows the normal entity page.
-- Before deleting, I confirm no other file imports anything from the removed code, and that the entity route, its child-slug route, and the slug-redirect behaviour still work.
+## The sub-phases, one at a time
 
-Because this permanently removes code, I will show the exact file list and wait for your go-ahead at this gate rather than deleting as part of a larger step.
+Each gate is finished, checked and shown to you before the next starts.
 
-## Gate 6C — dead rows retired
+### 6A — outside search rows and the My Stuff picker (visual change)
 
-`src/components/search/ProductResultItem.tsx` and `src/components/recommendations/RecommendationForm.tsx` are removed after a final proof of zero importers (including tests and lazy imports). If anything unexpected turns up referencing them, they stay and are recorded instead.
+1. Replace "No Image" and the stock photo in the outside-result rows with the type icon, in all four search places listed above (it is one shared row, so one change covers them all).
+2. Replace the stock photos in both lists inside the My Stuff picker with the type icon. Real pictures — including map photos for places and food — stay exactly as today.
+3. Saving check, for **both** ways an outside result becomes a new item (picking it from search, and picking it in the My Stuff picker): a real picture is kept; no picture saves as empty; an old stock placeholder saves as empty; an existing good picture is never overwritten. The search-row path is checked end to end and fixed only if a fake picture can get through.
+4. Stop for your visual approval.
 
-## Gate 6D — admin, classified by image role
+### 6B — retire the old entity pages (deletion, separate approval)
 
-Each admin picture slot is labelled first, then only the entity's-own-picture ones move to the shared contract:
+1. First I show you the exact deletion list and every place that points at them (links, tests, notes, the version switch, lazy loading). No deleting yet.
+2. After your OK: delete v1, v2 and v3 and the switch that chose between them.
+3. Check that stay working exactly as today: normal entity links, sub-item entity links, old renamed links that redirect, loading and not-found screens, signed-in and signed-out views, and the page title and share preview.
+4. Stop and report.
 
-- Migrating: `AdminEntitiesPanel`, `AdminEntityManagementPanel`, `ParentEntitySelector` (both slots), `ClaimReviewModal`, `AdminClaimsPanel`, `SuggestionReviewModal`, `AdminSuggestionsPanel`, `entity-create/ExactUrlDuplicateDialog`, `entity-create/DuplicateConfirmDialog`.
-- Not migrating, recorded with the reason: `entity-create/ImageCandidateGrid` and `AutoFillPreviewModal` (candidate pictures and upload previews under review — a broken candidate must keep looking broken), plus any image-health or diagnostic display found during the classification.
+### 6C — remove proven-unused code
 
-## Deliberately outside Group 6
+1. Final proof that nothing uses the old product search row or the old recommendation form — including tests and delayed loading.
+2. Delete those two only. The My Stuff picker's search code **stays**, because My Stuff still uses it.
+3. If anything unexpected is found using either one, it stays and is recorded instead.
 
-- `EntityTabsContent` child cards — they omit the picture area entirely when there is no picture, and a present-but-broken picture can still fall through to a stock photo. Correct policy: missing stays omitted, broken uses the icon inside the already-rendered area. That is a behaviour nuance in optional regions and gets its own small plan after Group 6, not a bolt-on here.
-- Accepted layout exceptions: `MyStuffItemCard`, `EntityProductsCard`.
-- Permanently excluded: `EntityDetailSkeleton` (loading is not missing), location-search photography, profile covers, avatars and initials.
-- Post-Group-6 cleanup, unchanged: `ImageWithFallback` disposition (it still serves non-entity images, so it is reshaped or split, not deleted), legacy stock-helper deletion once zero callers are proven, the optional historical database cleanup, the `getOptimalEntityImageUrl` resolver decision, and the final inventory audit.
+### 6D — admin, by what each picture means (decision first, then code)
+
+1. I give you a table of every admin picture: which screen, what it shows, and one of: the entity's own saved picture / a candidate picture being reviewed / an upload preview / a suggested or duplicate record shown for comparison / a health check.
+2. You approve which rows change. Default rule: only "the entity's own saved picture" gets the type icon. Anything shown so an admin can judge it — candidates, previews, suggestions, comparisons — keeps showing a broken picture as broken, because that is useful evidence.
+3. Implement only the approved rows, then stop.
+
+### 6E — the entity tab child cards
+
+1. No picture → keep showing no picture area (layout unchanged).
+2. Picture present and working → unchanged.
+3. Picture present but broken, or an old stock placeholder → type icon inside the area that is already there.
+4. Record the two cards that deliberately show no picture area at all — the My Stuff item card and the product list rows on an entity page — as accepted exceptions.
+
+## What is still pending after Group 6
+
+These are tidy-up jobs, not screen changes, and each gets its own plan:
+
+1. **Old picture helper** (`ImageWithFallback`) — still used for non-entity pictures such as profile covers, upload previews and location photos, so it cannot simply be deleted. Decide whether to keep it for those only, remove its built-in stock photo, and remove its second-attempt retry.
+2. **Old stock photo lists** — delete each one only once nothing uses it.
+3. **Saved old stock photos in the database** — optional. Count items still holding a known old stock address, back up the list, clear only exact known ones, check nothing else changes.
+4. **One central rule** — decide whether "old stock placeholders count as no picture" can move into the single place the app picks a picture, now that every screen agrees.
+5. **Final inventory** — one last list proving every picture area is fixed, deliberately excepted, or retired.
+
+Permanently left alone: the loading placeholder on entity pages, location search photos, and people's avatars, covers and initials.
 
 ## Technical details
 
-- Every migrated slot renders through the existing shared pieces — `useEntityImageFallback` + `getEntityFallbackIcon` — reusing `EntityCollectionImage` where a caller-controlled renderer fits; no new fallback component.
-- Source precedence preserved per surface as in Group 4: slots already calling `getOptimalEntityImageUrl` keep passing the whole entity; slots reading `image_url` directly pass only `{ id, image_url }`, so a stored metadata photo can never displace the picture shown today.
-- `ImageWithFallback` with its `entityType` / `fallbackSrc` stock retry is dropped from migrated slots only; unused imports (`getEntityTypeFallbackImage`, `EntityType`) are removed where they become dead.
-- In `EntitySearch.tsx` the `getImageUrl` helper keeps the stored picture and the Places proxy and loses only the type-keyed stock `switch`, returning `null`; the `fallbackSrc={getImageUrl({})}` arguments disappear with it.
-- Every fallback element carries `role="img"` and an `aria-label` naming the entity. Registered legacy placeholder addresses still count as missing; a legitimate, unregistered Unsplash photo that is a surface's real picture still renders normally. One real request, no stock request.
+- Files per gate. 6A: `src/components/search/SearchResultHandler.tsx` (rendered by `EnhancedSearchInput` on Feed/Explore, `SearchDialog`, `src/pages/Search.tsx`, `src/pages/ProductSearch.tsx`; local rows there are `EntityResultItem`, already migrated), `src/components/recommendations/EntitySearch.tsx` (via `AddToMyStuffModal` ← `MyStuffFilters` "Add Item"), creation paths `EntitySearch.handleSelectExternal` (currently `result.image_url || getImageUrl(result)`, which can yield a stock address) and `SearchResultHandler` → `useOptimisticEntityCreation` (`image_url: result.image_url`). 6B: v1 component inside `src/pages/EntityDetail.tsx` (lines 56–999), `src/pages/EntityDetailV2.tsx`, `src/components/entity-v3/`, `src/utils/entityVersionUtils.ts`; `EntityDetail.tsx` stays as the route and renders V4 only. 6C: `src/components/search/ProductResultItem.tsx`, `src/components/recommendations/RecommendationForm.tsx`. 6E: `src/components/entity-v4/EntityTabsContent.tsx` (~line 273).
+- Rendering uses the existing shared pieces (`useEntityImageFallback`, `getEntityFallbackIcon`, `EntityCollectionImage`); no new fallback component. Source precedence preserved per surface; `ImageWithFallback` removed only from migrated slots.
+- Persistence follows the existing real-URL-or-null contract (`getPersistableEntityImageUrl`): `null` exactly, never `''`, never a stock address; registered placeholders → `null`; legitimate unregistered Unsplash photos preserved.
+- Fallbacks carry `role="img"` and an `aria-label` naming the entity; one real request, no stock request.
+- Tests per gate: frame/class preservation, missing/broken/placeholder/unknown-type cases, legitimate-Unsplash preservation, "No Image" gone, both creation paths (real kept, none → `null`, placeholder → `null`, existing not overwritten), V4 route/child-route/redirect/`?v=` behaviour after 6B, zero-import proof for 6C. Plus full suite, typecheck, build log, and desktop/mobile fixtures, with close-out notes in `docs/verification/entity-image-fallback-inventory.md` and the roadmap.
 
-## Tests
-
-- New `src/components/search/group6LivePickers.test.tsx` (6A) and `src/components/admin/group6AdminThumbnails.test.tsx` (6D), both registered in `vitest.config.ts`: frames and image classes preserved verbatim; precedence preserved per surface using an entity with both a raw picture and a different stored metadata photo; missing → canonical icon with accessible label; broken → identical icon and no second request; registered placeholder → icon, its address absent from output; unknown type → neutral icon; a legitimate unregistered Unsplash photo still renders; the "No Image" text is gone.
-- Write-path coverage extending `src/hooks/useEntitySearchWritePaths.test.tsx`: outside result with a real picture → preserved; with none → `image_url: null` exactly; with a registered placeholder → `null`; an existing valid picture never overwritten.
-- 6B: the entity route and child-slug route still render V4, and a `?v=1|2|3` link renders the normal page rather than failing.
-- 6C: no import of the retired files remains.
-
-## Verification and close-out
-
-Per gate: focused tests, full suite, `bunx tsgo --noEmit`, focused lint (pre-existing issues reported, not fixed), build log check, and controlled desktop (1280px) and mobile (390px) fixtures of the migrated row frames — authenticated and admin runtime capture is unavailable for this project, so fixtures stand in as in earlier groups. Then close-out evidence in `docs/verification/entity-image-fallback-inventory.md` and roadmap lines, including the retirement records and the admin role classification table.
-
-Stop for approval after 6A, again before the deletions in 6B, and at the end of 6D. The wider programme is not finished by Group 6 — the optional-region nuance and all the cleanup items above remain open.
+On approval, only 6A is implemented; each later gate comes back to you first.
