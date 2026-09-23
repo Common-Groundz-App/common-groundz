@@ -1,37 +1,23 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Bookmark, MapPin, ShoppingBag, Book, Clapperboard, Coffee } from 'lucide-react';
+import { Bookmark } from 'lucide-react';
 import { format } from 'date-fns';
 import { SavedItem } from '@/hooks/use-saved-items';
 import { useNavigate } from 'react-router-dom';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
+import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
 
 interface SavedEntityCardProps {
   item: SavedItem;
   onUnsave: () => void;
 }
 
-const getEntityIcon = (type: string) => {
-  switch (type) {
-    case 'place':
-      return MapPin;
-    case 'product':
-      return ShoppingBag;
-    case 'book':
-      return Book;
-    case 'movie':
-    case 'show':
-      return Clapperboard;
-    default:
-      return Coffee;
-  }
-};
-
 const SavedEntityCard = ({ item, onUnsave }: SavedEntityCardProps) => {
   const navigate = useNavigate();
   const entity = item.content;
-  const Icon = getEntityIcon(entity.type);
+  const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(entity);
+  const Icon = getEntityFallbackIcon(entity.type);
 
   const handleCardClick = () => {
     if (entity.slug) {
@@ -45,16 +31,17 @@ const SavedEntityCard = ({ item, onUnsave }: SavedEntityCardProps) => {
         <div className="flex gap-4">
           {/* Entity Image */}
           <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-            {entity.image_url ? (
-              <ImageWithFallback
-                src={entity.image_url}
-                alt={entity.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
+            {showFallback ? (
               <div className="w-full h-full flex items-center justify-center">
                 <Icon className="h-6 w-6 text-muted-foreground" />
               </div>
+            ) : (
+              <img
+                src={imageUrl || ''}
+                alt={entity.name}
+                className="w-full h-full object-cover"
+                onError={markImageFailed}
+              />
             )}
           </div>
 
