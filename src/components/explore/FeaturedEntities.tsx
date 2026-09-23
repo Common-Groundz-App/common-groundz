@@ -14,7 +14,6 @@ import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { useAuth } from '@/contexts/AuthContext';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 export const FeaturedEntities = () => {
   const navigate = useNavigate();

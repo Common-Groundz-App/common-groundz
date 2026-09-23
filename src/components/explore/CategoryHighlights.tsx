@@ -13,7 +13,6 @@ import { useDiscovery } from '@/hooks/use-discovery';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 import { formatCount } from '@/lib/utils';
 
 interface CategoryHighlightsProps {
