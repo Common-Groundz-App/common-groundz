@@ -18,7 +18,7 @@ import { EntityHeaderImage } from '@/components/entity-v4/EntityHeaderImage';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { EntityFollowersCount } from '@/components/entity/EntityFollowersCount';
