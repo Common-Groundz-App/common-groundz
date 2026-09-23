@@ -101,6 +101,7 @@ export default defineConfig({
             'src/components/mystuff/saved/group3aCardThumbnails.test.tsx',
             'src/components/profile/reviews/group3bLargeFallback.test.tsx',
             'src/components/explore/group4GridCarouselImages.test.tsx',
+            'src/components/entity-v4/group5HeaderImage.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
             'src/components/content/StructuredFieldsDisplay.test.tsx',
             'src/components/common/EntityImage.test.tsx',
