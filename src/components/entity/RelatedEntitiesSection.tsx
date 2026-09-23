@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { ArrowRight } from 'lucide-react';
 import { Entity } from '@/services/recommendation/types';
@@ -78,11 +78,14 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProps> = ({
                       onClick={() => onViewChild(child)}
                     >
                       <div className="aspect-square mb-3 rounded-md overflow-hidden bg-gray-100">
-                        <ImageWithFallback
-                          src={child.image_url || ''}
-                          alt={child.name}
-                          entityType={child.type}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        {/* Group 4: raw `image_url` precedence preserved (see
+                            EntityCollectionImage). */}
+                        <EntityCollectionImage
+                          source={{ id: child.id, image_url: child.image_url }}
+                          type={child.type}
+                          name={child.name}
+                          imageClassName="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          iconClassName="h-10 w-10"
                         />
                       </div>
                       <h4 className="font-medium text-sm mb-1 line-clamp-2 group-hover:text-brand-orange transition-colors">

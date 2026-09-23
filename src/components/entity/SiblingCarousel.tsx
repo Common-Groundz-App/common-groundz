@@ -4,10 +4,10 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { getSentimentLabel } from '@/utils/ratingColorUtils';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { Button } from '@/components/ui/button';
 import { Entity } from '@/services/recommendation/types';
-import { getEntityTypeFallbackImage, getEntityTypeLabel } from '@/services/entityTypeHelpers';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 interface SiblingCarouselProps {
   siblings: Entity[];
@@ -81,11 +81,15 @@ export const SiblingCarousel: React.FC<SiblingCarouselProps> = ({
               onClick={() => onViewSibling(sibling)}
             >
               <div className="w-full h-32 rounded-md overflow-hidden bg-muted mb-3">
-                <ImageWithFallback
-                  src={sibling.image_url || ''}
-                  alt={sibling.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                  fallbackSrc={getEntityTypeFallbackImage(sibling.type)}
+                {/* Group 4: raw `image_url` precedence preserved — passing the
+                    whole entity would let a stored metadata photo replace the
+                    photo this surface displays today. */}
+                <EntityCollectionImage
+                  source={{ id: sibling.id, image_url: sibling.image_url }}
+                  type={sibling.type}
+                  name={sibling.name}
+                  imageClassName="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                  iconClassName="h-10 w-10"
                 />
               </div>
               

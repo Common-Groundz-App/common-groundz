@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, Gem, Clock, Users, Sparkles } from 'lucide-react';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
@@ -117,12 +117,12 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                   onClick={() => handleEntityClick(entity)}
                 >
                   <div className="h-32 relative">
-                    <ImageWithFallback
-                      src={getOptimalEntityImageUrl(entity) || ''}
-                      alt={entity.name}
-                      className="h-full w-full object-cover"
-                      fallbackSrc="/placeholder.svg"
-                      entityType={entity.type}
+                    <EntityCollectionImage
+                      source={entity}
+                      type={entity.type}
+                      name={entity.name}
+                      imageClassName="h-full w-full object-cover"
+                      iconClassName="h-10 w-10"
                     />
                   </div>
                   <div className="p-3">
@@ -178,12 +178,12 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                   onClick={() => handleEntityClick(entity)}
                 >
                   <div className="h-32 relative">
-                    <ImageWithFallback
-                      src={getOptimalEntityImageUrl(entity) || ''}
-                      alt={entity.name}
-                      className="h-full w-full object-cover"
-                      fallbackSrc="/placeholder.svg"
-                      entityType={entity.type}
+                    <EntityCollectionImage
+                      source={entity}
+                      type={entity.type}
+                      name={entity.name}
+                      imageClassName="h-full w-full object-cover"
+                      iconClassName="h-10 w-10"
                     />
                   </div>
                   <div className="p-3">
@@ -273,12 +273,12 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                 onClick={() => handleEntityClick(entity)}
               >
                 <div className="h-32 relative">
-                  <ImageWithFallback
-                    src={getOptimalEntityImageUrl(entity) || ''}
-                    alt={entity.name}
-                    className="h-full w-full object-cover"
-                    fallbackSrc="/placeholder.svg"
-                    entityType={entity.type}
+                  <EntityCollectionImage
+                    source={entity}
+                    type={entity.type}
+                    name={entity.name}
+                    imageClassName="h-full w-full object-cover"
+                    iconClassName="h-10 w-10"
                   />
                 </div>
                 <div className="p-3">
