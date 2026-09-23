@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, Clock, Users, Sparkles } from 'lucide-react';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
@@ -14,7 +14,6 @@ import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { useAuth } from '@/contexts/AuthContext';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 export const FeaturedEntities = () => {
   const navigate = useNavigate();
@@ -108,12 +107,12 @@ export const FeaturedEntities = () => {
             onClick={() => handleEntityClick(entity)}
           >
             <div className="h-48 relative">
-              <ImageWithFallback
-                src={getOptimalEntityImageUrl(entity) || ''}
-                alt={entity.name}
-                className="h-full w-full object-cover"
-                fallbackSrc="/placeholder.svg"
-                entityType={entity.type}
+              <EntityCollectionImage
+                source={entity}
+                type={entity.type}
+                name={entity.name}
+                imageClassName="h-full w-full object-cover"
+                iconClassName="h-12 w-12"
               />
               <Badge className="absolute top-2 right-2 bg-background/80 text-foreground backdrop-blur-sm">
                 {getEntityTypeLabel(entity.type)}
