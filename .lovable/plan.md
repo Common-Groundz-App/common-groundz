@@ -1,55 +1,38 @@
-# Group 4 — Explore grids and carousels
+# Group 4 (revised) — Explore grids and entity collections
 
-Yes, there is a saved document: `docs/verification/entity-image-fallback-inventory.md`. It uses exactly your numbering, and its Group 4 line lists Featured Entities, Category Highlights, Sibling Carousel and the entity detail skeleton. This plan follows that document and your summary, so my earlier "Group 4 = search rows" numbering is dropped; those search rows move into the remaining-surfaces group instead.
+Both reviews are right, and I checked every disputed claim in the code before rewriting. Two corrections were needed; one point I want to add myself.
 
-## Groups 3A and 3B — verified complete
+## Audit answers
 
-- None of the five migrated files still reference the stock-photo helper, the shared retry image component, `/placeholder.svg`, or an inline stock address.
-- All of them resolve pictures through the shared fallback contract; the two big-picture cards use the new shared renderer plus the separate source-classification module.
-- Both focused test files are registered and passing; full suite 750, type check and build clean; evidence and checklist lines recorded.
+**1. The related-by-creator card is not live.** `EntityRelatedCard` renders a centred "Coming Soon" card only. Its 40×40 thumbnail row exists solely inside a commented-out block (lines 113–135, "Example structure for when we implement this"). It is mounted from `EntitySidebar` and both legacy entity pages, but no related-entity list renders. My earlier plan was wrong to call the thumbnail live — the original inventory classification was correct. It is removed from Group 4 and left untouched.
 
-No rework needed, so Group 4 can start.
+**2. The deferred search rows are genuinely different files.** Group 2A migrated `EntityResultItem`, `ProductSearch`, `SubjectSelectStep`, and the `UnifiedEntitySelector` dropdown rows. Still unmigrated and still showing stock photography, going to Group 6: `src/components/search/SearchResultHandler.tsx` (search dialog and header search input, 48×48, shows the words "No Image"), `src/components/search/ProductResultItem.tsx` (48×48, always falls back to a generic product photo), and `src/components/recommendations/EntitySearch.tsx` (40×40 rows with a hard-coded stock photo per type — and it also copies that stock address into the item it creates when you pick an external result, which is a write-path fix). Distinct surfaces, no double count, no gap in 2A.
 
-## What Group 4 changes
+**3. Real-image precedence — the strongest point raised.** Verified: the shared hook resolves through `getOptimalEntityImageUrl`, which prefers `metadata.stored_photo_urls[0]` over `image_url`. Featured entities and Category highlights already call that resolver, so nothing changes for them. The sibling strip and the related-items grid read `image_url` directly today, so handing them the whole entity could swap a currently displayed real photo for a different one — outside a fallback-only change. Those two will pass only their current source (`{ id, image_url }`, no metadata) into the hook, so the displayed real picture is unchanged and only the missing/broken/placeholder path becomes shared.
 
-The larger entity pictures in collections. Live surfaces:
+**4. Hover zoom — preserve, never add.** Confirmed neither Explore file has any hover-scale classes. The sibling strip and related grid keep `group-hover:scale-105 transition-transform`; Explore gets nothing added.
 
-1. Explore — Featured entities (192px-tall picture area) and the Discover / category rows (128px-tall picture areas, three separate blocks in one file).
-2. Entity page — the "other items like this" sibling strip (256px-wide cards with a 128px-tall picture) and the related-items grid (square picture areas).
-3. Entity page sidebar — the related-by-creator rows (40×40 thumbnails).
+**5. The loading skeleton is intentionally excluded, not deferred.** It represents loading, can render before any entity exists, and conflating it with a missing picture would remove loading feedback. I will record it in the inventory as a permanent exclusion so it stops resurfacing as pending work.
 
-Behaviour after this group, on every one of them:
+## Addition of my own
 
-- Real picture → unchanged, same crop, same hover zoom.
-- No picture, broken picture, or one of the known old stock addresses → the canonical icon for that item's type on the existing neutral tile.
-- Unrecognised type → the neutral icon, never a guessed one.
-- Missing and broken look identical; one real attempt, then the local icon, no second request.
+One more safeguard worth having: Category highlights has three separate picture blocks in one file and Explore also renders it four more times with a type filter. The focused tests will cover all three branches individually, not just the first — an easy place for one branch to be missed silently. I will also assert that no surface in this group renders `/placeholder.svg` or any `images.unsplash.com` address after the change, as a single catch-all guard.
 
-Every card keeps its current aspect ratio, crop, radius, spacing, hover behaviour, and layout. No picture area is added where one doesn't exist, and none is removed.
+## Corrected scope — four files
 
-## Two judgement calls inside this group
+- `src/components/explore/FeaturedEntities.tsx` — the 192px-tall picture area; keeps its existing optimal-source resolution; `fallbackSrc="/placeholder.svg"` and the stock `entityType` path removed.
+- `src/components/explore/CategoryHighlights.tsx` — all three 128px-tall picture areas; same.
+- `src/components/entity/SiblingCarousel.tsx` — the 128px-tall picture in each 256px-wide card; current raw `image_url` precedence preserved; `getEntityTypeFallbackImage` import dropped; hover zoom kept.
+- `src/components/entity/RelatedEntitiesSection.tsx` — the square picture area; current raw `image_url` precedence preserved; hover zoom kept.
 
-- **Bigger empty areas.** The Featured entities tile is the largest in this group. The icon treatment already approved for the profile cards (neutral tile, centred icon) is reused here so the app stays consistent. I will capture a controlled desktop and mobile fixture of the grid and carousel empty states before close-out, and adjust only icon size or background tone if it reads sparse — never the frame.
-- **The loading skeleton stays out.** The entity detail skeleton is a loading placeholder, not a missing-picture state; it renders while data is still arriving and has no entity to resolve. Recommendation: leave it as a pure loading state and record that decision in the inventory so it stops appearing as deferred work.
+Behaviour on all four: real picture unchanged; no picture, broken picture, or a known old stock address → the canonical icon for that item's type on the existing neutral tile with an accessible missing-picture label; unrecognised type → neutral icon. Missing and broken identical, one real attempt, no second request. Frames, heights, aspect ratios, radius, crop, spacing, badges, links, navigation and layout preserved verbatim.
 
-## Explicitly not in Group 4
+## Explicitly excluded
 
-The responsive entity header and other large hero placeholders (your Group 5, needs its own visual decision), admin screens and version-gated legacy pages (Group 6), the global search and recommendation-picker rows I inventoried (they still show stock photos — folding them into Group 6 rather than expanding this one), the shared retry image component, the legacy stock helpers, the global resolver, database rows, schema, generated types, My Stuff cards, and every user avatar or initials fallback.
+The commented-out related-card example, the loading skeleton (permanent exclusion), optional picture regions that would change layout, the entity header and large hero placeholders (Group 5), admin and version-gated legacy pages (Group 6), the three search/recommendation-picker files named above (Group 6), the shared retry image component, the legacy stock helpers, the global resolver, database rows, schema, generated types, My Stuff cards, and every user avatar or initials fallback. Group 4 does not close the wider programme.
 
-## Technical notes
+## Tests and verification
 
-Files to migrate, each through `useEntityImageFallback` + `getEntityFallbackIcon` inside the existing wrapper:
+Focused file `src/components/explore/group4GridCarouselImages.test.tsx`, registered in `vitest.config.ts`, per surface: real image renders with the exact preserved wrapper, height/aspect and crop classes; an entity with both a raw `image_url` and a different stored metadata photo keeps today's selection on each surface (stored photo on Explore, raw `image_url` on the sibling strip and related grid); missing → canonical icon with accessible label; broken (error event) → identical icon and no second request; registered legacy placeholder → icon; unknown type → neutral icon; all three Category highlights branches covered; no `/placeholder.svg` or `images.unsplash.com` in any rendered output; hover-zoom classes present only where they exist today.
 
-- `src/components/explore/FeaturedEntities.tsx` — `h-48 relative` block; remove `fallbackSrc="/placeholder.svg"` and the `entityType` stock path.
-- `src/components/explore/CategoryHighlights.tsx` — all three `h-32 relative` blocks (personalised, type-filtered, and default lists); same removals.
-- `src/components/entity/SiblingCarousel.tsx` — `w-full h-32 rounded-md overflow-hidden bg-muted mb-3`; drop the `getEntityTypeFallbackImage` import and preserve `group-hover:scale-105 transition-transform` on real images.
-- `src/components/entity/RelatedEntitiesSection.tsx` — `aspect-square mb-3 rounded-md overflow-hidden bg-gray-100`; same hover preservation.
-- `src/components/entity/EntityRelatedCard.tsx` — `w-10 h-10 rounded overflow-hidden bg-muted` row thumbnail (live via `EntitySidebar`, not commented out).
-
-Types parsed through the canonical registry, no `product`/`place` coercion. Badges, labels, links, keyboard behaviour and skeleton loaders untouched. `getOptimalEntityImageUrl` unchanged globally; legacy placeholder recognition only through the shared contract.
-
-Tests: one focused file (`src/components/explore/group4GridCarouselImages.test.tsx`, registered in `vitest.config.ts`) asserting per surface: real image renders with the exact preserved wrapper and crop classes; missing → canonical icon with an accessible missing-image label; broken (error event) → identical icon and no second request; registered legacy placeholder → icon; unknown type → neutral icon with no stock address and no `/placeholder.svg` in the output; hover-zoom classes still present on real images.
-
-Verification: focused tests, full suite, `bunx tsgo --noEmit`, focused lint (pre-existing findings reported separately), preview build, then inventory + roadmap lines recording this group and the skeleton decision, plus the still-open Group 5/6 and cleanup items. Authenticated runtime capture is unavailable on this project, so controlled fixtures stand in; I stop for your visual approval and do not begin Group 5.
-
-roadmap.md will also get the new lines from your message: Group 5 (entity header / large placeholders, visual decision), Group 6 (admin, legacy, plus the search and recommendation-picker rows), retry-component cleanup, legacy helper cleanup, optional historical data cleanup, global resolver decision, and the final inventory audit.
+Then: full suite, `bunx tsgo --noEmit`, focused lint (pre-existing findings reported separately), preview build, controlled desktop and mobile fixtures of the grid and carousel empty states for your visual approval (adjusting only icon size or background tone if sparse, never the frame), and inventory + roadmap updates recording this group, the related-card and skeleton exclusions, the named Group 6 files, and the still-open Group 5/6 plus cleanup items. Then stop — no Group 5.
