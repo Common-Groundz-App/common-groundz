@@ -12,7 +12,13 @@ At the top of an entity page the picture is 96×96 beside the title on desktop, 
 
 Same frame, same size, same position, same rounding, same crop. Only the empty state changes: a soft neutral panel with the centred canonical icon for the entity's type, identical in language to the cards and grids already approved. Unrecognised types get the neutral icon. Nothing is added — no text label, no initials, no second attempt at another address.
 
-The refresh button stays exactly as it behaves today: for a signed-in person it appears over the area only when a real picture existed and failed to load, never when the entity simply has no picture.
+The refresh button keeps a strict, three-way distinction:
+
+- the entity never had a picture → icon, no refresh button;
+- the picture is one of the old stock placeholders (so it counts as no picture) → icon, no refresh button;
+- a real picture was attempted and genuinely failed to load → icon, and for a signed-in person the refresh button appears over it exactly as today.
+
+Moving between entities never carries a failure over: opening an entity whose picture is fine must never show a refresh button left behind by the previous one.
 
 ## Scope
 
@@ -32,7 +38,10 @@ Deliberately out of scope:
 - `EntityV4.tsx:472` currently computes `entity?.image_url || getEntityTypeFallbackImage(...)`. That stock substitution is removed, so the header receives only the entity's own image value; the `getEntityTypeFallbackImage` import is dropped if it becomes unused.
 - `EntityHeader.tsx` resolves the picture through `useEntityImageFallback({ id: entity.id, image_url: <entity image> })`. Passing only the current source preserves today's raw `image_url` precedence — a stored metadata photo must not displace the picture the header shows now.
 - `ImageWithFallback` is replaced by a plain `<img>` plus the shared fallback branch. Classes are kept verbatim: wrapper `w-full h-48 mb-4 rounded-lg overflow-hidden` (mobile) / `flex-shrink-0 h-24 w-24 min-w-[96px] rounded-lg overflow-hidden` (desktop), plus `relative group` and the existing `bg-muted` for brand entities; image `h-full w-full` with `object-contain` for brands and `object-cover` otherwise.
+- `EntityHeaderProps.entityImage` becomes `string | null`, and `null` — never `''` — is passed when there is no real source. `entityData.image` (the same value) becomes nullable with it; it is confirmed unused inside `EntityHeader`, and `SEOHead` already reads `entity.image_url` separately, so social metadata is unaffected.
 - `onError` keeps calling `setIsImageExpired(true)` (so the refresh overlay still appears) and additionally marks the source failed in the hook, so a broken picture converges on the same icon as a missing one, with no second network request.
+- The expired flag is set **only** by a real `onError` from a rendered `<img>`. A missing source and a registered legacy placeholder never reach the `<img>`, so they can never set it — "no usable image" stays distinct from "an image expired".
+- The existing reset effect currently depends on `entityImage` alone (`EntityHeader.tsx:89-93`). It gains `entity.id`, so `setIsImageExpired(false)` also runs when navigating between entities that share the same image value or both have none — no stale overlay can survive a change of entity. The overlay render condition additionally requires a resolved real source, so it cannot appear over a never-present picture.
 - Fallback element: fills the frame, centred icon (`h-10 w-10` desktop 96px frame, `h-12 w-12` mobile 192px band), `role="img"` and an `aria-label` naming the entity so the missing-image state keeps accessible meaning. The refresh overlay remains absolutely positioned above it, unchanged.
 - Registered legacy placeholder addresses continue to be treated as missing; a legitimate, unregistered Unsplash photo that is the entity's real picture still renders normally.
 
@@ -46,7 +55,8 @@ New `src/components/entity-v4/group5HeaderImage.test.tsx`, registered in `vitest
 - a legitimate unregistered Unsplash photo still renders as the real picture;
 - unknown type → neutral icon; no `/placeholder.svg` and no stock address introduced as a fallback;
 - brand entities keep `object-contain` and the `bg-muted` wrapper;
-- the refresh overlay appears after a load failure for a signed-in person and does not appear for a never-present picture.
+- refresh overlay rules: appears after a genuine load failure for a signed-in person; never appears for a missing source; never appears for a registered legacy placeholder; never appears for a signed-out visitor;
+- entity-switch resets: a failed source followed by a valid source restores the real picture and removes the overlay; switching to a different entity id with the same image value (or with no image on either side) clears the overlay too.
 
 ## Verification and close-out
 
