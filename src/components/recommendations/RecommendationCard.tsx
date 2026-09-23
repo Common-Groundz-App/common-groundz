@@ -8,7 +8,7 @@ import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
-import { getEntityTypeLabel, getEntityTypeFallbackImage, getCanonicalType } from '@/services/entityTypeHelpers';
+import { getEntityTypeLabel, getCanonicalType } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
 import { 
   DropdownMenu,
@@ -17,10 +17,13 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { MediaItem } from '@/types/media';
-import { ensureHttps } from '@/utils/urlUtils';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import { EntityCardFallbackImage } from '@/components/cards/EntityCardFallbackImage';
+import {
+  getAuthorMediaItems,
+  shouldShowAuthorMedia,
+  shouldRenderEntityFallbackArea,
+} from '@/components/cards/entityCardMediaSources';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ProfileDisplay } from '@/components/common/ProfileDisplay';
@@ -49,16 +52,6 @@ const RecommendationCard = ({
   const [likes, setLikes] = useState(recommendation.likes || 0);
   
 
-  // Get optimal entity image URL - prioritizes stored photos over proxy URLs
-  const entityImageUrl = getOptimalEntityImageUrl(recommendation.entity);
-
-  console.log(`RecommendationCard - Recommendation ${recommendation.id} entity data:`, {
-    hasEntity: !!recommendation.entity,
-    entityId: recommendation.entity?.id,
-    entityName: recommendation.entity?.name,
-    entityImageUrl: entityImageUrl
-  });
-
   // Canonical entity destination. Phase 4.3 Gate 6: the app serves entity pages
   // only under `/entity/:slug` (and `/entity/:parentSlug/:childSlug`), so the
   // canonical helper is the single source of truth here — type-prefixed paths
@@ -70,66 +63,34 @@ const RecommendationCard = ({
     return getEntityUrlWithParent(entity);
   };
 
-  // Process media items for proper fallback handling
-  const mediaItems = React.useMemo(() => {
-    console.log(`Processing media for recommendation ${recommendation.id}:`, {
-      hasMedia: Boolean(recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0),
-      hasImageUrl: Boolean(recommendation.image_url),
-      hasEntityImage: Boolean(entityImageUrl),
-      entityId: recommendation.entity?.id
-    });
-    
-    // If media array is already provided (user uploads)
-    if (recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0) {
-      console.log(`Using ${recommendation.media.length} media items from recommendation.media`);
-      return recommendation.media as MediaItem[];
-    }
-    
-    // If we have a legacy image_url (user upload)
-    if (recommendation.image_url) {
-      console.log(`Using legacy image_url: ${recommendation.image_url}`);
-      return [{
-        url: recommendation.image_url,
-        type: 'image' as const,
-        order: 0,
-        id: recommendation.id
-      }] as MediaItem[];
-    }
-    
-    // If we have an entity with an image, use it as fallback
-    if (entityImageUrl) {
-      console.log(`Using entity image as fallback: ${entityImageUrl}`);
-      return [{
-        url: entityImageUrl,
-        type: 'image' as const,
-        order: 0,
-        id: `entity-${recommendation.entity?.id}`,
-        source: 'entity' // Mark as entity fallback
-      }] as MediaItem[];
-    }
-    
-    console.log(`No media found for recommendation ${recommendation.id}, using empty array`);
-    return [] as MediaItem[];
-  }, [recommendation, entityImageUrl]);
+  // Group 3B: author-authored media only. The subject (entity) image is no
+  // longer merged in here, so a broken subject image can reach the shared
+  // fallback contract instead of failing silently inside PostMediaDisplay.
+  const mediaItems = React.useMemo<MediaItem[]>(
+    () => getAuthorMediaItems({
+      id: recommendation.id,
+      media: recommendation.media,
+      image_url: recommendation.image_url,
+    }),
+    [recommendation.id, recommendation.media, recommendation.image_url],
+  );
 
   // Determine if media should be shown based on hideEntityFallbacks setting
-  const shouldShowMedia = React.useMemo(() => {
-    if (!hideEntityFallbacks) {
-      return mediaItems.length > 0; // Show everything normally (profile/feed pages)
-    }
-    
-    // On entity pages: only show if there's actual user content in media array
-    const hasUserMediaArray = recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0;
-    return hasUserMediaArray;
-  }, [recommendation.media, hideEntityFallbacks, mediaItems.length]);
+  const shouldShowMedia = React.useMemo(() => shouldShowAuthorMedia({
+    hasMediaArray: Boolean(
+      recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0,
+    ),
+    authorMediaCount: mediaItems.length,
+    hideEntityFallbacks,
+  }), [recommendation.media, hideEntityFallbacks, mediaItems.length]);
 
-  // Get a fallback image using canonical helper
-  const getFallbackImage = (): string => {
-    if (entityImageUrl) {
-      return entityImageUrl;
-    }
-    return recommendation.category ? getEntityTypeFallbackImage(recommendation.category) : getEntityTypeFallbackImage(EntityType.Product);
-  };
+  // Group 3B: the large subject area renders only where it renders today.
+  const showEntityFallbackArea = shouldRenderEntityFallbackArea({
+    authorMediaCount: mediaItems.length,
+    hideEntityFallbacks,
+    compact,
+  });
+
 
   const handleLike = async () => {
     if (!requireAuth({ action: 'like', surface: 'recommendation_card', recommendationId: recommendation?.id, entityName: recommendation?.entity?.name })) return;
@@ -358,17 +319,15 @@ const RecommendationCard = ({
           </div>
         )}
         
-        {/* Fallback when no media should be shown */}
-        {!shouldShowMedia && !hideEntityFallbacks && mediaItems.length === 0 && (
+        {/* Subject image area — real subject image, else canonical type icon */}
+        {showEntityFallbackArea && (
           <div className="mt-3">
-            <div className="rounded-md overflow-hidden relative bg-gray-50 mt-2 mb-3 h-48">
-              <ImageWithFallback
-                src={getFallbackImage()}
-                alt={`${recommendation.title} - ${recommendation.category || 'Recommendation'}`}
-                className="w-full h-full object-cover"
-                fallbackSrc={recommendation.category ? getEntityTypeFallbackImage(recommendation.category) : undefined}
-              />
-            </div>
+            <EntityCardFallbackImage
+              entity={recommendation.entity}
+              type={recommendation.category}
+              imageAlt={`${recommendation.title} - ${recommendation.category || 'Recommendation'}`}
+              fallbackLabel={`No image available for ${recommendation.title}`}
+            />
           </div>
         )}
         

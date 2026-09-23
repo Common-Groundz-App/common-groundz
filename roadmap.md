@@ -324,6 +324,8 @@ cross-read between them.
 - [x] Step 5 Group 2B — child rows, sidebar parent/related rows, and recommendation entity thumbnails on the shared fallback contract; parent-image substitution removed as an approved fallback shortcut (thumbnail source only; parent relationship/description/navigation unchanged); all frames, crop modes, navigation, analytics, and user initials preserved; 724 tests, typecheck, and build pass; stopped before later groups
 - [x] Step 5 Group 3A — Saved, chat, and review-preview card thumbnails on the shared fallback contract; local 6-type icon map, chat stock helpers and unknown→product coercion removed; EntityPreviewCard's "No image" text replaced by an accessibly labelled canonical icon (approved one-time content change); all frames/crops preserved; 738 tests, typecheck, and build pass; stopped before Group 3B
 
+- [x] Group 3B — profile review/recommendation large subject-image area on the shared fallback contract (author media separated from subject image; hideEntityFallbacks and compact semantics preserved; 750 tests)
+
 ## Deferred
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
 - [ ] Manual remediation of legacy unlinked reviews

@@ -99,6 +99,7 @@ export default defineConfig({
             'src/components/search/group2aEntityThumbnails.test.tsx',
             'src/components/entity/group2bEntityThumbnails.test.tsx',
             'src/components/mystuff/saved/group3aCardThumbnails.test.tsx',
+            'src/components/profile/reviews/group3bLargeFallback.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
             'src/components/content/StructuredFieldsDisplay.test.tsx',
             'src/components/common/EntityImage.test.tsx',

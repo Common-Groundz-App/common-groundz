@@ -21,8 +21,12 @@ import ReviewForm from './ReviewForm';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { MediaItem } from '@/types/media';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import { ensureHttps } from '@/utils/urlUtils';
+import { EntityCardFallbackImage } from '@/components/cards/EntityCardFallbackImage';
+import {
+  getAuthorMediaItems,
+  shouldShowAuthorMedia,
+  shouldRenderEntityFallbackArea,
+} from '@/components/cards/entityCardMediaSources';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import UsernameLink from '@/components/common/UsernameLink';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
@@ -32,9 +36,8 @@ import { ReviewTimelineViewer } from './ReviewTimelineViewer';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { RatingEvolutionDisplay } from './RatingEvolutionDisplay';
-import { getEntityTypeLabel, getEntityTypeFallbackImage, getCanonicalType } from '@/services/entityTypeHelpers';
+import { getEntityTypeLabel, getCanonicalType } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 import { resolveReviewDisplayType, displayTypeValue } from './reviewDisplayType';
 
 interface ReviewCardProps {
@@ -77,50 +80,20 @@ const ReviewCard = ({
   // Check if user can start timeline (owns review and has no timeline)
   const canStartTimeline = isOwner && (!review.has_timeline || !review.timeline_count || review.timeline_count === 0);
   
-  // Get entity image URL if available, ensuring it uses HTTPS and optimal URL helper
-  const entityImageUrl = review.entity ? (getOptimalEntityImageUrl(review.entity) || (review.entity.image_url ? ensureHttps(review.entity.image_url) : null)) : null;
-  
-  // Process media items for display with improved fallback handling
-  const mediaItems = React.useMemo(() => {
-    // If media array is already provided (user uploads)
-    if (review.media && Array.isArray(review.media) && review.media.length > 0) {
-      return review.media as MediaItem[];
-    }
-    
-    // If we have a legacy image_url (user upload)
-    if (review.image_url) {
-      return [{
-        url: review.image_url,
-        type: 'image' as const,
-        order: 0,
-        id: review.id
-      }] as MediaItem[];
-    }
-    
-    // If we have an entity with an image, use it as fallback
-    if (entityImageUrl) {
-      return [{
-        url: entityImageUrl,
-        type: 'image' as const,
-        order: 0,
-        id: `entity-${review.entity?.id}`,
-        source: 'entity' // Mark as entity fallback
-      }] as MediaItem[];
-    }
-    
-    return [] as MediaItem[];
-  }, [review, entityImageUrl]);
+  // Group 3B: author-authored media only. The subject (entity) image is no
+  // longer merged in here, so a broken subject image can reach the shared
+  // fallback contract instead of failing silently inside PostMediaDisplay.
+  const mediaItems = React.useMemo<MediaItem[]>(
+    () => getAuthorMediaItems({ id: review.id, media: review.media, image_url: review.image_url }),
+    [review.id, review.media, review.image_url],
+  );
 
   // Determine if media should be shown based on hideEntityFallbacks setting
-  const shouldShowMedia = React.useMemo(() => {
-    if (!hideEntityFallbacks) {
-      return mediaItems.length > 0; // Show everything normally (profile/feed pages)
-    }
-    
-    // On entity pages: only show if there's actual user content in media array
-    const hasUserMediaArray = review.media && Array.isArray(review.media) && review.media.length > 0;
-    return hasUserMediaArray;
-  }, [review.media, hideEntityFallbacks, mediaItems.length]);
+  const shouldShowMedia = React.useMemo(() => shouldShowAuthorMedia({
+    hasMediaArray: Boolean(review.media && Array.isArray(review.media) && review.media.length > 0),
+    authorMediaCount: mediaItems.length,
+    hideEntityFallbacks,
+  }), [review.media, hideEntityFallbacks, mediaItems.length]);
   
   // Phase 2.5A — strict display type. Never invented, never coerced to `others`:
   // a failed or unattempted subject lookup degrades to the stored category.
@@ -131,13 +104,13 @@ const ReviewCard = ({
   });
   const resolvedType = displayTypeValue(displayType);
 
-  // Get a fallback image using canonical helper — only ever with a verified type.
-  const getFallbackImage = (): string => {
-    if (entityImageUrl) {
-      return entityImageUrl;
-    }
-    return resolvedType ? getEntityTypeFallbackImage(resolvedType) : '/placeholder.svg';
-  };
+  // Group 3B: the large subject area renders only where it renders today.
+  const showEntityFallbackArea = shouldRenderEntityFallbackArea({
+    authorMediaCount: mediaItems.length,
+    hideEntityFallbacks,
+    compact,
+  });
+  
   
   const getBadgeColor = (category: string) => {
     const canonical = getCanonicalType(category);
@@ -644,17 +617,15 @@ const ReviewCard = ({
             </div>
           )}
           
-          {/* Fallback when no media should be shown */}
-          {!shouldShowMedia && !hideEntityFallbacks && mediaItems.length === 0 && (
+          {/* Subject image area — real subject image, else canonical type icon */}
+          {showEntityFallbackArea && (
             <div className="mt-3">
-              <div className="rounded-md overflow-hidden relative bg-gray-50 mt-2 mb-3 h-48">
-                <ImageWithFallback
-                  src={getFallbackImage()}
-                  alt={`${review.title} - ${resolvedType ? getEntityTypeLabel(resolvedType) : 'Review'}`}
-                  className="w-full h-full object-cover"
-                  fallbackSrc={resolvedType ? getEntityTypeFallbackImage(resolvedType) : undefined}
-                />
-              </div>
+              <EntityCardFallbackImage
+                entity={review.entity}
+                type={resolvedType}
+                imageAlt={`${review.title} - ${resolvedType ? getEntityTypeLabel(resolvedType) : 'Review'}`}
+                fallbackLabel={`No image available for ${review.title}`}
+              />
             </div>
           )}
           

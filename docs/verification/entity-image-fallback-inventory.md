@@ -214,3 +214,26 @@ Tests: `src/components/mystuff/saved/group3aCardThumbnails.test.tsx` (14 tests) 
 Verification run: Vitest 50 files / 738 tests passed; `bunx tsgo --noEmit` clean; focused ESLint on the four files reports only three pre-existing `no-explicit-any` errors on untouched `ChatEntityCard` lines (metadata/rating casts); preview build watcher reported `build OK`. Authenticated runtime capture remains unavailable (`external_unmanaged`), so rendered-output assertions stand in, as in earlier groups.
 
 Stopped after Group 3A. No Group 3B, explore-grid, carousel, header, or admin migration was started.
+
+## Group 3B close-out — large subject-image area on profile review and recommendation cards
+
+Scope: `src/components/profile/reviews/ReviewCard.tsx` (live via `ProfileReviews`) and `src/components/recommendations/RecommendationCard.tsx` (live via `ProfileRecommendations`). New shared modules: `src/components/cards/EntityCardFallbackImage.tsx` (renderer) and `src/components/cards/entityCardMediaSources.ts` (source classification + visibility rules).
+
+Root problem corrected: both cards previously merged author media, a legacy single `image_url` **and** the subject (entity) image into one `mediaItems` array. Because the entity image entered that array, a broken entity URL rendered inside `PostMediaDisplay` and could never reach any fallback, while a missing entity image fell through to a remote stock photograph via `ImageWithFallback`.
+
+Now:
+
+- `getAuthorMediaItems` returns author-authored sources only (explicit media array, then legacy `image_url`). The subject image is no longer part of it.
+- `shouldShowAuthorMedia` reproduces the existing rule verbatim: with `hideEntityFallbacks` only an explicit media array displays, so a legacy `image_url` stays suppressed on entity-detail callers exactly as before.
+- `shouldRenderEntityFallbackArea` renders the large area only where the cards render it today: never in `compact` mode, never when `hideEntityFallbacks` is set, and only when there is no author media at all.
+- `EntityCardFallbackImage` resolves the subject image through `useEntityImageFallback`, so valid / missing / broken / registered-legacy-placeholder sources converge on `getEntityFallbackIcon(type)` — one real source, no second network request, no stock photo, no `/placeholder.svg`.
+- Presentation frozen: wrapper `rounded-md overflow-hidden relative bg-gray-50 mt-2 mb-3 h-48` (flex centering added for the icon only), real images keep `w-full h-full object-cover`, icon `h-12 w-12`, fallback carries `role="img"` with an `aria-label` naming the subject.
+- Removed from these paths: `ImageWithFallback`, `getEntityTypeFallbackImage`, the `'/placeholder.svg'` literal, both `getFallbackImage` helpers, and the now-unused `getOptimalEntityImageUrl`/`ensureHttps` imports. Strict typing preserved (`resolveReviewDisplayType`; `recommendation.category` parsed canonically), unknown → neutral Tag icon.
+
+Untouched: `src/components/ReviewCard.tsx` (Entity V4 reviews), `PostFeedItem` recommendation posts, `RecommendationEntityCard`, journey and chat cards, `MyStuffItemCard`, explore grids, carousels, headers, skeletons, admin, version-gated legacy pages, `ImageWithFallback`, `getOptimalEntityImageUrl`, the legacy stock helpers, database rows, schema, generated types, and every user avatar or initials fallback.
+
+Tests: `src/components/profile/reviews/group3bLargeFallback.test.tsx` (12 tests) — author media wins over a legacy image; legacy image treated as author media, never as the subject image; large area renders only with no author media; `hideEntityFallbacks` shows only an explicit array and suppresses the legacy image, the subject image and the icon; compact never gains the large block; valid subject image renders in the preserved frame; missing / broken (error event) / registered placeholder all converge on the same icon; unknown type → neutral icon with no `images.unsplash.com` or `placeholder.svg` in the output.
+
+Verification run: Vitest 51 files / 750 tests passed; `bunx tsgo --noEmit` clean; focused ESLint reports only two pre-existing `no-explicit-any` errors on untouched `RecommendationCard` lines (props and `getEntityRoute`); preview build watcher reported `build OK`. Authenticated runtime capture remains unavailable (`external_unmanaged`); the empty state was reviewed through a controlled desktop (1280px) and mobile (390px) fixture reproducing the exact frame classes and 48px icon — layout reads calm and balanced, so no presentation adjustment was applied.
+
+Programme status: this closes the large-fallback group for the profile review and recommendation cards only. Still open or intentionally exempt: explore grids, carousels, `EntityDetailSkeleton`, responsive entity headers, admin surfaces, version-gated legacy pages, shared `ImageWithFallback`, the legacy fallback helpers, and `MyStuffItemCard`.
