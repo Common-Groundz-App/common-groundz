@@ -42,6 +42,22 @@ Box sizes, corners, crop and layout are unchanged. Working pictures look exactly
   - A failed fallback followed by a new, good link shows the new picture.
 - **Kept on purpose:** the Unsplash rule for loading pictures across sites stays, because real Unsplash photos still exist.
 
+## Two more cases (from Codex, accepted)
+- **A link that is not a real web address** (for example "not a url" or an `ftp://` link): no request is made. The screen's own fallback is tried once if it has a valid one. Otherwise the "Image failed to load" panel shows. The screen is told it failed exactly once, so image candidates are still marked broken once. This goes through a separate "failed" signal and no fake browser event is created.
+- **No picture link, but the screen supplies its own fallback:** the fallback shows once. For example, a profile with no cover shows the default cover. If that fallback fails, it stops there, with no loop and no failure signal for a picture that never existed.
+
+### Full behaviour table
+| Situation | Retry | Screen's own fallback | "Failed" signal |
+|---|---|---|---|
+| Direct picture fails | None | Once, if valid | Once |
+| Relayed picture fails | Direct link, once | Not yet | Not yet |
+| Direct retry fails | None | Once, if valid | Once |
+| Link invalid before any request | No request | Once, if valid | Once |
+| Fallback fails | No loop | No | No second signal |
+| No link, fallback valid | No picture request | Once | None |
+| No link, no fallback | No request | No | None; nothing is drawn |
+| Link or fallback changes | Everything resets | As above | Starts fresh |
+
 **Stop** after Step 2. After that come Step 3 (stock-photo lists), Step 4 (optional database tidy-up) and Step 5 (central rule and the final inventory), each needing its own approval.
 
 ## Technical details
@@ -51,7 +67,8 @@ Box sizes, corners, crop and layout are unchanged. Working pictures look exactly
   - ImageUploader, both SearchEntryPanel rows, and both AutoFillPreviewModal sites pass `failedContent={<ImageFailedState/>}`. AutoFill's primary image gets an `h-32` panel so its height stays within the current `max-h-32`.
   - Drop `entityType=` from ImageCandidateGrid and AutoFill. ImageCandidateGrid's `markBroken` is unchanged.
   - ProfileCoverImage and LocationSearchInput are unchanged.
-- Test file `src/components/common/imageWithFallbackStep2.test.tsx`, registered in vitest.config.ts. It covers:
+- New prop `onFailure?: (reason: 'load' | 'invalid') => void`. It fires once per source key, for a primary failure (either reason), and never for a fallback failure or the relay retry. `onError` stays tied to real `<img>` events only. ImageCandidateGrid moves `markBroken` to `onFailure`, so both reasons mark a candidate broken once. For invalid input: `isValidImageUrl` fails → no `<img>` for the primary; use the fallback if it is valid, else `failedContent`.
+- Test file `src/components/common/imageWithFallbackStep2.test.tsx`, registered in vitest.config.ts. Beyond the table cases, it covers invalid primary with no fallback (panel, zero requests, `onFailure('invalid')` once), invalid primary with a fallback (fallback once), no src with a fallback (fallback once, no `onFailure`), and ImageCandidateGrid with an invalid link (marked broken once). It also covers:
   - Empty src → nothing.
   - A direct failure with no fallback → the failed panel, no second request, `onError` once.
   - A relay failure → one direct retry and no `onError`, then a direct failure → the failed panel and `onError` once.
