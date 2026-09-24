@@ -301,3 +301,6 @@ Still open: 6B (retire entity v1/v2/v3 — deletion manifest first), 6C (retire 
 
 ## Group 6B — legacy entity pages retired (done)
 v1/v2/v3 and the version switch deleted; the /entity doorway always renders V4 and keeps the query string. Canonical ignores ?v=. Orphans recorded: EntityDetailSkeleton, DynamicReviewsSummary. See docs/verification/group-6b-legacy-entity-pages.md.
+
+## Group 6C — unreachable pages and unused components retired (done)
+Deleted ProductSearch (/product-search/:query), Books/Movies/Places/Food/Products pages and routes, ProductResultItem, RecommendationForm. No redirects — the old paths fall through to NotFound. The 6A ProductSearch row fix is therefore moot. See docs/verification/group-6c-retired-pages.md.
