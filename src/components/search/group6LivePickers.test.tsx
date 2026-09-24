@@ -21,8 +21,8 @@ vi.mock('@/hooks/use-optimistic-entity-creation', () => ({
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
 const pickerState = vi.hoisted(() => ({
-  localResults: [] as any[],
-  externalResults: [] as any[],
+  localResults: [] as Record<string, unknown>[],
+  externalResults: [] as Record<string, unknown>[],
 }));
 vi.mock('@/hooks/use-entity-search', () => ({
   useEntitySearch: () => ({
@@ -51,7 +51,7 @@ vi.mock('@/contexts/LocationContext', () => ({
 const renderRow = (result: Record<string, unknown>) =>
   render(
     <MemoryRouter>
-      <SearchResultHandler result={{ name: 'Dune', api_source: 'openlibrary', api_ref: 'OL1', venue: 'Frank Herbert', ...result } as any} query="dune" />
+      <SearchResultHandler result={{ name: 'Dune', api_source: 'openlibrary', api_ref: 'OL1', venue: 'Frank Herbert', ...result } as unknown as React.ComponentProps<typeof SearchResultHandler>['result']} query="dune" />
     </MemoryRouter>,
   );
 
@@ -94,7 +94,7 @@ describe('Group 6A — outside-result search rows', () => {
 });
 
 const openPicker = (onSelect = vi.fn()) => {
-  const utils = render(<EntitySearch type={'book' as any} onSelect={onSelect} />);
+  const utils = render(<EntitySearch type="book" onSelect={onSelect} />);
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'dune' } });
   return { ...utils, onSelect };
 };
