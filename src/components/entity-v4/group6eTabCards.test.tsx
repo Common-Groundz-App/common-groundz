@@ -41,7 +41,7 @@ describe('Group 6E — child card picture', () => {
     const { container } = render(<ChildCardImage child={c(REAL, { type: 'weird' })} />);
     fireEvent.error(photo()!);
     expect(icon()).toBeInTheDocument();
-    expect(container.innerHTML)..replace(/http:\/\/www\.w3\.org[^"]*/g, '')).not.toMatch(/placeholder\.svg|https?:/);
+    expect(container.innerHTML.replace(/http:\/\/www\.w3\.org[^"]*/g, "")).not.toMatch(/placeholder\.svg|https?:/);
   });
   it('failure resets for a different child and for the same id with a new link', () => {
     const r = render(<ChildCardImage child={c(REAL)} />);
