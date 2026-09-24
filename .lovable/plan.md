@@ -75,10 +75,10 @@ I checked every remaining screen:
 **Stop** after Step 2. After that come Step 3 (stock-photo lists), Step 4 (optional database tidy-up) and Step 5 (central rule and the final inventory), each needing its own approval.
 
 ## Technical details
-- `ImageWithFallback.tsx`: remove `entityType`, the `getEntityTypeFallbackImage` import and the default Unsplash constant. Keep the `proxyAttempted` branch, but set it only when `processUrl(src) !== ensureHttps(src)`, and do not call `onError` on that step. Add an optional `failedContent?: ReactNode`, rendered at the terminal failure when there is no usable fallback. Empty `src` with no fallback → render `null`. Equivalence is checked with `processUrl(fallback) === processUrl(src)` or `ensureHttps` equality. State is keyed on `src|fallbackSrc`, so an error from an older key is ignored. The first-failure callback is guarded by a ref that resets on key change.
+- `ImageWithFallback.tsx`: remove `entityType`, the `getEntityTypeFallbackImage` import and the default Unsplash constant. Keep the `proxyAttempted` branch, but set it only when `processUrl(src) !== ensureHttps(src)`, and do not call `onError` on that step. Add an optional `failedContent?: ReactNode`, rendered at the terminal failure when there is no usable fallback. Empty `src` with no fallback → render `null`. Equivalence is checked with `processUrl(fallback) === processUrl(src)` or `ensureHttps` equality. (Lifecycle tracking is described below.)
 - Extract the failed panel from `admin/EvidenceImage.tsx` into a shared `ImageFailedState` (local icon and text, no request). EvidenceImage uses it, with no visual change.
 - Callers:
-  - ImageUploader, both SearchEntryPanel rows, and both AutoFillPreviewModal sites pass `failedContent={<ImageFailedState/>}`. AutoFill's primary image gets an `h-32` panel so its height stays within the current `max-h-32`.
+  - Both SearchEntryPanel rows and both AutoFillPreviewModal sites pass `failedContent={<ImageFailedState/>}`. AutoFill's primary image gets an `h-32` panel so its height stays within the current `max-h-32`.
   - Drop `entityType=` from ImageCandidateGrid and AutoFill. ImageCandidateGrid's `markBroken` is unchanged.
   - ProfileCoverImage and LocationSearchInput are unchanged.
 - New prop `onFailure?: (reason: 'load' | 'invalid') => void`. It fires once per primary lifecycle, and never for a fallback failure or the intermediate relay failure.
@@ -87,9 +87,14 @@ I checked every remaining screen:
 - Invalid input: no `<img>` is rendered for the primary. Use the fallback if it is valid, else `failedContent`.
 - Add a local `isRenderableImageSrc(src)` in the helper for the rule above. The shared `isValidImageUrl` is untouched, because other code uses it.
 - The relay applies only when the source is http/https.
-- State is tracked by a structured `{src, fallbackSrc}` identity rather than string concatenation. Each `<img>` error handler checks the identity captured at render, so stale events are ignored.
+- **Lifecycle identity:** there are no concatenated keys and no per-render objects.
+  - The normalised scalars `src` and `fallbackSrc` are the effect dependencies. When either changes, a numeric lifecycle token (a ref) is incremented, and all attempt state and callback guards reset.
+  - Each rendered `<img>` captures the token. Its error handler returns early if the token no longer matches the current ref, so stale events are ignored.
 - Successful real and fallback images keep `className`, `alt`, CORS and the other props they have today.
-- Delete `src/components/profile/reviews/ImageUploader.tsx` after the `rg` proof, which showed zero importers.
+- **Terminal states:**
+  - Invalid primary with a valid fallback → `onFailure('invalid')` fires once, the fallback is tried once, and a fallback failure then shows `failedContent`, or `null` if none is supplied, with no further callback.
+  - Missing primary with a fallback → no `onFailure`, the fallback is tried once, and a fallback failure then shows `failedContent` or `null`.
+- **Delete, not migrate:** `src/components/profile/reviews/ImageUploader.tsx`. A case-insensitive search across `src` found no references in static or dynamic imports, barrels, tests or fixtures; the only name match is the unrelated `EntityImageUploader`. The proof is re-run right before deleting. It is excluded from the caller changes, the failure-panel work and the tests.
 - Test file `src/components/common/imageWithFallbackStep2.test.tsx`, registered in vitest.config.ts. Beyond the table cases, it covers invalid primary with no fallback (panel, zero requests, `onFailure('invalid')` once), invalid primary with a fallback (fallback once), no src with a fallback (fallback once, no `onFailure`), and ImageCandidateGrid with an invalid link (marked broken once). It also covers source formats: `blob:`, `data:image`, and a `/local` path render directly with no relay and no retry, whether as the source or as a fallback, while `ftp:`, `javascript:` and `data:text` count as invalid. It also covers `onError`: it is not called on the relay step, and it is called once after the direct retry fails. It also covers:
   - Empty src → nothing.
   - A direct failure with no fallback → the failed panel, no second request, `onError` once.
