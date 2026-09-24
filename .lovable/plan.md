@@ -41,7 +41,11 @@ These stay as they are: image candidates, upload previews, auto-fill preview, se
 This covers the "Did you mean one of these?" window and the edit page Preview.
 - **Stock-photo swap removed.** Neither spot uses the type icon either.
 - **The Preview shows exactly the link typed in the field.** A different stored photo can no longer hide a bad link. The Preview still appears only when a link exists.
-- **When the picture fails to load**, the same frame shows a clear "Image failed to load" state with a small broken-image symbol, instead of the browser's unclear default. A screen-reader label names the entity.
+- **Three clear states in the same frame**, instead of the browser's unclear default:
+  - The picture loads: it shows as it is.
+  - A link was given but fails: "Image failed to load", with a small broken-image symbol.
+  - No link was given: "No image provided", with a small empty-image symbol. This happens in the look-alike window when an entity has no picture.
+  - Each state has a screen-reader label that names the entity.
 
 ## Steps
 
@@ -50,7 +54,12 @@ This covers the "Did you mean one of these?" window and the edit page Preview.
 3. Run tests, grouped by what each picture is for:
    - **Entity's own picture:** real picture, missing, broken, old placeholder, unknown type, switching to another entity resets the state, frame unchanged.
    - **Relationships:** no picture means no box. A broken picture shows the icon inside the existing box.
-   - **Comparison and preview:** the exact link is tried, a failure shows "Image failed to load", and no stock photo, type icon or substitute photo appears.
+   - **Comparison and preview:**
+     - the exact link is tried
+     - a failure shows "Image failed to load"
+     - no link shows "No image provided", with no download attempted
+     - changing the link clears the old failure
+     - no stock photo, type icon or substitute photo ever appears
 
    Then run the full test suite, the type check and the build.
 4. Record the work in the inventory, the roadmap and a new 6D note. Stop before 6E.
@@ -61,12 +70,15 @@ This covers the "Did you mean one of these?" window and the edit page Preview.
   - Whole entity, which keeps the optimal source: AdminEntitiesPanel, AdminEntityManagementPanel, AdminSuggestionsPanel, ClaimReviewModal.
   - `{ id, image_url }` only, which keeps the raw source: ParentEntitySelector, AdminClaimsPanel, PendingEntitiesQueue, AdminProductRelationshipsPanel.
 - AdminProductRelationshipsPanel keeps the `image_url &&` guard. `EntityCollectionImage` is used only inside it.
-- ParentEntitySelector puts its size classes (`w-8 h-8 rounded`, `w-10 h-10 rounded`) on both the image and the fallback span.
+- ParentEntitySelector: `EntityCollectionImage`'s fallback span is fixed at `h-full w-full`. So each thumbnail gets a fixed wrapper at today's exact size: `w-8 h-8 rounded overflow-hidden bg-muted`, and `w-10 h-10 rounded overflow-hidden bg-muted flex-shrink-0`. The image fills it with `w-full h-full object-cover`. The visible size and layout are unchanged, and only one extra wrapping element is added.
 - Icon sizes: h-4 w-4 at 32px, h-5 w-5 at 40–48px, h-6 w-6 at 64px.
 - Group C adds a small local `EvidenceImage` component in `src/components/admin/EvidenceImage.tsx`.
   - It renders `<img>` with the same classes.
-  - On error it renders a span with the same classes, `bg-muted`, a lucide `ImageOff` icon, the text "Image failed to load" (at 48px the text is screen-reader only and only the icon shows), `role="img"` and `aria-label="Image failed to load for {name}"`.
-  - It does not retry and does not use the placeholder registry.
+  - It has three states: `loaded`, `failed` (`ImageOff`, "Image failed to load") and `missing` (`ImageIcon`, "No image provided").
+  - `missing` applies when `src` is null, empty or only whitespace. In that case no `<img>` is rendered at all.
+  - The two non-loaded states render a span with the same classes plus `bg-muted`, `role="img"` and `aria-label="{state text} for {name}"`. At 48px the text is screen-reader only and the icon is visible.
+  - The failure flag is keyed on `src`, so it resets when the link changes.
+  - It has no retry, no placeholder registry, no alternate source and no type icon.
 - AdminEntityEdit uses `src={entity.image_url}` directly and drops `getOptimalEntityImageUrl` there. The `entity.image_url &&` guard is unchanged.
 - `ImageWithFallback`, `getOptimalEntityImageUrl`, the stock helpers, the database and the schema are all unchanged.
 - New test `src/components/admin/group6dAdminImages.test.tsx`, registered in vitest.config.ts.
