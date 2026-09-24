@@ -8,7 +8,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useEntitySearch } from '@/hooks/use-entity-search';
 import { Badge } from '@/components/ui/badge';
 import { useLocation } from '@/contexts/LocationContext';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
+import { getPersistableEntityImageUrl } from '@/utils/entityImageFallback';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { EntityAdapter } from '@/components/profile/circles/types';
 import { useToast } from '@/hooks/use-toast';
@@ -148,7 +149,7 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
       id: `temp-${Date.now()}`, // Temporary ID
       name: result.name,
       description: result.description,
-      image_url: result.image_url || getImageUrl(result),
+      image_url: getPersistableEntityImageUrl(getImageUrl(result)),
       type: type,
       venue: result.venue,
       api_ref: result.api_ref,
@@ -293,21 +294,8 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
       return `${proxyUrl}?photoReference=${photoReference}&maxWidth=100`;
     }
     
-    // Type-specific placeholder images with better fallbacks
-    switch (type) {
-      case 'movie':
-        return "https://images.unsplash.com/photo-1489599510961-b3f9db2a06be?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-      case 'book':
-        return "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-      case 'product':
-        return "https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-      case 'food':
-        return "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-      case 'place':
-        return "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-      default:
-        return "https://images.unsplash.com/photo-1495195134817-aeb325a55b65?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-    }
+    // No real picture: the row shows the canonical type icon instead.
+    return null;
   };
 
   // Check if we should show distance for a result
@@ -434,16 +422,13 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                             aria-selected="false"
                           >
                             {/* Entity Image with enhanced error handling */}
-                            <div className="flex-shrink-0">
-                              <ImageWithFallback
-                                src={getImageUrl(entity)}
-                                alt={entity.name}
-                                className="w-10 h-10 object-cover rounded-md"
-                                fallbackSrc={getImageUrl({})}
-                                entityType={entity.type}
-                                onError={(e) => {
-                                  console.log('Image failed to load for entity:', entity.name, 'URL:', getImageUrl(entity));
-                                }}
+                            <div className="flex-shrink-0 w-10 h-10 rounded-md overflow-hidden bg-muted">
+                              <EntityCollectionImage
+                                source={{ id: entity.id, image_url: getImageUrl(entity) }}
+                                type={entity.type}
+                                name={entity.name}
+                                imageClassName="w-10 h-10 object-cover rounded-md"
+                                iconClassName="h-5 w-5"
                               />
                             </div>
                             
@@ -479,17 +464,13 @@ export function EntitySearch({ type, onSelect }: EntitySearchProps) {
                             aria-selected="false"
                           >
                             {/* Result Image with enhanced error handling */}
-                            <div className="flex-shrink-0">
-                              <ImageWithFallback
-                                src={getImageUrl(result)}
-                                alt={result.name}
-                                className="w-10 h-10 object-cover rounded-md"
-                                fallbackSrc={getImageUrl({})}
-                                entityType={type}
-                                onError={(e) => {
-                                  console.log('Image failed to load for external result:', result.name, 'URL:', getImageUrl(result));
-                                  console.log('Result metadata:', result.metadata);
-                                }}
+                            <div className="flex-shrink-0 w-10 h-10 rounded-md overflow-hidden bg-muted">
+                              <EntityCollectionImage
+                                source={{ id: `${result.api_source}:${result.api_ref ?? result.name}`, image_url: getImageUrl(result) }}
+                                type={type}
+                                name={result.name}
+                                imageClassName="w-10 h-10 object-cover rounded-md"
+                                iconClassName="h-5 w-5"
                               />
                             </div>
                             

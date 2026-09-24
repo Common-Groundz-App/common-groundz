@@ -11,7 +11,7 @@ import { fetchEntityWithParentContext } from '@/services/entityService';
 import { getEntityUrl, getHierarchicalEntityUrl } from '@/utils/entityUrlUtils';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { EntityCategory } from '@/utils/loadingMessages';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getCanonicalType, getEntityTypeLabel } from '@/services/entityTypeHelpers';
@@ -217,18 +217,13 @@ export function SearchResultHandler({
         onClick={handleResultClick}
       >
         <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative group">
-          {result.image_url ? (
-            <ImageWithFallback
-              src={result.image_url} 
-              alt={result.name}
-              entityType={entityType}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
-              No Image
-            </div>
-          )}
+          <EntityCollectionImage
+            source={{ id: `${result.api_source}:${result.api_ref ?? result.name}`, image_url: result.image_url }}
+            type={entityType}
+            name={result.name}
+            imageClassName="w-full h-full object-cover"
+            iconClassName="h-5 w-5"
+          />
           {currentIsProcessing && (
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
               <LoadingSpinner size="sm" />
