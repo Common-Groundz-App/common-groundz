@@ -87,9 +87,10 @@ I checked every remaining screen:
 - Invalid input: no `<img>` is rendered for the primary. Use the fallback if it is valid, else `failedContent`.
 - Add a local `isRenderableImageSrc(src)` in the helper for the rule above. The shared `isValidImageUrl` is untouched, because other code uses it.
 - The relay applies only when the source is http/https.
-- **Lifecycle identity:** there are no concatenated keys and no per-render objects.
-  - The normalised scalars `src` and `fallbackSrc` are the effect dependencies. When either changes, a numeric lifecycle token (a ref) is incremented, and all attempt state and callback guards reset.
-  - Each rendered `<img>` captures the token. Its error handler returns early if the token no longer matches the current ref, so stale events are ignored.
+- **Lifecycle identity (derived during render):**
+  - `const lifecycleKey = JSON.stringify([normalizedSrc, normalizedFallbackSrc])` is computed synchronously on every render, and `currentKeyRef.current = lifecycleKey` is set during render.
+  - Each `<img>` error handler closes over the `lifecycleKey` of the render that created it, and returns early if it differs from `currentKeyRef.current`.
+  - An effect on `lifecycleKey` only resets attempt state and the callback guards. It never creates the identity, so an error on the first render is always treated as current.
 - Successful real and fallback images keep `className`, `alt`, CORS and the other props they have today.
 - **Terminal states:**
   - Invalid primary with a valid fallback → `onFailure('invalid')` fires once, the fallback is tried once, and a fallback failure then shows `failedContent`, or `null` if none is supplied, with no further callback.
