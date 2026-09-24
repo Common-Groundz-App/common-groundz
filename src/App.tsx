@@ -25,12 +25,6 @@ import Search from '@/pages/Search';
 import EntityDetail from '@/pages/EntityDetail';
 import PostView from '@/pages/PostView';
 import TagPage from '@/pages/TagPage';
-import ProductSearch from '@/pages/ProductSearch';
-import PlacesPage from '@/pages/PlacesPage';
-import ProductsPage from '@/pages/ProductsPage';
-import BooksPage from '@/pages/BooksPage';
-import MoviesPage from '@/pages/MoviesPage';
-import FoodPage from '@/pages/FoodPage';
 import AdminPortal from '@/pages/AdminPortal';
 import AdminEntityEdit from '@/pages/admin/AdminEntityEdit';
 import YourData from '@/pages/YourData';
@@ -194,36 +188,6 @@ function App() {
                   <Route path="/t/:hashtag" element={
                     <AppProtectedRoute>
                       <TagPage />
-                    </AppProtectedRoute>
-                  } />
-                  <Route path="/product-search/:query" element={
-                    <AppProtectedRoute>
-                      <ProductSearch />
-                    </AppProtectedRoute>
-                  } />
-                  <Route path="/places" element={
-                    <AppProtectedRoute>
-                      <PlacesPage />
-                    </AppProtectedRoute>
-                  } />
-                  <Route path="/products" element={
-                    <AppProtectedRoute>
-                      <ProductsPage />
-                    </AppProtectedRoute>
-                  } />
-                  <Route path="/books" element={
-                    <AppProtectedRoute>
-                      <BooksPage />
-                    </AppProtectedRoute>
-                  } />
-                  <Route path="/movies" element={
-                    <AppProtectedRoute>
-                      <MoviesPage />
-                    </AppProtectedRoute>
-                  } />
-                  <Route path="/food" element={
-                    <AppProtectedRoute>
-                      <FoodPage />
                     </AppProtectedRoute>
                   } />
                   <Route path="/admin" element={
