@@ -1,10 +1,13 @@
 import React from 'react';
+import * as ReactNS from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 /** Group 6C — retired legacy routes fall through to NotFound; live routes still resolve. */
-const page = (id: string) => ({ default: () => <div data-testid={id} /> });
-const pass = { default: ({ children }: { children: React.ReactNode }) => <>{children}</> };
+const { page, pass } = vi.hoisted(() => ({
+  page: (id: string) => ({ default: () => require('react').createElement('div', { 'data-testid': id }) }),
+  pass: { default: ({ children }: { children: React.ReactNode }) => children as React.ReactElement },
+}));
 
 vi.mock('@/pages/NotFound', () => page('not-found'));
 vi.mock('@/pages/Search', () => page('search'));
