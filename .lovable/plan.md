@@ -3,61 +3,70 @@
 ## 6C check result
 
 6C is complete with nothing left over:
-- The eight files are gone.
-- The app has no remaining links to them or references to their addresses. The only mention is the new check that confirms the six old addresses show "not found".
+- The eight files are gone and nothing links to them.
 - My Stuff still uses its picker.
-- All 818 checks pass, and the build is clean.
+- 818 checks pass and the build is clean.
 
-## How admin pictures are split
+## Where to find each change (Admin page)
 
-The rule you approved: only a picture that is **the entity's own picture** gets the soft panel with its type icon. Pictures that admins are **judging or comparing**, such as candidates, uploads, suggestion or duplicate comparisons and health checks, must show exactly what is there. A broken picture stays visibly broken, because that is useful evidence.
+| Where | What you see |
+|---|---|
+| Admin → **Entities** tab → the entity table | 48×48 picture at the start of each row |
+| Admin → **Entities** → pencil (edit) on a row → "Image URL" field → **Preview** | the manual picture preview |
+| Admin → **Entities** → **New Entity** → "Did you mean one of these?" window | the pictures of existing look-alike entities |
+| Admin → **Entities** → **New Entity**, or the edit page → **"Part of"** field | the chosen parent and the search list under it |
+| Admin → **Moderation** tab → pending entities list | 48×48 box on each row |
+| Admin → **Content** tab → "Entity AI Summaries" list | 48×48 picture on each row |
+| Admin → **Suggestions** tab → the "Entity" column | 40×40 picture |
+| Admin → **Claims** tab → "Brand Claims Management" table | 40×40 picture |
+| Admin → **Claims** → open a claim → review window | 64×64 picture |
+| Admin → **Relationships** tab (product relationships) | the two pictures on each relationship card |
+
+## How the pictures are split
 
 ### A. Entity's own picture: switch to the shared type-icon panel
 
-| Admin screen | Size | Today when missing or broken |
-|---|---|---|
-| Entities list (admin portal) | 48×48 | random stock photo |
-| Entity management table | 48×48 | "No Image" text, or stock photo if broken |
-| Parent picker: the chosen parent and the list rows | 32×32 / 40×40 | stock photo |
-| Claims table | 40×40 | stock photo |
-| Claim review window | 64×64 | stock photo |
-| Suggestions table: the entity column | 40×40 | stock photo |
-| Pending entities queue | 48×48 | empty grey box, or broken-image icon |
-| Product relationships (both sides) | 48×48 | broken-image icon |
+This covers the Entities table, Moderation list, Content list, Suggestions column, Claims table, claim review window and the "Part of" picker.
+- Missing, broken or old stock placeholder → the soft panel with the type icon, in the same frame.
+- In the Entities table, the "No Image" words become the icon, which has a screen-reader label.
 
-### B. Evidence pictures: kept as they are
+**Relationships tab: a special case.** Today it shows no picture box at all when an entity has no picture. That stays the same, so nothing shifts in the card. Only when a picture is present but broken, or is an old stock placeholder, does the icon appear, in the same 48×48 space the picture already takes.
 
-These stay untouched: image candidate grid, upload previews (create dialog and uploader), auto-fill preview, create-search candidate rows, photo moderation, image health panel, user avatars.
+### B. Evidence pictures: not touched
 
-### C. Two comparison and preview spots: one small change
+These stay as they are: image candidates, upload previews, auto-fill preview, search candidates during creation, photo moderation, image health and user avatars.
 
-- **Duplicate check window.** It shows existing entities so an admin can compare them.
-- **Entity edit, the "Preview" of the manual picture link.**
+### C. Comparison and preview spots: show the truth
 
-Today both quietly swap a broken picture for a stock photo. That hides the problem you are supposed to catch. Under your rule they should show the real picture, and a broken one should look broken. The only change here is removing the stock-photo swap. Nothing is added.
+This covers the "Did you mean one of these?" window and the edit page Preview.
+- **Stock-photo swap removed.** Neither spot uses the type icon either.
+- **The Preview shows exactly the link typed in the field.** A different stored photo can no longer hide a bad link. The Preview still appears only when a link exists.
+- **When the picture fails to load**, the same frame shows a clear "Image failed to load" state with a small broken-image symbol, instead of the browser's unclear default. A screen-reader label names the entity.
 
 ## Steps
 
-1. Switch the group A spots to the shared type-icon panel. Every size, corner, crop and layout stays the same. The "No Image" text in the management table becomes the icon, with a screen-reader label.
-2. Remove the stock-photo swap from the two group C spots. They become plain pictures in the same frames.
-3. Leave every group B spot, and all upload, refresh and moderation actions, untouched.
-4. Test each group A spot:
-   - a real picture still shows
-   - a missing picture shows the icon
-   - a broken picture shows the icon, with no second download
-   - an old stock placeholder shows the icon
-   - an unknown type shows the neutral icon
+1. Switch the group A spots to the shared type-icon panel. Keep the Relationships rule above.
+2. Update the group C spots as described. Leave group B and every admin action untouched.
+3. Run tests, grouped by what each picture is for:
+   - **Entity's own picture:** real picture, missing, broken, old placeholder, unknown type, switching to another entity resets the state, frame unchanged.
+   - **Relationships:** no picture means no box. A broken picture shows the icon inside the existing box.
+   - **Comparison and preview:** the exact link is tried, a failure shows "Image failed to load", and no stock photo, type icon or substitute photo appears.
 
-   Test the group C spots: a broken picture stays broken and no stock address appears. Then run the full test suite, the type check and the build.
-5. Record the work in the picture inventory, the roadmap and a new 6D note, then stop before 6E.
+   Then run the full test suite, the type check and the build.
+4. Record the work in the inventory, the roadmap and a new 6D note. Stop before 6E.
 
 ## Technical details
 
-- Group A uses `EntityCollectionImage` (source, type, name, imageClassName, iconClassName) inside the existing wrapper divs.
-  - Places that already call `getOptimalEntityImageUrl` keep it and pass the whole entity: AdminEntitiesPanel, AdminEntityManagementPanel, AdminSuggestionsPanel and ClaimReviewModal.
-  - Places that read `image_url` directly pass only `{ id, image_url }`, so the source order stays the same: ParentEntitySelector, AdminClaimsPanel, PendingEntitiesQueue and AdminProductRelationshipsPanel.
-- ParentEntitySelector has no wrapper today, because its size classes sit on the image itself. For the icon case the same `w-8 h-8 rounded` and `w-10 h-10 rounded` classes go on the fallback span, so its size is unchanged.
+- Group A uses `EntityCollectionImage` inside the existing wrappers.
+  - Whole entity, which keeps the optimal source: AdminEntitiesPanel, AdminEntityManagementPanel, AdminSuggestionsPanel, ClaimReviewModal.
+  - `{ id, image_url }` only, which keeps the raw source: ParentEntitySelector, AdminClaimsPanel, PendingEntitiesQueue, AdminProductRelationshipsPanel.
+- AdminProductRelationshipsPanel keeps the `image_url &&` guard. `EntityCollectionImage` is used only inside it.
+- ParentEntitySelector puts its size classes (`w-8 h-8 rounded`, `w-10 h-10 rounded`) on both the image and the fallback span.
 - Icon sizes: h-4 w-4 at 32px, h-5 w-5 at 40–48px, h-6 w-6 at 64px.
-- Group C (DuplicateConfirmDialog, AdminEntityEdit preview): replace `ImageWithFallback` with a plain `<img>` using the same classes, with no onError swap.
-- `ImageWithFallback` itself, `getOptimalEntityImageUrl`, the stock helpers, the database and the schema are all unchanged.
+- Group C adds a small local `EvidenceImage` component in `src/components/admin/EvidenceImage.tsx`.
+  - It renders `<img>` with the same classes.
+  - On error it renders a span with the same classes, `bg-muted`, a lucide `ImageOff` icon, the text "Image failed to load" (at 48px the text is screen-reader only and only the icon shows), `role="img"` and `aria-label="Image failed to load for {name}"`.
+  - It does not retry and does not use the placeholder registry.
+- AdminEntityEdit uses `src={entity.image_url}` directly and drops `getOptimalEntityImageUrl` there. The `entity.image_url &&` guard is unchanged.
+- `ImageWithFallback`, `getOptimalEntityImageUrl`, the stock helpers, the database and the schema are all unchanged.
 - New test `src/components/admin/group6dAdminImages.test.tsx`, registered in vitest.config.ts.
