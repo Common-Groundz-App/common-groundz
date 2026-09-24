@@ -330,7 +330,11 @@ cross-read between them.
 - [x] Group 5 — live Entity V4 header picture on the shared fallback contract via new EntityHeaderImage (stock substitution removed in EntityV4; entityImage now string|null; dead entityData.image removed; responsive 96px/192px frames, brand object-contain and refresh overlay preserved; overlay only after a genuine load failure and reset on entity id + source change); 776 tests, typecheck, build clean
 
 ## Deferred
-- [ ] Group 6 — admin surfaces plus SearchResultHandler, ProductResultItem and EntitySearch (incl. its external-result write path), and any live version-gated legacy pages
+- [x] Group 6A — outside-result search rows (SearchResultHandler) and Add to My Stuff picker rows (EntitySearch) on the shared fallback; picker preview never carries a stock address; 785 tests
+- [ ] Group 6B — retire entity page v1/v2/v3 and the version switch (show deletion manifest first)
+- [ ] Group 6C — retire unused ProductResultItem and RecommendationForm after zero-importer proof
+- [ ] Group 6D — admin pictures: classify by role, approve, then migrate only entity-own-picture slots
+- [ ] Group 6E — EntityTabsContent child cards: broken present picture → icon; missing stays omitted
 - [ ] Post-group cleanup — ImageWithFallback simplification, legacy stock-helper deletion once zero active callers are proven, optional historical database cleanup of known stock placeholder rows, the getOptimalEntityImageUrl resolver decision, final inventory audit
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
 - [ ] Manual remediation of legacy unlinked reviews
