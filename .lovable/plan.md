@@ -45,6 +45,8 @@ This covers the "Did you mean one of these?" window and the edit page Preview.
   - The picture loads: it shows as it is.
   - A link was given but fails: "Image failed to load", with a small broken-image symbol.
   - No link was given: "No image provided", with a small empty-image symbol. This happens in the look-alike window when an entity has no picture.
+    - **Layout check:** that window always draws its 48×48 box, and today a stock photo fills it when there is no picture. So "No image provided" sits in a box that already exists, and the row does not move.
+    - The edit page Preview keeps its rule of no link, no Preview, so it never shows this state.
   - Each state has a screen-reader label that names the entity.
 
 ## Steps
