@@ -332,7 +332,7 @@ cross-read between them.
 ## Deferred
 - [x] Group 6A — outside-result search rows (SearchResultHandler) and Add to My Stuff picker rows (EntitySearch) on the shared fallback; picker preview never carries a stock address; 785 tests
 - [ ] Group 6B — retire entity page v1/v2/v3 and the version switch (show deletion manifest first)
-- [ ] Group 6C — retire unused ProductResultItem and RecommendationForm after zero-importer proof
+- [x] Group 6C — retired ProductSearch page, 5 legacy category pages, ProductResultItem, RecommendationForm (no redirects)
 - [ ] Group 6D — admin pictures: classify by role, approve, then migrate only entity-own-picture slots
 - [ ] Group 6E — EntityTabsContent child cards: broken present picture → icon; missing stays omitted
 - [ ] Post-group cleanup — ImageWithFallback simplification, legacy stock-helper deletion once zero active callers are proven, optional historical database cleanup of known stock placeholder rows, the getOptimalEntityImageUrl resolver decision, final inventory audit
@@ -340,6 +340,6 @@ cross-read between them.
 - [ ] Manual remediation of legacy unlinked reviews
 
 - [x] Group 6B: retire legacy entity pages v1/v2/v3 (V4 untouched)
-- [ ] Group 6C: remove proven-unused product row and old recommendation form
+- [x] Group 6C: removed proven-unused pages and components
 - [ ] Group 6D: admin pictures, decided row by row
 - [ ] Group 6E: entity tab child cards

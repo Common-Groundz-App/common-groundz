@@ -4,7 +4,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 import { EntityResultItem } from '@/components/search/EntityResultItem';
-import { EntityResultThumbnail } from '@/pages/ProductSearch';
 import { SubjectThumbnail } from '@/components/profile/reviews/steps/SubjectSelectStep';
 import { UnifiedEntitySelector, EntityRowThumbnail } from '@/components/feed/UnifiedEntitySelector';
 import type { EntitySearchResult } from '@/hooks/use-unified-search';
@@ -154,23 +153,6 @@ describe('EntityResultItem (search result row)', () => {
     );
     const img = screen.getByRole('img', { name: 'Beauty of Joseon Ginseng Essence Water 150ml' });
     expect(img).toHaveAttribute('src', 'https://cdn.example.com/photos/ginseng.jpg');
-  });
-});
-
-describe('EntityResultThumbnail (ProductSearch row)', () => {
-  it('keeps the 48px rounded frame and shows the icon when no image exists', () => {
-    const { container } = render(<EntityResultThumbnail entity={imagelessProduct} />);
-    const frame = container.firstElementChild as HTMLElement;
-    expect(frame).toHaveClass('w-12', 'h-12', 'rounded-lg');
-    expect(container.querySelector('svg.lucide-package')).not.toBeNull();
-  });
-
-  it('shows the same icon when the image fails to load', () => {
-    const { container } = render(
-      <EntityResultThumbnail entity={{ ...imagelessProduct, image_url: REAL_IMAGE }} />,
-    );
-    fireEvent.error(container.querySelector('img') as HTMLImageElement);
-    expect(container.querySelector('svg.lucide-package')).not.toBeNull();
   });
 });
 

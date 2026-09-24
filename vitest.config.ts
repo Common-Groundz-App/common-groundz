@@ -104,6 +104,7 @@ export default defineConfig({
             'src/components/entity-v4/group5HeaderImage.test.tsx',
             'src/components/search/group6LivePickers.test.tsx',
             'src/pages/group6bEntityDoorway.test.tsx',
+            'src/pages/group6cRetiredRoutes.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
             'src/components/content/StructuredFieldsDisplay.test.tsx',
             'src/components/common/EntityImage.test.tsx',
