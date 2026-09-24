@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,6 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { useAdminSuggestions, AdminSuggestion } from '@/hooks/admin/useAdminSuggestions';
 import { SuggestionReviewModal } from './SuggestionReviewModal';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
@@ -340,12 +340,15 @@ export const AdminSuggestionsPanel: React.FC = () => {
                           <TableCell>
                             {suggestion.entity ? (
                               <div className="flex items-center gap-3">
-                                <ImageWithFallback
-                                  src={getOptimalEntityImageUrl(suggestion.entity) || suggestion.entity.image_url}
-                                  alt={suggestion.entity.name}
-                                  entityType={suggestion.entity.type}
-                                  className="w-10 h-10 rounded object-cover"
-                                />
+                                <div className="w-10 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
+                                  <EntityCollectionImage
+                                    source={suggestion.entity}
+                                    type={suggestion.entity.type}
+                                    name={suggestion.entity.name}
+                                    imageClassName="w-full h-full object-cover"
+                                    iconClassName="h-5 w-5"
+                                  />
+                                </div>
                                 <div>
                                   <div className="font-medium">{suggestion.entity.name}</div>
                                   <div className="text-sm text-muted-foreground">

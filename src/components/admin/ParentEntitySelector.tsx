@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { useUniversalEntitySearch } from '@/hooks/use-universal-entity-search';
 import { X, Search, Loader2 } from 'lucide-react';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
 import { Badge } from '@/components/ui/badge';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
@@ -137,11 +137,15 @@ export function ParentEntitySelector({
         {/* Current parent display */}
         {selectedParent && (
           <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/50">
-            <ImageWithFallback
-              src={selectedParent.image_url || ''}
-              alt={selectedParent.name}
-              className="w-8 h-8 rounded object-cover"
-            />
+            <div className="w-8 h-8 rounded overflow-hidden bg-muted flex-shrink-0">
+              <EntityCollectionImage
+                source={{ id: selectedParent.id, image_url: selectedParent.image_url }}
+                type={selectedParent.type}
+                name={selectedParent.name}
+                imageClassName="w-full h-full object-cover"
+                iconClassName="h-4 w-4"
+              />
+            </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{selectedParent.name}</p>
               <Badge variant="outline" className="text-xs">
@@ -197,11 +201,15 @@ export function ParentEntitySelector({
                       onClick={() => handleEntitySelect(entity)}
                       className="w-full flex items-center gap-3 p-2 text-left hover:bg-accent rounded-sm transition-colors"
                     >
-                      <ImageWithFallback
-                        src={entity.image_url || ''}
-                        alt={entity.name}
-                        className="w-10 h-10 rounded object-cover flex-shrink-0"
-                      />
+                      <div className="w-10 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
+                        <EntityCollectionImage
+                          source={{ id: entity.id, image_url: entity.image_url }}
+                          type={entity.type}
+                          name={entity.name}
+                          imageClassName="w-full h-full object-cover"
+                          iconClassName="h-5 w-5"
+                        />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{entity.name}</p>
                         {entity.description && (

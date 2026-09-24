@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { EvidenceImage } from '@/components/admin/EvidenceImage';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1052,10 +1053,11 @@ const AdminEntityEdit = () => {
                         <div className="mt-2">
                           <p className="text-sm text-muted-foreground mb-2">Preview:</p>
                           <div className="w-32 h-32 rounded-md overflow-hidden bg-muted">
-                            <ImageWithFallback
-                              src={getOptimalEntityImageUrl(entity) || entity.image_url || ''}
-                              alt={entity.name}
+                            <EvidenceImage
+                              src={entity.image_url}
+                              name={entity.name}
                               className="w-full h-full object-cover"
+                              iconClassName="h-6 w-6"
                             />
                           </div>
                         </div>

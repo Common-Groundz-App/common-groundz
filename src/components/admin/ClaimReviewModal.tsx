@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +29,6 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { AdminSuggestion } from '@/hooks/admin/useAdminSuggestions';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Link } from 'react-router-dom';
 import { downloadFileFromUrl } from '@/utils/downloadUtils';
 import { toast } from 'sonner';
@@ -233,12 +233,15 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
             <CardContent>
               {entity ? (
                 <div className="flex items-start gap-4">
-                  <ImageWithFallback
-                    src={getOptimalEntityImageUrl(entity) || entity.image_url}
-                    alt={entity.name}
-                    entityType={entity.type}
-                    className="w-16 h-16 rounded object-cover"
-                  />
+                  <div className="w-16 h-16 rounded overflow-hidden bg-muted flex-shrink-0">
+                    <EntityCollectionImage
+                      source={entity}
+                      type={entity.type}
+                      name={entity.name}
+                      imageClassName="w-full h-full object-cover"
+                      iconClassName="h-6 w-6"
+                    />
+                  </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="text-xl font-semibold">{entity.name}</h3>

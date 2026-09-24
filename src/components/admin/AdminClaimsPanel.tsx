@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,7 +25,6 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useAdminSuggestions } from '@/hooks/admin/useAdminSuggestions';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ClaimReviewModal } from './ClaimReviewModal';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
@@ -278,12 +278,15 @@ export const AdminClaimsPanel = () => {
                     <TableRow key={claim.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <ImageWithFallback
-                            src={claim.entity?.image_url}
-                            alt={claim.entity?.name || 'Entity'}
-                            entityType={claim.entity?.type}
-                            className="w-10 h-10 rounded object-cover"
-                          />
+                          <div className="w-10 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
+                            <EntityCollectionImage
+                              source={claim.entity ? { id: claim.entity.id, image_url: claim.entity.image_url } : null}
+                              type={claim.entity?.type}
+                              name={claim.entity?.name || 'Entity'}
+                              imageClassName="w-full h-full object-cover"
+                              iconClassName="h-5 w-5"
+                            />
+                          </div>
                           <div>
                             <div className="font-medium">
                               {claim.entity?.name || 'Deleted Entity'}

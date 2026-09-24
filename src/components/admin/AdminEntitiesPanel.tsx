@@ -1,14 +1,13 @@
 
 import React from 'react';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, MapPin, Calendar, Loader2 } from 'lucide-react';
 import { useAdminEntities } from '@/hooks/admin/useAdminEntities';
 import { formatRelativeDate } from '@/utils/dateUtils';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 import { EntityApprovalChip } from './moderation/EntityApprovalChip';
 
 export const AdminEntitiesPanel = () => {
@@ -104,11 +103,12 @@ export const AdminEntitiesPanel = () => {
                 <div className="flex items-center gap-4 flex-1">
                   {/* Entity Image */}
                   <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                    <ImageWithFallback
-                      src={getOptimalEntityImageUrl(entity)}
-                      alt={entity.name}
-                      className="w-full h-full object-cover"
-                      entityType={entity.type}
+                    <EntityCollectionImage
+                      source={entity}
+                      type={entity.type}
+                      name={entity.name}
+                      imageClassName="w-full h-full object-cover"
+                      iconClassName="h-5 w-5"
                     />
                   </div>
                   

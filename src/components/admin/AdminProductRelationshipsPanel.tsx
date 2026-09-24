@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -301,11 +302,15 @@ export const AdminProductRelationshipsPanel = () => {
                 <div key={rel.id} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-center gap-4">
                     {rel.entities_a?.image_url && (
-                      <img
-                        src={rel.entities_a.image_url}
-                        alt={rel.entities_a.name}
-                        className="w-12 h-12 rounded object-cover"
-                      />
+                      <div className="w-12 h-12 rounded overflow-hidden bg-muted flex-shrink-0">
+                        <EntityCollectionImage
+                          source={{ id: rel.entities_a.id, image_url: rel.entities_a.image_url }}
+                          type={rel.entities_a.type}
+                          name={rel.entities_a.name}
+                          imageClassName="w-full h-full object-cover"
+                          iconClassName="h-5 w-5"
+                        />
+                      </div>
                     )}
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -323,11 +328,15 @@ export const AdminProductRelationshipsPanel = () => {
                       </p>
                     </div>
                     {rel.entities_b?.image_url && (
-                      <img
-                        src={rel.entities_b.image_url}
-                        alt={rel.entities_b.name}
-                        className="w-12 h-12 rounded object-cover"
-                      />
+                      <div className="w-12 h-12 rounded overflow-hidden bg-muted flex-shrink-0">
+                        <EntityCollectionImage
+                          source={{ id: rel.entities_b.id, image_url: rel.entities_b.image_url }}
+                          type={rel.entities_b.type}
+                          name={rel.entities_b.name}
+                          imageClassName="w-full h-full object-cover"
+                          iconClassName="h-5 w-5"
+                        />
+                      </div>
                     )}
                   </div>
                   {rel.evidence_text && (

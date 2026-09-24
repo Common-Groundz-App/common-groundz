@@ -1,12 +1,12 @@
 // Phase 3.3A-2 — "Did you mean?" pre-insert duplicate prompt.
 import React from 'react';
+import { EvidenceImage } from '@/components/admin/EvidenceImage';
 import {
   AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle,
   AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { AlertTriangle } from 'lucide-react';
 
 export interface DuplicateCandidate {
@@ -48,10 +48,9 @@ export const DuplicateConfirmDialog: React.FC<Props> = ({
         <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
           {candidates.map((c) => (
             <div key={c.id} className="flex items-center gap-3 border rounded-md p-2 bg-muted/30">
-              <ImageWithFallback
-                src={c.image_url ?? undefined}
-                alt={c.name}
-                entityType={c.type as any}
+              <EvidenceImage
+                src={c.image_url}
+                name={c.name}
                 className="h-12 w-12 rounded object-cover bg-muted shrink-0"
               />
               <div className="min-w-0 flex-1">
