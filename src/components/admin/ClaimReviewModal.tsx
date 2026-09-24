@@ -32,7 +32,6 @@ import { AdminSuggestion } from '@/hooks/admin/useAdminSuggestions';
 import { Link } from 'react-router-dom';
 import { downloadFileFromUrl } from '@/utils/downloadUtils';
 import { toast } from 'sonner';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface ClaimReviewModalProps {
   claim: AdminSuggestion | null;

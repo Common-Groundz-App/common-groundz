@@ -26,7 +26,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { useAdminSuggestions, AdminSuggestion } from '@/hooks/admin/useAdminSuggestions';
 import { SuggestionReviewModal } from './SuggestionReviewModal';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 const getPriorityColor = (score: number) => {
   if (score >= 70) return 'bg-red-100 text-red-800';

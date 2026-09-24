@@ -32,7 +32,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { Link } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
@@ -41,7 +40,6 @@ import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations
 import { CreateEntityDialog } from './CreateEntityDialog';
 import { AdminEntityPlaceIdTool } from './AdminEntityPlaceIdTool';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 import { EntityApprovalChip } from './moderation/EntityApprovalChip';
 
 // Constants for bulk operations

@@ -15,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NavBarComponent from '@/components/NavBarComponent';
 import AdminSidebar from '@/components/admin/AdminSidebar';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
 import { Database } from '@/integrations/supabase/types';
 import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations';
@@ -38,7 +37,6 @@ import { TagInput, Tag } from '@/components/admin/TagInput';
 import { getEntityTags } from '@/services/tagService';
 import { fetchCategoriesByType } from '@/services/categoryService';
 import { getCanonicalType } from '@/services/entityTypeHelpers';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 const MAX_MEDIA_ITEMS = 4;
 
