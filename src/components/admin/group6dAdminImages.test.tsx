@@ -102,3 +102,38 @@ describe('C — evidence image', () => {
     expect(document.body.innerHTML).not.toMatch(/unsplash|placeholder\.svg/);
   });
 });
+
+import { ExactUrlDuplicateDialog } from '@/components/admin/entity-create/ExactUrlDuplicateDialog';
+
+describe('6D addendum', () => {
+  const cand = (id: string, image_url: string | null) => ({ id, name: `E${id}`, slug: null, image_url, type: 'book', parent_name: null, score: 1, reasons: [] });
+  const noop = () => {};
+  it('exact-URL window shows truthful states, isolates rows, never icon/stock', () => {
+    render(<ExactUrlDuplicateDialog open candidates={[cand('1', REAL), cand('2', STORED), cand('3', null), cand('4', LEGACY)]} onCancel={noop} onOpenExisting={noop} onContinueAnyway={noop} />);
+    const imgs = screen.getAllByTestId('evidence-image');
+    expect(imgs.map(i => i.getAttribute('src'))).toEqual([REAL, STORED, LEGACY]);
+    fireEvent.error(imgs[1]);
+    expect(screen.getByRole('img', { name: 'Image failed to load for E2' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'No image provided for E3' })).toBeInTheDocument();
+    expect(screen.getAllByTestId('evidence-image').map(i => i.getAttribute('src'))).toEqual([REAL, LEGACY]);
+    expect(screen.queryByTestId('entity-collection-fallback')).toBeNull();
+  });
+  it('suggestion thumbnail resets failure when the entity changes', () => {
+    const T = ({ id, url }: { id: string; url: string }) => (
+      <div className="w-16 h-16 rounded overflow-hidden flex-shrink-0">
+        <EntityCollectionImage key={id} source={{ id, image_url: url }} type="book" name="S" imageClassName="w-16 h-16 rounded object-cover" iconClassName="h-6 w-6" />
+      </div>
+    );
+    const r = render(<T id="a" url={REAL} />);
+    fireEvent.error(screen.getByTestId('entity-collection-photo'));
+    expect(screen.getByTestId('entity-collection-fallback')).toBeInTheDocument();
+    r.rerender(<T id="b" url={STORED} />);
+    expect(screen.getByTestId('entity-collection-photo')).toHaveAttribute('src', STORED);
+  });
+  it('evidence image resets when its source changes', () => {
+    const r = render(<EvidenceImage src={REAL} name="D" className="h-12 w-12" />);
+    fireEvent.error(screen.getByTestId('evidence-image'));
+    r.rerender(<EvidenceImage src={STORED} name="D" className="h-12 w-12" />);
+    expect(screen.getByTestId('evidence-image')).toHaveAttribute('src', STORED);
+  });
+});
