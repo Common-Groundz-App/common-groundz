@@ -23,9 +23,8 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { AdminSuggestion } from '@/hooks/admin/useAdminSuggestions';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { Link } from 'react-router-dom';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface SuggestionReviewModalProps {
   suggestion: AdminSuggestion | null;
@@ -166,12 +165,16 @@ export const SuggestionReviewModal: React.FC<SuggestionReviewModalProps> = ({
             <CardContent>
               {entity ? (
                 <div className="flex items-start gap-4">
-                  <ImageWithFallback
-                    src={getOptimalEntityImageUrl(entity) || entity.image_url}
-                    alt={entity.name}
-                    entityType={entity.type}
-                    className="w-16 h-16 rounded object-cover"
-                  />
+                  <div className="w-16 h-16 rounded overflow-hidden flex-shrink-0">
+                    <EntityCollectionImage
+                      key={entity.id}
+                      source={entity}
+                      type={entity.type}
+                      name={entity.name}
+                      imageClassName="w-16 h-16 rounded object-cover"
+                      iconClassName="h-6 w-6"
+                    />
+                  </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <h3 className="text-xl font-semibold">{entity.name}</h3>
