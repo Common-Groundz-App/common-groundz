@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Entity } from '@/services/recommendation/types';
 import { Users, ArrowRight, Book, Film, MapPin } from 'lucide-react';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 interface EntityRelatedCardProps {

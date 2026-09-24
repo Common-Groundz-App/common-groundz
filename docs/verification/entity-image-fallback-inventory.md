@@ -309,3 +309,7 @@ Deleted ProductSearch (/product-search/:query), Books/Movies/Places/Food/Product
 A (entity own thumbnail → shared type icon): AdminEntityManagementPanel (Entities tab table; "No Image" text replaced), AdminEntitiesPanel (Content tab), PendingEntitiesQueue (Moderation), AdminSuggestionsPanel, AdminClaimsPanel, ClaimReviewModal, ParentEntitySelector ("Part of", fixed wrappers), AdminProductRelationshipsPanel (optional slot kept — no image_url → no box). C (evidence → EvidenceImage, exact source, "Image failed to load" / "No image provided", no stock/icon/retry): DuplicateConfirmDialog, AdminEntityEdit manual-URL Preview (raw image_url). B untouched: candidates, uploads, auto-fill, create-search rows, photo moderation, image health, avatars. See docs/verification/group-6d-admin-images.md.
 - 6D addendum: SuggestionReviewModal + ExactUrlDuplicateDialog closed (836 tests). 6E awaits approval.
 - 6E done: entity page child cards (846 tests). Next: post-6 cleanup.
+
+## Post-6 Step 1 (addendum)
+- EntityProductsCard had zero importers (no lazy load, no tests), so it was dead code, not a live exception. It has been deleted. This corrects the 6E exception list: MyStuffItemCard is now the only remaining no-picture-area exception.
+- EntityRelatedCard: removed the unused ImageWithFallback import. It only served commented-out example code. The live "Coming Soon" card is unchanged.
