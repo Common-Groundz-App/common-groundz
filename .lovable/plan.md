@@ -43,14 +43,23 @@ What stays: the doorway file (made much smaller and only opening V4), the V4 fol
    - The loading screen and the "not found" screen
    - Signed-in and signed-out views
    - Page title and share preview
-5. Update the notes that mention the old versions (the verification documents), then stop and report to you.
+5. **Share and search address check.** `?v=1` and the other extras must not turn into their own separate page for search engines or share previews. I checked this: V4 already builds its main address from the entity name alone, `.../entity/isha-foundation-chikkaballapura`, and ignores anything after `?`. A test will lock this in.
+6. **Leave the address bar alone.** The doorway will not remove or rewrite anything after `?`. V4 itself uses one of these extras (`?compose=review` opens the review writer), so removing them would break it. `?v=1` stays visible but has no effect.
+7. **Write the record, then stop and report to you.** The report lists exactly which files were deleted and which shared files were kept on purpose. Older phase reports are **not edited**, because they are a history of what existed back then. The retirement is recorded only in the current inventory, the roadmap and a new 6B close-out note.
+
+6B does no general cleanup. Anything else found unused is only written down. 6C stays a separate step.
 
 ## Technical details
 
-- Keep `src/pages/EntityDetail.tsx` as the route element, reduced to: `React.lazy(() => import('@/components/entity-v4/EntityV4'))` hoisted to module scope (it is currently created inside render), wrapped in the existing `Suspense` + `EntityV4LoadingWrapper` with `formatSlugAsName` display name. `App.tsx` routes at lines 191–192 are unchanged.
+- Keep `src/pages/EntityDetail.tsx` as the route element, reduced to: `React.lazy(() => import('@/components/entity-v4/EntityV4'))` hoisted to module scope (it is currently created inside render), wrapped in the existing `Suspense` + `EntityV4LoadingWrapper` with `formatSlugAsName` display name. `App.tsx` routes at lines 191–192 are unchanged. There is no redirect, `navigate` or `setSearchParams` in the doorway, so the query string is preserved as-is (V4 reads `?compose=review` at EntityV4.tsx:227–238).
 - Delete: `EntityDetailOriginal` (lines ~56–999 of EntityDetail.tsx) and its now-unused imports, `src/pages/EntityDetailV2.tsx`, `src/components/entity-v3/EntityV3.tsx` + `EntityV3Header.tsx`, `src/utils/entityVersionUtils.ts`.
 - Untouched: `src/components/entity-v4/**`, `use-entity-detail(-cached)`, `entityRedirectService`, `EntityV4LoadingWrapper`, `EntityDetailSkeleton`, `EntityRelatedCard` (EntitySidebar still mounts it).
 - Orphans found in step 1 are recorded in the inventory for the later cleanup plan, not deleted here.
-- Tests: a new route test mounting `/entity/:slug` and `/entity/:parent/:child` under MemoryRouter with each query variant, which asserts V4 renders (V4 is mocked); a zero-import check for deleted modules; full suite, typecheck and build log. Docs to update: `entity-image-fallback-inventory.md`, `roadmap.md`, and historical mentions in `phase-0-taxonomy-audit.md` and `phase-4-*` (annotated as "retired in 6B", not rewritten).
+- Tests are in two separate groups:
+  - (a) Route-selection test: mounts the doorway with V4 mocked, for `/entity/:slug` and `/entity/:parent/:child` with `?v=1/2/3/4`, `?preview=true`, `?v=junk` and `?compose=review`. It checks that V4 renders and the query string is unchanged.
+  - (b) Metadata test on the real V4 (data hooks mocked): canonical is `/entity/<slug>` with no query for every variant, and title and share tags come from the entity.
+  - Plus a zero-import check for the deleted modules, the full suite, a typecheck and the build log.
+- Docs: `entity-image-fallback-inventory.md`, `roadmap.md`, and a new `docs/verification/group-6b-legacy-entity-pages.md`. The `phase-0-*` and `phase-4-*` records are left unchanged.
+- Existing behaviour that is noted but not changed: a sub-item's canonical uses only its own slug (EntityV4.tsx:517).
 
 After 6B: 6C (unused product row and old recommendation form), 6D (admin, decided row by row), 6E (entity tab child cards), then the cleanup list from the Group 6 plan.
