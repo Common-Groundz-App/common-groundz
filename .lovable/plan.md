@@ -17,16 +17,39 @@ These are recorded as intentional "no picture area" exceptions, with no code cha
 Nothing else on the card changes: grid, text, badge, hover shadow and click all stay as they are. **Stop** after 6E, before the post-6 cleanup.
 
 ## Technical details
-- In `src/components/entity-v4/EntityTabsContent.tsx`, the guard becomes `child.image_url?.trim() &&`, and the `w-full h-32 rounded-md overflow-hidden bg-muted mb-3` wrapper is kept.
-- Inside that wrapper: `<EntityCollectionImage key={child.id} source={{ id: child.id, image_url: child.image_url }} type={child.type} name={child.name} imageClassName="w-full h-full object-cover" iconClassName="h-10 w-10" />`. This keeps raw `image_url` precedence.
+- In `src/components/entity-v4/EntityTabsContent.tsx`, normalise the link once and use that same value for both the check and the source:
+
+```tsx
+const imageUrl = child.image_url?.trim();
+
+{imageUrl && (
+  <div className="w-full h-32 rounded-md overflow-hidden bg-muted mb-3">
+    <EntityCollectionImage
+      source={{ id: child.id, image_url: imageUrl }}
+      type={child.type}
+      name={child.name}
+      imageClassName="w-full h-full object-cover"
+      iconClassName="h-10 w-10"
+    />
+  </div>
+)}
+```
+
+  Passing only `{ id, image_url }` keeps raw `image_url` precedence. The shared hook keys failure on id plus link, so a new child or a new link clears the broken state.
 - The `ImageWithFallback` import is removed. `getEntityTypeFallbackImage` is dropped from the import, and `getEntityTypeLabel` is kept.
-- A new test file `src/components/entity-v4/group6eTabCards.test.tsx` is registered in vitest.config.ts. It covers:
-  - null, empty and whitespace links render no wrapper;
-  - a real picture keeps the exact src and classes;
-  - a broken picture keeps the wrapper and shows the icon, with no second src;
-  - a registered placeholder shows the icon;
-  - an unknown type shows the neutral icon;
-  - no /placeholder.svg or stock link appears in the output;
-  - a stored metadata photo never overrides `image_url`.
+- A new test file `src/components/entity-v4/group6eTabCards.test.tsx` is registered in vitest.config.ts. Tests:
+  - Null → no wrapper
+  - Empty → no wrapper
+  - Whitespace-only → no wrapper
+  - A valid link with spaces around it → renders the trimmed link
+  - A valid real link → unchanged src and classes
+  - A broken link → icon, with no second request
+  - A registered legacy placeholder → icon
+  - A legitimate, unregistered Unsplash link → real image (not treated as missing)
+  - Unknown type → neutral icon
+  - A different child after a failure → its real image shows
+  - The same child ID with a new link after a failure → the real image shows
+  - A stored metadata photo never overrides the raw `image_url`
+  - No /placeholder.svg and no newly introduced remote fallback in the output
 - Checks: the full suite, tsgo, focused lint and the build log. Then the inventory, the roadmap and `docs/verification/group-6e-tab-cards.md`.
 - Out of scope: ImageWithFallback globally, the stock helpers, getOptimalEntityImageUrl, the database, and MyStuffItemCard / EntityProductsCard.
