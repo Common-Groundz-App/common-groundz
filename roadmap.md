@@ -345,4 +345,5 @@ cross-read between them.
 - [ ] Group 6E: entity tab child cards
 
 - [x] 6D addendum — suggestion review picture + "URL already exists" window
-- [ ] 6E — entity page tab cards (awaiting approval of 6D addendum)
+- [x] 6E — entity page tab cards
+- [ ] Post-6 cleanup (ImageWithFallback, stock helpers, optional DB, resolver decision, final audit)
