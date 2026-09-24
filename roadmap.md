@@ -343,3 +343,6 @@ cross-read between them.
 - [x] Group 6C: removed proven-unused pages and components
 - [x] Group 6D: admin pictures, decided row by row
 - [ ] Group 6E: entity tab child cards
+
+- [x] 6D addendum — suggestion review picture + "URL already exists" window
+- [ ] 6E — entity page tab cards (awaiting approval of 6D addendum)

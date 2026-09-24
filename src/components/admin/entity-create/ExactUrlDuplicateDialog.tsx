@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { EvidenceImage } from '@/components/admin/EvidenceImage';
 import { AlertTriangle } from 'lucide-react';
 import type { DuplicateCandidate } from './DuplicateConfirmDialog';
 
@@ -38,12 +38,9 @@ export const ExactUrlDuplicateDialog: React.FC<Props> = ({
         <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
           {candidates.map((c) => (
             <div key={c.id} className="flex items-center gap-3 border rounded-md p-2 bg-muted/30">
-              <ImageWithFallback
-                src={c.image_url ?? undefined}
-                alt={c.name}
-                entityType={c.type as any}
-                className="h-12 w-12 rounded object-cover bg-muted shrink-0"
-              />
+              <div className="h-12 w-12 rounded bg-muted shrink-0 overflow-hidden">
+                <EvidenceImage key={c.id} src={c.image_url} name={c.name} className="h-12 w-12 rounded object-cover" />
+              </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">{c.name}</p>
                 <p className="text-[11px] text-muted-foreground truncate">
