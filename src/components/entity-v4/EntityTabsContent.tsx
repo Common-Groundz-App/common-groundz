@@ -12,8 +12,8 @@ import { EntityStats } from '@/hooks/use-entity-detail-cached';
 import { EntityWithChildren } from '@/services/entityHierarchyService';
 import { RelatedEntitiesSection } from '@/components/entity/RelatedEntitiesSection';
 import { getChildPresentation } from '@/services/entityRelationshipRegistry';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import { getEntityTypeFallbackImage, getEntityTypeLabel } from '@/services/entityTypeHelpers';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { getEntityStats } from '@/services/entityService';
 import PostFeedItem from '@/components/feed/PostFeedItem';
 import { useEntityPosts } from '@/hooks/use-entity-posts';
@@ -28,6 +28,28 @@ import { FeedVideoManagerProvider } from '@/hooks/useFeedVideoManager';
  * children tab is hidden entirely when the entity has no children, and the
  * "Coming soon" placeholder block is gone by design.
  */
+/**
+ * Group 6E — optional picture area on a child card. No usable link → no area
+ * (card height unchanged). A present link that fails, or a registered legacy
+ * placeholder, shows the canonical type icon inside the existing area. Raw
+ * image_url precedence is preserved (only { id, image_url } is passed).
+ */
+export const ChildCardImage: React.FC<{ child: Pick<Entity, 'id' | 'name' | 'type' | 'image_url'> }> = ({ child }) => {
+  const imageUrl = child.image_url?.trim();
+  if (!imageUrl) return null;
+  return (
+    <div className="w-full h-32 rounded-md overflow-hidden bg-muted mb-3">
+      <EntityCollectionImage
+        source={{ id: child.id, image_url: imageUrl }}
+        type={child.type}
+        name={child.name}
+        imageClassName="w-full h-full object-cover"
+        iconClassName="h-10 w-10"
+      />
+    </div>
+  );
+};
+
 interface EntityTabsContentProps {
   entity?: Entity;
   stats?: EntityStats | null;
@@ -270,16 +292,7 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
                     onClick={() => onViewChild?.(child)}
                   >
                     <CardContent className="p-4">
-                      {child.image_url && (
-                        <div className="w-full h-32 rounded-md overflow-hidden bg-muted mb-3">
-                          <ImageWithFallback
-                            src={child.image_url}
-                            alt={child.name}
-                            className="w-full h-full object-cover"
-                            fallbackSrc={getEntityTypeFallbackImage(child.type)}
-                          />
-                        </div>
-                      )}
+                      <ChildCardImage child={child} />
                       <div className="space-y-2">
                         <h4 className="font-medium">{child.name}</h4>
                         {child.description && (
