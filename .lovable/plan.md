@@ -1,37 +1,41 @@
-# Post-Group-6 cleanup (gated, one step at a time)
+# Post-Group-6 cleanup: Step 2 (the old picture helper)
 
-## 6E audit result
-6E is in place: the child tab cards use the shared rules, the old helper and stock lookup are gone from that file, and the tests are registered.
+## Check result: 6E and Step 1
+- 6E is complete. The child tab cards use the shared rules, nothing from the old helper is left in that file, and the tests are registered.
+- Step 1 is complete. The unused product list card has been deleted, and the unused line is gone from the related-items card, which still shows "Coming Soon". All 846 checks pass and the type check is clean.
+- Nothing else is left over from Group 6. The old helper is now used only on screens where the picture does not belong to an entity.
 
-One leftover was found next to it. **EntityProductsCard** (recorded as a "no picture area" exception) still uses the old helper, so a broken product picture would swap in a stock photo. It turns out nothing in the app shows this card any more, so it is dead code rather than a live exception. It moves to step 1 for removal. The exception record is corrected in the notes. Earlier evidence is not rewritten.
+## Step 2: what changes on each screen when a picture fails
+| Screen | Today | After |
+|---|---|---|
+| Profile → cover banner | Your default cover | **Same** (it keeps its own default) |
+| Location search in the post composer | Its own food photo | **Same** (it keeps its own photo) |
+| Review → upload a photo → preview | Random stock photo | The existing box stays empty, so you can see the upload is broken |
+| Admin → New Entity → search rows (two lists) | Random stock photo | The existing box stays empty |
+| Admin → New Entity → image candidates | A product stock photo, then the candidate is marked broken | The candidate is marked broken, as today, with no stock photo |
+| Admin → auto-fill preview (image choices and the preview row) | A type stock photo | The existing box stays empty |
 
-## Step 1: remove dead picture code (this approval)
-- Delete `EntityProductsCard` after a zero-caller check covering imports, lazy loading and tests.
-- `EntityRelatedCard` stays, because the sidebar shows its "Coming Soon" card. Only its unused picture-helper import, which serves commented-out example code, is removed. Nothing visible changes.
-- **Stop.**
+Box sizes, corners and layout are unchanged on every screen. A picture that works looks exactly as it does today.
 
-## Step 2: old picture helper (`ImageWithFallback`)
-After step 1 it is only used where the picture is not an entity's own: profile cover, review upload previews, location search photos, and three admin "judge the picture" screens.
-- Remove its built-in stock photo and type-to-stock lookup, and remove its second-attempt retry.
-- Each caller keeps what it passes today. A caller that passes nothing on failure keeps its frame and shows nothing inside it.
-- Before coding, I show you a per-screen table of what each one shows on failure today and after the change. Profile covers and location photos stay exactly as they look now if they pass their own fallback.
-- **Stop.**
+## What changes in the helper
+- The built-in random photo and the type-to-photo lookup are removed. A screen gets a fallback only if it supplies its own.
+- The second attempt (after the proxy fails, it loads the picture directly) is removed. Each picture makes one request, then shows the fallback or stays empty.
+- If there is no link at all, the helper draws nothing instead of loading a stock photo.
 
-## Step 3: old stock-photo lists
-Delete `getEntityTypeFallbackImage` (in both copies), `getCategoryFallbackImage`, `getRecommendationFallbackImage`, and the Unsplash maps, **one at a time**, only after each one has zero callers. The legacy-placeholder registry stays, because it is how we recognise old saved stock links. Any helper still used by a write path is replaced with `null` there, per the write rules.
-- **Stop.**
-
-## Step 4: optional database tidy-up (needs your separate yes)
-- Read-only count of entities whose `image_url` exactly matches a registered stock link, with a sample list shown to you.
-- Only if you approve: back up the ids and links, then set exactly those to `null`. A recount confirms that nothing else changed.
-- Nothing changes on screen, because the app already treats these as missing.
-
-## Step 5: central rule decision, then final inventory
-- Decide whether `getOptimalEntityImageUrl` should also skip registered placeholders. Default recommendation: leave it unchanged, because every screen already goes through the shared contract.
-- Final inventory: every picture area is marked as migrated, a deliberate exception (loading skeleton, avatars and initials, location photos, profile covers, judge-the-picture admin screens, MyStuffItemCard) or retired.
+**Stop** after Step 2. The next steps are unchanged and each needs its own approval:
+- **Step 3:** delete the old stock-photo lists, one at a time, once each has no users left.
+- **Step 4:** optional database tidy-up, which needs a separate yes.
+- **Step 5:** the central-rule decision and the final inventory.
 
 ## Technical details
-- Step 1 proof: `rg` for the symbol across src (imports, `lazy(`, tests, vitest config), then delete, then tsgo, full suite, build log.
-- Step 2 file: `src/components/common/ImageWithFallback.tsx`. Callers: ProfileCoverImage, ImageUploader, LocationSearchInput, AutoFillPreviewModal, ImageCandidateGrid, SearchEntryPanel. Tests cover no fallback → no stock request, a caller-provided fallback is used once, and no retry.
-- Step 3 files: `utils/urlUtils.ts`, `services/entityTypeHelpers.ts`, `utils/fallbackImageUtils.ts`, `utils/imageUtils.ts`, `utils/entityImageUtils.ts`. Also check the imports in `use-entity-search`, `entityOperations`, `enhancedEntityService`, `imageMigrationService` and `use-entity-refresh`, plus the comment in `reviewDisplayType.ts`.
-- Each step records its notes in `docs/verification/`, the inventory and the roadmap.
+- In `src/components/common/ImageWithFallback.tsx`, drop the `entityType` prop, the `getEntityTypeFallbackImage` import, the default Unsplash URL and the `proxyAttempted` retry branch. When there is no fallback: `src` is empty → render `null`; on error → hide the `<img>` (render `null`), then call `onError` once. When `fallbackSrc` is set: swap to it once, and never loop if the fallback itself fails.
+- Remove `entityType=` from ImageCandidateGrid and from both AutoFillPreviewModal sites. The `markBroken` logic in ImageCandidateGrid is untouched.
+- Remove the `images.unsplash.com` entry from `shouldUseCors` only if nothing else relies on it. If something does, keep it and record why.
+- New test `src/components/common/imageWithFallbackStep2.test.tsx`, registered in vitest.config.ts. It checks:
+  - No src and no fallback → renders nothing, with no request.
+  - An error with no fallback → hidden, with no second request and `onError` called once.
+  - An error with a fallback → the fallback is used exactly once.
+  - A failed fallback → no loop.
+  - A real image → unchanged src and classes.
+  - No Unsplash or `/placeholder.svg` appears unless the caller supplies it.
+- Checks: the full suite, tsgo, focused lint and the build log. Notes go in `docs/verification/post6-step2-image-helper.md`, the inventory and the roadmap.
