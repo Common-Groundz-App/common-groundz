@@ -339,3 +339,7 @@ cross-read between them.
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
 - [ ] Manual remediation of legacy unlinked reviews
 
+- [x] Group 6B: retire legacy entity pages v1/v2/v3 (V4 untouched)
+- [ ] Group 6C: remove proven-unused product row and old recommendation form
+- [ ] Group 6D: admin pictures, decided row by row
+- [ ] Group 6E: entity tab child cards

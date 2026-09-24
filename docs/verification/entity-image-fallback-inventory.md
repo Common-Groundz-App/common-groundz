@@ -298,3 +298,6 @@ Programme status: Group 5 closes the live entity header only. Still open: Group 
 - Tests: `src/components/search/group6LivePickers.test.tsx` (9, registered). Full suite 785/785, typecheck clean; focused lint shows only pre-existing `no-explicit-any` / exhaustive-deps findings in `EntitySearch.tsx`.
 
 Still open: 6B (retire entity v1/v2/v3 — deletion manifest first), 6C (retire `ProductResultItem`, `RecommendationForm`), 6D (admin role classification first), 6E (`EntityTabsContent` broken-present-picture case), then the post-Group-6 cleanup list.
+
+## Group 6B — legacy entity pages retired (done)
+v1/v2/v3 and the version switch deleted; the /entity doorway always renders V4 and keeps the query string. Canonical ignores ?v=. Orphans recorded: EntityDetailSkeleton, DynamicReviewsSummary. See docs/verification/group-6b-legacy-entity-pages.md.
