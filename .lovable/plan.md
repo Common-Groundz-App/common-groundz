@@ -20,7 +20,7 @@
 |---|---|---|
 | Profile → cover banner | Your default cover | **Same.** Default cover, tried once. If that also fails, the plain banner background, with no loop |
 | Location search (post composer) | Its own food photo | **Same.** Kept and recorded as a deliberate location exception, not counted as "no stock photos left" |
-| Review → add photo → preview | Stock photo | "Image failed to load" in the same 192px box |
+| Review photo preview (old piece) | Nothing uses it any more | **Deleted** after a check that nothing uses it |
 | Admin → New Entity → "already on Groundz" rows | Stock photo | "Image failed to load" in the 56×56 box. No link → empty box, as today |
 | Admin → New Entity → result rows | Stock photo | "Image failed to load" in the 56×56 box. No link → initials, as today |
 | Admin → image candidates | Product stock photo, then marked broken | Marked broken exactly once, as today, with its existing "Image unavailable" overlay and no stock photo |
@@ -41,6 +41,20 @@ Box sizes, corners, crop and layout are unchanged. Working pictures look exactly
   - A late error from an old link is ignored after the link has changed.
   - A failed fallback followed by a new, good link shows the new picture.
 - **Kept on purpose:** the Unsplash rule for loading pictures across sites stays, because real Unsplash photos still exist.
+
+## Which kinds of picture link count as valid (ChatGPT's check)
+I checked every remaining screen:
+- **Normal web links (https/http):** all of them use these, including the profile cover's default and the location photo.
+- **Upload previews (`blob:` links):** the only one found is in admin image candidates. That preview uses a plain picture, not this helper, so it is not affected.
+- **The review photo preview:** nothing in the app uses it any more, so it is deleted in this step instead of being changed.
+- **`data:image` links and `/local` paths:** no current screen passes these.
+
+**The rule:**
+- Valid: `https:`, `http:`, `data:image/...`, `blob:`, and app paths starting with `/` (but not `//`). The last three are allowed so a future upload preview or local default is never wrongly rejected.
+- Invalid: everything else, including `ftp:`, `javascript:`, `data:` that isn't an image, and malformed text.
+- The same rule applies to a screen's own fallback.
+- Only remote https/http links can go through the relay. `data:`, `blob:` and `/` links load directly, with no relay and no retry.
+- One change from today: `blob:` and `/` links are currently rejected and replaced with a stock photo. After this step they display.
 
 ## Two more cases (from Codex, accepted)
 - **A link that is not a real web address** (for example "not a url" or an `ftp://` link): no request is made. The screen's own fallback is tried once if it has a valid one. Otherwise the "Image failed to load" panel shows. The screen is told it failed exactly once, so image candidates are still marked broken once. This goes through a separate "failed" signal and no fake browser event is created.
@@ -67,7 +81,15 @@ Box sizes, corners, crop and layout are unchanged. Working pictures look exactly
   - ImageUploader, both SearchEntryPanel rows, and both AutoFillPreviewModal sites pass `failedContent={<ImageFailedState/>}`. AutoFill's primary image gets an `h-32` panel so its height stays within the current `max-h-32`.
   - Drop `entityType=` from ImageCandidateGrid and AutoFill. ImageCandidateGrid's `markBroken` is unchanged.
   - ProfileCoverImage and LocationSearchInput are unchanged.
-- New prop `onFailure?: (reason: 'load' | 'invalid') => void`. It fires once per source key, for a primary failure (either reason), and never for a fallback failure or the relay retry. `onError` stays tied to real `<img>` events only. ImageCandidateGrid moves `markBroken` to `onFailure`, so both reasons mark a candidate broken once. For invalid input: `isValidImageUrl` fails → no `<img>` for the primary; use the fallback if it is valid, else `failedContent`.
+- New prop `onFailure?: (reason: 'load' | 'invalid') => void`. It fires once per primary lifecycle, and never for a fallback failure or the intermediate relay failure.
+- The external `onError` fires only for the terminal primary browser failure: after the direct retry fails, or when a direct link fails. It does not fire for the relay step, for invalid input or for a fallback failure.
+- ImageCandidateGrid moves `markBroken` to `onFailure` only, so there are no duplicate notifications.
+- Invalid input: no `<img>` is rendered for the primary. Use the fallback if it is valid, else `failedContent`.
+- Add a local `isRenderableImageSrc(src)` in the helper for the rule above. The shared `isValidImageUrl` is untouched, because other code uses it.
+- The relay applies only when the source is http/https.
+- State is tracked by a structured `{src, fallbackSrc}` identity rather than string concatenation. Each `<img>` error handler checks the identity captured at render, so stale events are ignored.
+- Successful real and fallback images keep `className`, `alt`, CORS and the other props they have today.
+- Delete `src/components/profile/reviews/ImageUploader.tsx` after the `rg` proof, which showed zero importers.
 - Test file `src/components/common/imageWithFallbackStep2.test.tsx`, registered in vitest.config.ts. Beyond the table cases, it covers invalid primary with no fallback (panel, zero requests, `onFailure('invalid')` once), invalid primary with a fallback (fallback once), no src with a fallback (fallback once, no `onFailure`), and ImageCandidateGrid with an invalid link (marked broken once). It also covers:
   - Empty src → nothing.
   - A direct failure with no fallback → the failed panel, no second request, `onError` once.
