@@ -334,7 +334,7 @@ cross-read between them.
 - [ ] Group 6B — retire entity page v1/v2/v3 and the version switch (show deletion manifest first)
 - [x] Group 6C — retired ProductSearch page, 5 legacy category pages, ProductResultItem, RecommendationForm (no redirects)
 - [x] Group 6D — admin pictures: classify by role, approve, then migrate only entity-own-picture slots
-- [ ] Group 6E — EntityTabsContent child cards: broken present picture → icon; missing stays omitted
+- [x] Group 6E — EntityTabsContent child cards: broken present picture → icon; missing stays omitted
 - [ ] Post-group cleanup — ImageWithFallback simplification, legacy stock-helper deletion once zero active callers are proven, optional historical database cleanup of known stock placeholder rows, the getOptimalEntityImageUrl resolver decision, final inventory audit
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
 - [ ] Manual remediation of legacy unlinked reviews
@@ -342,8 +342,10 @@ cross-read between them.
 - [x] Group 6B: retire legacy entity pages v1/v2/v3 (V4 untouched)
 - [x] Group 6C: removed proven-unused pages and components
 - [x] Group 6D: admin pictures, decided row by row
-- [ ] Group 6E: entity tab child cards
+- [x] Group 6E: entity tab child cards
 
 - [x] 6D addendum — suggestion review picture + "URL already exists" window
 - [x] 6E — entity page tab cards
+- [x] Post-6 Step 1 — removed dead EntityProductsCard (zero callers) and unused ImageWithFallback import in EntityRelatedCard
+- [ ] Post-6 Step 2 — ImageWithFallback: remove stock fallback + retry (awaiting approval)
 - [ ] Post-6 cleanup (ImageWithFallback, stock helpers, optional DB, resolver decision, final audit)
