@@ -103,6 +103,7 @@ export default defineConfig({
             'src/components/explore/group4GridCarouselImages.test.tsx',
             'src/components/entity-v4/group5HeaderImage.test.tsx',
             'src/components/search/group6LivePickers.test.tsx',
+            'src/pages/group6bEntityDoorway.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
             'src/components/content/StructuredFieldsDisplay.test.tsx',
             'src/components/common/EntityImage.test.tsx',
