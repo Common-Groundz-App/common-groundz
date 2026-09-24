@@ -33,26 +33,43 @@ What stays: the main search page, the search box, the "Add to My Stuff" picker (
 
 **Old typed addresses do not break.** Instead of showing "not found":
 - `/product-search/<word>` goes to the main search for that word.
-- `/books`, `/movies`, `/places`, `/food` and `/products` go to Explore.
+- `/books`, `/movies`, `/places`, `/food` and `/products` go to Explore. Explore has no address that opens a single category, so plain Explore is the closest match. No new filter system gets built for this.
+- **Signed-out visitors are treated the same as today.** The redirects sit behind the same sign-in check the old pages had. The old page code is deleted, but the old addresses still work as redirects.
+- **Back button:** the redirect replaces the old address, so pressing Back does not reopen it.
+
+## Already checked for outside links
+
+- There is no sitemap in the project.
+- No menu, footer, notification link, share link, settings file or search setting points at these six addresses. Only the category pages link to the product search page.
+- The old hosting file mentions `/food/*`, which is a different pattern. Lovable hosting ignores that file, so it is left alone.
 
 ## Steps
 
 1. **Proof before deleting.** List every file that points at each item: links, tests, delayed loading and notes. Confirm nothing live uses them. Shared pieces used only by these items are recorded, not deleted.
-2. **Add the redirects** above, so old addresses land somewhere useful.
-3. **Delete** the items in the table, and remove their address entries.
-4. **Tests.** Move the small picture test for the product search row out of its current test file, because it goes with the page. Add checks that:
-   - the old addresses redirect correctly
-   - the deleted files are gone and nothing imports them
-   - My Stuff's picker still works.
+2. **Add the protected redirects** above.
+3. **Delete** the eight files and remove their imports.
+4. **Tests.** These check what the app does, not whether files exist:
+   - Each old address redirects correctly, including searches with spaces, `&` and `+`.
+   - The redirect replaces the history entry.
+   - A signed-out visitor still meets the sign-in check first.
 
-   Then run the full test suite, the type check and the build.
-5. **Write the record** in the picture inventory, the roadmap and a new 6C note. Older reports are not edited. Then stop and report back.
+   The existing My Stuff tests confirm the picker still works. A text search, the type check and the build confirm nothing still uses the deleted files.
+5. **Write the record** in the picture inventory, the roadmap and a new 6C note. Older reports are not edited. Then stop before 6D and report back.
 
 ## Technical details
 
 - Delete: `src/pages/ProductSearch.tsx`, `src/pages/{Books,Movies,Places,Food,Products}Page.tsx`, `src/components/search/ProductResultItem.tsx`, `src/components/recommendations/RecommendationForm.tsx`.
-- `App.tsx`: remove those imports. Replace the six routes with `<Navigate replace>`. For `/product-search/:query`, a tiny inline component → `/search?q=<encoded query>&mode=quick`, matching the search box. The five category paths go to `/explore`.
-- Keep: `EntitySearch.tsx` (MyStuff), `SearchResultHandler.tsx` (live search rows), `useUnifiedSearch`, `ConnectedRingsRating`.
-- In `group2aEntityThumbnails.test.tsx`, drop the `EntityResultThumbnail` block. It is only exported from ProductSearch.
-- Check for orphans that the deleted files alone imported (for example the `hooks/feed/api/types` `EntityTypeString` or the category-page-only components) and record them. Do not delete them.
-- New test `src/pages/group6cRetiredPages.test.tsx`: redirect cases, a zero-importer file check and existence checks. Register it in vitest.config.ts.
+- `App.tsx`: remove the six page imports and keep each route wrapped in `<AppProtectedRoute>`.
+  - The five category routes render `<Navigate to="/explore" replace />`.
+  - `/product-search/:query` renders a small `LegacyProductSearchRedirect`. It reads the `useParams` value, which React Router has already decoded, builds the target with `new URLSearchParams({ q, mode: 'quick' })` so the query is encoded exactly once, and uses `<Navigate replace>`.
+- Keep: `EntitySearch.tsx` (MyStuff), `SearchResultHandler.tsx`, `useUnifiedSearch`, `ConnectedRingsRating`.
+- In `group2aEntityThumbnails.test.tsx`, remove the `EntityResultThumbnail` import and its block.
+- Record the orphans left by the deleted files, for example `useIsMobile` or `VerticalTubelightNavbar` if they end up unused. Do not delete them.
+- New test `src/pages/group6cRetiredRoutes.test.tsx`, registered in vitest.config.ts. It uses a MemoryRouter with the real `AppProtectedRoute` and a mocked auth state, and covers:
+  - `/product-search/books` → `/search?q=books&mode=quick`
+  - `/product-search/skin%20care`, which decodes and re-encodes to a single `q=skin care`
+  - `/product-search/a%26b%2Bc` → `q=a&b+c` exactly
+  - the five category addresses → `/explore`
+  - history length unchanged, confirming the history entry is replaced
+  - signed-out behaviour identical to today.
+- Static proof goes in the close-out note: `rg` shows zero references to the deleted modules.
