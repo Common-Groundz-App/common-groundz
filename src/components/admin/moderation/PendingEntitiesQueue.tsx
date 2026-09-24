@@ -1,4 +1,5 @@
 import React from 'react';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -108,15 +109,15 @@ export const PendingEntitiesQueue: React.FC = () => {
               className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between p-3 border rounded-lg"
             >
               <div className="flex gap-3 items-start min-w-0 flex-1">
-                {entity.image_url ? (
-                  <img
-                    src={entity.image_url}
-                    alt={entity.name}
-                    className="h-12 w-12 rounded object-cover flex-shrink-0 bg-muted"
+                <div className="h-12 w-12 rounded overflow-hidden bg-muted flex-shrink-0">
+                  <EntityCollectionImage
+                    source={{ id: entity.id, image_url: entity.image_url }}
+                    type={entity.type}
+                    name={entity.name}
+                    imageClassName="w-full h-full object-cover"
+                    iconClassName="h-5 w-5"
                   />
-                ) : (
-                  <div className="h-12 w-12 rounded bg-muted flex-shrink-0" />
-                )}
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium truncate">{entity.name}</span>

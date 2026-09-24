@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { EvidenceImage } from '@/components/admin/EvidenceImage';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import NavBarComponent from '@/components/NavBarComponent';
 import AdminSidebar from '@/components/admin/AdminSidebar';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
 import { Database } from '@/integrations/supabase/types';
 import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations';
@@ -37,7 +37,6 @@ import { TagInput, Tag } from '@/components/admin/TagInput';
 import { getEntityTags } from '@/services/tagService';
 import { fetchCategoriesByType } from '@/services/categoryService';
 import { getCanonicalType } from '@/services/entityTypeHelpers';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 const MAX_MEDIA_ITEMS = 4;
 
@@ -1052,10 +1051,11 @@ const AdminEntityEdit = () => {
                         <div className="mt-2">
                           <p className="text-sm text-muted-foreground mb-2">Preview:</p>
                           <div className="w-32 h-32 rounded-md overflow-hidden bg-muted">
-                            <ImageWithFallback
-                              src={getOptimalEntityImageUrl(entity) || entity.image_url || ''}
-                              alt={entity.name}
+                            <EvidenceImage
+                              src={entity.image_url}
+                              name={entity.name}
                               className="w-full h-full object-cover"
+                              iconClassName="h-6 w-6"
                             />
                           </div>
                         </div>

@@ -304,3 +304,6 @@ v1/v2/v3 and the version switch deleted; the /entity doorway always renders V4 a
 
 ## Group 6C — unreachable pages and unused components retired (done)
 Deleted ProductSearch (/product-search/:query), Books/Movies/Places/Food/Products pages and routes, ProductResultItem, RecommendationForm. No redirects — the old paths fall through to NotFound. The 6A ProductSearch row fix is therefore moot. See docs/verification/group-6c-retired-pages.md.
+
+## Group 6D — admin pictures by role (done)
+A (entity own thumbnail → shared type icon): AdminEntityManagementPanel (Entities tab table; "No Image" text replaced), AdminEntitiesPanel (Content tab), PendingEntitiesQueue (Moderation), AdminSuggestionsPanel, AdminClaimsPanel, ClaimReviewModal, ParentEntitySelector ("Part of", fixed wrappers), AdminProductRelationshipsPanel (optional slot kept — no image_url → no box). C (evidence → EvidenceImage, exact source, "Image failed to load" / "No image provided", no stock/icon/retry): DuplicateConfirmDialog, AdminEntityEdit manual-URL Preview (raw image_url). B untouched: candidates, uploads, auto-fill, create-search rows, photo moderation, image health, avatars. See docs/verification/group-6d-admin-images.md.

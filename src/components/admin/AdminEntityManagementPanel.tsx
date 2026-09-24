@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { EntityCollectionImage } from '@/components/entity/EntityCollectionImage';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +32,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
-import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { Link } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
@@ -40,7 +40,6 @@ import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations
 import { CreateEntityDialog } from './CreateEntityDialog';
 import { AdminEntityPlaceIdTool } from './AdminEntityPlaceIdTool';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
-import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 import { EntityApprovalChip } from './moderation/EntityApprovalChip';
 
 // Constants for bulk operations
@@ -733,18 +732,13 @@ export const AdminEntityManagementPanel = () => {
                     )}
                     <TableCell>
                       <div className="w-12 h-12 rounded-md overflow-hidden bg-muted">
-                        {getOptimalEntityImageUrl(entity) || entity.image_url ? (
-                          <ImageWithFallback
-                            src={getOptimalEntityImageUrl(entity) || entity.image_url || ''}
-                            alt={entity.name}
-                            className="w-full h-full object-cover"
-                            suppressConsoleErrors
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <span className="text-xs text-muted-foreground">No Image</span>
-                          </div>
-                        )}
+                        <EntityCollectionImage
+                          source={entity}
+                          type={entity.type}
+                          name={entity.name}
+                          imageClassName="w-full h-full object-cover"
+                          iconClassName="h-5 w-5"
+                        />
                       </div>
                     </TableCell>
                     <TableCell>
