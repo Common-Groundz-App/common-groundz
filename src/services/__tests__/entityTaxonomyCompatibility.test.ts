@@ -4,7 +4,6 @@ import {
   getCanonicalType,
   getEntityTypeLabel,
   getEntityTypeIcon,
-  getEntityTypeFallbackImage,
   isValidEntityType,
   getActiveEntityTypes,
 } from '../entityTypeHelpers';
@@ -48,11 +47,10 @@ describe('display-only normalization', () => {
     expect(getCanonicalType('widget')).not.toBe(EntityType.Place);
   });
 
-  it('has a label, icon and fallback image for every canonical type', () => {
+  it('has a label and icon for every canonical type', () => {
     for (const t of CANONICAL_ENTITY_TYPES) {
       expect(getEntityTypeLabel(t)).toBeTruthy();
       expect(getEntityTypeIcon(t)).toBeTruthy();
-      expect(getEntityTypeFallbackImage(t)).toMatch(/^https?:\/\//);
     }
   });
 });

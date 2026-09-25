@@ -147,17 +147,3 @@ export const validateImageUrlForStorage = (
   return persistableImageUrl;
 };
 
-/**
- * Get a fallback image URL for an entity type
- */
-export const getEntityTypeFallbackImage = (type: string): string => {
-  const fallbacks: Record<string, string> = {
-    book: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400',
-    movie: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400',
-    place: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-    food: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400',
-    product: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400',
-    person: 'https://images.unsplash.com/photo-1511367461989-f85a21fda167?w=400',
-  };
-  return fallbacks[type] || fallbacks.product;
-};
