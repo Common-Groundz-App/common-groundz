@@ -107,6 +107,7 @@ export default defineConfig({
             'src/pages/group6cRetiredRoutes.test.tsx',
             'src/components/admin/group6dAdminImages.test.tsx',
             'src/components/entity-v4/group6eTabCards.test.tsx',
+            'src/components/common/imageWithFallbackStep2.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
             'src/components/content/StructuredFieldsDisplay.test.tsx',
             'src/components/common/EntityImage.test.tsx',
