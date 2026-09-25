@@ -349,5 +349,7 @@ cross-read between them.
 - [x] Post-6 Step 1 — removed dead EntityProductsCard (zero callers) and unused ImageWithFallback import in EntityRelatedCard
 - [x] Post-6 Step 2 — ImageWithFallback stock fallback removed (relay retry kept)
 - [x] Post-6 Step 3 — deleted all client stock-photo lists (imageUtils, urlUtils, entityImageUtils, entityTypeHelpers, fallbackImageUtils) after repo-wide zero-caller proof; legacy-placeholder registry kept; 862 tests, tsgo clean
-- [ ] Post-6 Step 3f — server-side stock producers (unified-search-v2, search-places, search-google-books; check proxy-external-image mention) — needs own approval
+- [x] Post-6 Step 3f — server-side stock producers removed: unified-search-v2 (local type list deleted), search-places, search-google-books now return image_url: null; ProductSearchResult.image_url widened to string|null; proxy-external-image allowlist kept; deno check + 862 tests + live smoke (11/101 places returned null, no stock URL anywhere)
+- [ ] Post-6 Step 4 — optional database tidy-up of already-saved stock URLs (needs own approval)
+- [ ] Post-6 Step 5 — getOptimalEntityImageUrl decision + final inventory audit
 - [ ] Post-6 cleanup (ImageWithFallback, stock helpers, optional DB, resolver decision, final audit)

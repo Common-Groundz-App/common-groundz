@@ -321,3 +321,10 @@ A (entity own thumbnail → shared type icon): AdminEntityManagementPanel (Entit
 - All four client `getEntityTypeFallbackImage` copies (imageUtils, urlUtils, entityImageUtils, entityTypeHelpers) and `fallbackImageUtils.ts` (`getCategoryFallbackImage`, `getRecommendationFallbackImage`) deleted after repo-wide zero-caller proof. See `post6-step3-stock-helpers.md`.
 - The legacy-placeholder registry in `entityImageFallback.ts` stays: old saved records still hold those links.
 - Step 3f (separate approval): server-side stock producers — `unified-search-v2` (own type list), `search-places`, `search-google-books`; `proxy-external-image` mention to be checked.
+
+## Post-6 Step 3f — server-side stock producers removed (2026-09-25)
+- `unified-search-v2` (local type-to-stock list deleted), `search-places` and `search-google-books` no longer invent images; they return `image_url: null` when the provider has no real photo. Real Google Places / Google Books / Amazon-OMDb imagery and their proxies are unchanged.
+- `proxy-external-image` untouched: its `unsplash.com` entries are a pass-through allowlist, not a fallback.
+- `ProductSearchResult.image_url` widened to `string | null` in `use-unified-search.ts` and `use-enhanced-search.ts` (type accuracy only; tsgo clean, no consumer assumed non-null).
+- Verified: deno check per function (only pre-existing unrelated errors), 862 tests, build clean, and a live smoke where 11 of 101 sampled places returned `null` instead of a stock cafe photo. See `post6-step3f-server-stock-producers.md`.
+- No server search function creates a stock URL any more. Remaining Unsplash references are the proxy allowlist, the legacy-placeholder registry (historical records), and the documented deliberate non-entity photos.
