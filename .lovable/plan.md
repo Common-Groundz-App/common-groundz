@@ -1,25 +1,27 @@
-# Step 4 — Delete the one entity with a saved stock photo
+# Step 4 finish + Step 5 plan
 
-## Step 3 check (done, read-only)
-- No leftover stock-photo helpers anywhere in the app or server functions.
-- Remaining stock-photo links are all known, deliberate: the placeholder list itself (used to recognise old stock links), test fixtures, the profile default cover, the review avatar default, the location food photo, the reviews-section founder photo, and the image relay's allowed-domain lists. None invents an entity image.
+## Step 4 check (done, read-only)
+Your manual deletion worked, but it was a **soft delete** — the row is still in the database, marked deleted, and still carries the stock photo link:
+- "Learn HANA in 1 Day" (id 3785f92d-…): `is_deleted = true`, stock link still stored.
+- All other live tables are clean: no stock links in active entities, photos, products, reviews, profiles, notifications, or caches.
+- Two internal history logs (image_health_results: 12 rows, image_migration_results: 6 rows) still mention stock links — these are service-role-only audit records of past checks, not displayed anywhere. Recommendation: leave them as history.
 
-## What the records hold today
-- 353 entities in total; exactly 1 has a stock photo link, and it matches the known placeholder list:
-  - "Learn HANA in 1 Day" (book, active) — generic book stock photo.
-- No other stock links exist.
+## Step 4 finish — remove the leftover
+Since all current data is dummy and you confirmed deletion:
+1. Hard-delete the soft-deleted row, guarded by the exact stock link so nothing else can be touched:
+   `delete from entities where id = '3785f92d-…' and is_deleted and image_url = '<exact stock link>';` — expect 1 row.
+2. Recount: zero stock links in `entities` (active or deleted), total 353 → 352.
+3. Document in docs/verification/post6-step4-db-placeholder-cleanup.md; tick Step 4 in roadmap.md.
 
-## What changes
-Per your confirmation that all current data is dummy and doesn't need preserving:
-1. Delete the entity "Learn HANA in 1 Day" (id 3785f92d-60f3-4aee-9e5e-ae80a5dab464), guarded so it only runs if the record still carries that exact stock link.
-2. Recount afterwards: stock links in records = 0, entity total drops 353 → 352, no other record touched.
-3. Document in docs/verification/post6-step4-db-placeholder-cleanup.md; tick Step 4 in roadmap.md; stop before Step 5.
+## Step 5 — final decision + inventory
+1. **getOptimalEntityImageUrl decision — recommendation: leave it unchanged.**
+   Verified: it returns `entity.image_url` directly (stored photos → storage URLs → external URLs) and does not filter registered placeholders itself. That is fine because every screen resolves images through the shared contract (EntityImage / useEntityImageFallback / EntityCollectionImage), which already treats registered placeholders as missing. Changing it would duplicate the filter in two places with no visible effect.
+2. **Final inventory audit:** update docs/verification/entity-image-fallback-inventory.md so every picture area is marked migrated, a deliberate exception, or retired — including the server functions (Step 3f) and the database (Step 4).
+3. Run the full suite (862 tests), typecheck, and build to confirm nothing regressed; tick Step 5 in roadmap.md.
 
 ## Not changing
-- No code, layout, schema or other records. The placeholder list stays (harmless safety net for any old links cached elsewhere).
+- No code, layout, schema, or other records. The placeholder registry and internal audit logs stay.
 
 ## Technical details
-- One-off data delete (not a schema migration), guarded by the exact link:
-  `delete from entities where id = '3785f92d-60f3-4aee-9e5e-ae80a5dab464' and image_url = 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&q=80&w=1000';` — expect 1 row.
-- Verify with the same count query (unsplash_total = 0, registered = 0, total = 352).
-- Alternative: you can delete it yourself from the admin panel — the result is identical; the guard just makes the scripted route safe.
+- Step 4 is a one-off guarded data delete via the SQL tool (not a schema migration); verification reuses the count query from the audit.
+- Step 5 touches only documentation files plus the roadmap; the getOptimalEntityImageUrl decision is documented as "unchanged, with rationale" in the inventory doc.
