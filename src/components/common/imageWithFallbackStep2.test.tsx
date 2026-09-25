@@ -1,7 +1,8 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { ImageWithFallback, isRenderableImageSrc } from './ImageWithFallback';
+import { ImageWithFallback } from './ImageWithFallback';
+import { isRenderableImageSrc } from '@/utils/renderableImageSrc';
 
 vi.mock('@/utils/imageUtils', () => ({
   getProxyUrlForImage: (u: string) => (u.includes('books.example') ? `https://relay.example/p?url=${encodeURIComponent(u)}` : u),

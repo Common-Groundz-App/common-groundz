@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ensureHttps } from '@/utils/urlUtils';
 import { getProxyUrlForImage } from '@/utils/imageUtils';
+import { isRemote, isRenderableImageSrc } from '@/utils/renderableImageSrc';
 
 /**
  * Generic picture helper for NON-entity imagery (profile cover, location
@@ -28,25 +29,6 @@ interface ImageWithFallbackProps extends Omit<React.ImgHTMLAttributes<HTMLImageE
 }
 
 const normalize = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
-
-const isRemote = (url: string) => /^https?:\/\//i.test(url);
-
-/** Local rule: which src values may be rendered. */
-export const isRenderableImageSrc = (url: string): boolean => {
-  if (!url) return false;
-  if (url.startsWith('/')) return !url.startsWith('//');
-  if (/^blob:/i.test(url)) return true;
-  if (/^data:/i.test(url)) return /^data:image\//i.test(url);
-  if (isRemote(url)) {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  return false;
-};
 
 const directUrl = (url: string) => (isRemote(url) ? ensureHttps(url) : url);
 const firstUrl = (url: string) => (isRemote(url) ? getProxyUrlForImage(ensureHttps(url)) : url);
