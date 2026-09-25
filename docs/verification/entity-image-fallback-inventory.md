@@ -328,3 +328,17 @@ A (entity own thumbnail → shared type icon): AdminEntityManagementPanel (Entit
 - `ProductSearchResult.image_url` widened to `string | null` in `use-unified-search.ts` and `use-enhanced-search.ts` (type accuracy only; tsgo clean, no consumer assumed non-null).
 - Verified: deno check per function (only pre-existing unrelated errors), 862 tests, build clean, and a live smoke where 11 of 101 sampled places returned `null` instead of a stock cafe photo. See `post6-step3f-server-stock-producers.md`.
 - No server search function creates a stock URL any more. Remaining Unsplash references are the proxy allowlist, the legacy-placeholder registry (historical records), and the documented deliberate non-entity photos.
+
+## Final disposition (Post-6 Step 5)
+
+- **Picker unchanged:** getOptimalEntityImageUrl still only chooses the best real image. Placeholder recognition, missing/broken handling and the icon all live in the shared layer (EntityImage, useEntityImageFallback, EntityCollectionImage, EntityCardFallbackImage, EntityHeaderImage). Every kept entity picture area has moved to that layer or is listed below as a deliberate exception, so the picker needs no filter of its own.
+- **Migrated:** all Group 1–6E surfaces (see the sections above).
+- **Optional slot (no frame when there's no source):** MyStuffItemCard and the ChildCardImage wrapper.
+- **Evidence (exact source plus an explicit failure panel):** EvidenceImage, ImageCandidateGrid, SearchEntryPanel, AutoFillPreviewModal.
+- **Loading:** EntityDetailSkeleton.
+- **Non-entity images (deliberate remote exceptions):** profile default cover, review avatar default, location food photo, reviews-section founder photo.
+- **Retired / dead code removed:** legacy v1–v3 entity pages, EntityProductsCard, ImageUploader, every stock-type helper, and fallbackImageUtils.
+- **Server fixed:** unified-search-v2, search-places and search-google-books now return a real image or null. They were deployed in Step 3f and re-checked live on 2026-09-25: books 10/10 real, places 17 real and 3 null, no stock links. The branch for a book with no cover was proven by static review only.
+- **Kept:** proxy-external-image allowlist; legacy-placeholder registry as a safety net for cached data.
+- **Old data cleaned:** Step 4 left zero registered placeholders across all entities. **Audit history kept:** image_health_results and image_migration_results.
+- Nothing is left unclassified.
