@@ -348,5 +348,6 @@ cross-read between them.
 - [x] 6E — entity page tab cards
 - [x] Post-6 Step 1 — removed dead EntityProductsCard (zero callers) and unused ImageWithFallback import in EntityRelatedCard
 - [x] Post-6 Step 2 — ImageWithFallback stock fallback removed (relay retry kept)
-- [ ] Post-6 Step 3 — delete stock-photo lists (awaiting approval)
+- [x] Post-6 Step 3 — deleted all client stock-photo lists (imageUtils, urlUtils, entityImageUtils, entityTypeHelpers, fallbackImageUtils) after repo-wide zero-caller proof; legacy-placeholder registry kept; 862 tests, tsgo clean
+- [ ] Post-6 Step 3f — server-side stock producers (unified-search-v2, search-places, search-google-books; check proxy-external-image mention) — needs own approval
 - [ ] Post-6 cleanup (ImageWithFallback, stock helpers, optional DB, resolver decision, final audit)
