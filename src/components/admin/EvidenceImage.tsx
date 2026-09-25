@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { ImageOff, Image as ImageIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ImageFailedState } from '@/components/common/ImageFailedState';
 
 /**
  * Group 6D — admin comparison / manual-preview picture.
@@ -33,17 +32,13 @@ export const EvidenceImage: React.FC<EvidenceImageProps> = ({ src, name, classNa
     );
   }
 
-  const text = state === 'failed' ? 'Image failed to load' : 'No image provided';
-  const Icon = state === 'failed' ? ImageOff : ImageIcon;
   return (
-    <span
-      role="img"
-      aria-label={`${text} for ${name}`}
-      className={cn(className, 'flex items-center justify-center bg-muted text-muted-foreground')}
-      data-testid={`evidence-image-${state}`}
-    >
-      <Icon className={iconClassName} aria-hidden="true" />
-      <span className="sr-only">{text}</span>
-    </span>
+    <ImageFailedState
+      name={name}
+      className={className}
+      iconClassName={iconClassName}
+      variant={state}
+      testId={`evidence-image-${state}`}
+    />
   );
 };

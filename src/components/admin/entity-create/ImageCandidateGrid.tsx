@@ -353,9 +353,9 @@ export const ImageCandidateGrid: React.FC<Props> = ({
                       <img src={t.url} alt="upload preview" className="aspect-square w-full object-cover bg-muted" />
                     ) : (
                       <ImageWithFallback
-                        src={t.url} alt="Candidate" entityType="product"
+                        src={t.url} alt="Candidate"
                         className="aspect-square w-full object-cover bg-muted"
-                        onError={() => markBroken(t.url)}
+                        onFailure={() => markBroken(t.url)}
                       />
                     )}
                   </button>

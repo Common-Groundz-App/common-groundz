@@ -313,3 +313,6 @@ A (entity own thumbnail → shared type icon): AdminEntityManagementPanel (Entit
 ## Post-6 Step 1 (addendum)
 - EntityProductsCard had zero importers (no lazy load, no tests), so it was dead code, not a live exception. It has been deleted. This corrects the 6E exception list: MyStuffItemCard is now the only remaining no-picture-area exception.
 - EntityRelatedCard: removed the unused ImageWithFallback import. It only served commented-out example code. The live "Coming Soon" card is unchanged.
+
+## Post-6 Step 2
+- ImageWithFallback no longer supplies any stock photo. Location search keeps its own caller-provided food photo as a deliberate location exception. The review ImageUploader was dead code and has been deleted.
