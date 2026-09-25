@@ -123,7 +123,7 @@ serve(async (req) => {
 
     // Transform Google Places data — compute distance + blended relevance
     let transformedResults = data.results.slice(0, maxResults).map((place: any, position: number) => {
-      let imageUrl = 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=300&h=200&fit=crop'
+      let imageUrl: string | null = null
       if (place.photos && place.photos[0]) {
         const photoRef = place.photos[0].photo_reference
         imageUrl = `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-image?ref=${photoRef}&maxWidth=300`

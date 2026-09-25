@@ -36,9 +36,9 @@ interface GoogleBooksResponse {
 }
 
 // Function to process image URLs through our proxy
-const processImageUrl = (originalUrl: string): string => {
+const processImageUrl = (originalUrl: string): string | null => {
   if (!originalUrl) {
-    return 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&q=80&w=1000';
+    return null;
   }
   
   // Convert to HTTPS first

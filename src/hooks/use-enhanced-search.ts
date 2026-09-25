@@ -6,7 +6,7 @@ export interface ProductSearchResult {
   name: string;
   venue: string;
   description: string | null;
-  image_url: string;
+  image_url: string | null;
   api_source: string;
   api_ref: string;
   metadata: {
