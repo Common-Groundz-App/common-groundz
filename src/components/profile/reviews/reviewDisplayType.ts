@@ -5,9 +5,9 @@
  *
  * - NEVER invent `others`. `others` is a real, user-selectable canonical type.
  *   It may only appear here when the entity or the stored category genuinely
- *   said `others`. `getEntityTypeLabel` / `getEntityTypeFallbackImage` both
- *   fall back to `Others` internally, so they must only ever be called with an
- *   already-verified canonical value — never with a raw string or `''`.
+ *   said `others`. `getEntityTypeLabel` falls back to `Others` internally, so
+ *   it must only ever be called with an already-verified canonical value —
+ *   never with a raw string or `''`.
  * - A failed or unattempted lookup is NOT evidence that a subject is missing.
  *   Those cases degrade to the stored category, never to `unavailable`.
  * - An unrecognised legacy string (`Travel`, `Music`, blank, null) yields

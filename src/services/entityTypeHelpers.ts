@@ -58,33 +58,6 @@ export const getEntityTypeLabel = (type: string | EntityType): string => {
 };
 
 /**
- * Get fallback image URL for entity type
- */
-export const getEntityTypeFallbackImage = (type: string | EntityType): string => {
-  const canonicalType = typeof type === 'string' ? getCanonicalType(type) : type;
-  
-  const fallbacks: Record<EntityType, string> = {
-    [EntityType.Movie]: 'https://images.unsplash.com/photo-1485846234645-a62644f84728',
-    [EntityType.Book]: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d',
-    [EntityType.Food]: 'https://images.unsplash.com/photo-1555939594-58d7698950b',
-    [EntityType.Place]: 'https://images.unsplash.com/photo-1501854140801-50d01698950b',
-    [EntityType.Product]: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
-    [EntityType.Brand]: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
-    [EntityType.Event]: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30',
-    [EntityType.Service]: 'https://images.unsplash.com/photo-1556761175-b413da4baf72',
-    [EntityType.Professional]: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf',
-    [EntityType.Others]: 'https://images.unsplash.com/photo-1560769629-975ec94e6a86',
-    [EntityType.TVShow]: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
-    [EntityType.Course]: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1',
-    [EntityType.App]: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c',
-    [EntityType.Game]: 'https://images.unsplash.com/photo-1511512578047-dfb367046420',
-    [EntityType.Experience]: 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51'
-  };
-  
-  return fallbacks[canonicalType] || fallbacks[EntityType.Product];
-};
-
-/**
  * Get contextual field label based on entity type
  */
 export const getContextualFieldLabel = (type: string | EntityType): string => {
