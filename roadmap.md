@@ -331,11 +331,11 @@ cross-read between them.
 
 ## Deferred
 - [x] Group 6A — outside-result search rows (SearchResultHandler) and Add to My Stuff picker rows (EntitySearch) on the shared fallback; picker preview never carries a stock address; 785 tests
-- [ ] Group 6B — retire entity page v1/v2/v3 and the version switch (show deletion manifest first)
+- [x] Group 6B — retire entity page v1/v2/v3 and the version switch (show deletion manifest first)
 - [x] Group 6C — retired ProductSearch page, 5 legacy category pages, ProductResultItem, RecommendationForm (no redirects)
 - [x] Group 6D — admin pictures: classify by role, approve, then migrate only entity-own-picture slots
 - [x] Group 6E — EntityTabsContent child cards: broken present picture → icon; missing stays omitted
-- [ ] Post-group cleanup — ImageWithFallback simplification, legacy stock-helper deletion once zero active callers are proven, optional historical database cleanup of known stock placeholder rows, the getOptimalEntityImageUrl resolver decision, final inventory audit
+- [x] Post-group cleanup — ImageWithFallback simplification, legacy stock-helper deletion once zero active callers are proven, optional historical database cleanup of known stock placeholder rows, the getOptimalEntityImageUrl resolver decision, final inventory audit
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
 - [ ] Manual remediation of legacy unlinked reviews
 
@@ -352,4 +352,5 @@ cross-read between them.
 - [x] Post-6 Step 3f — server-side stock producers removed: unified-search-v2 (local type list deleted), search-places, search-google-books now return image_url: null; ProductSearchResult.image_url widened to string|null; proxy-external-image allowlist kept; deno check + 862 tests + live smoke (11/101 places returned null, no stock URL anywhere)
 - [x] Post-6 Step 4 — soft-deleted "Learn HANA in 1 Day" had its stock link cleared (guarded update, 1 row); 0 stock links in entities (active+deleted); audit logs kept
 - [x] Post-6 Step 5 — getOptimalEntityImageUrl left unchanged (documented); final inventory classified; 862 tests, tsgo, build, live search OK. Entity-image fallback programme complete.
-- [ ] Post-6 cleanup (ImageWithFallback, stock helpers, optional DB, resolver decision, final audit)
+- [x] Post-6 cleanup (ImageWithFallback, stock helpers, optional DB, resolver decision, final audit)
+- [x] Image-fallback project closed (2026-09-25): Steps 1–5 verified, 0 stock links in entities, only documented exceptions remain.
