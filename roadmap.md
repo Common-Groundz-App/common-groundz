@@ -347,5 +347,6 @@ cross-read between them.
 - [x] 6D addendum — suggestion review picture + "URL already exists" window
 - [x] 6E — entity page tab cards
 - [x] Post-6 Step 1 — removed dead EntityProductsCard (zero callers) and unused ImageWithFallback import in EntityRelatedCard
-- [ ] Post-6 Step 2 — ImageWithFallback: remove stock fallback + retry (awaiting approval)
+- [x] Post-6 Step 2 — ImageWithFallback stock fallback removed (relay retry kept)
+- [ ] Post-6 Step 3 — delete stock-photo lists (awaiting approval)
 - [ ] Post-6 cleanup (ImageWithFallback, stock helpers, optional DB, resolver decision, final audit)
