@@ -58,9 +58,9 @@ function recordSuccess(service: keyof typeof circuitBreaker) {
 }
 
 // Smart image URL processor with Google Books and Movie Image proxies
-function processImageUrl(originalUrl: string, entityType: string): string {
+function processImageUrl(originalUrl: string, entityType: string): string | null {
   if (!originalUrl) {
-    return getEntityTypeFallbackImage(entityType)
+    return null
   }
   
   console.log('Processing image URL:', originalUrl, 'for type:', entityType);
@@ -109,7 +109,7 @@ function processImageUrl(originalUrl: string, entityType: string): string {
   
   if (definitivelyBlockedDomains.some(domain => originalUrl.includes(domain))) {
     console.log('Blocking CORS-problematic domain:', originalUrl);
-    return getEntityTypeFallbackImage(entityType);
+    return null;
   }
   
   // For all other URLs, try to ensure HTTPS
@@ -120,16 +120,6 @@ function processImageUrl(originalUrl: string, entityType: string): string {
   }
   
   return secureUrl;
-}
-
-function getEntityTypeFallbackImage(entityType: string): string {
-  const fallbacks = {
-    book: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&q=80&w=1000',
-    movie: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&q=80&w=1000',
-    place: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&q=80&w=1000',
-    default: 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&q=80&w=1000'
-  }
-  return fallbacks[entityType as keyof typeof fallbacks] || fallbacks.default
 }
 
 // Normalize search query to handle special characters (dots, spaces, hyphens)
@@ -369,7 +359,7 @@ async function searchPlaces(query: string, maxResults: number = 20, opts: Places
     const showDistanceLabels = hasCoords && (accuracy == null || accuracy <= 2000);
 
     let results = data.results.slice(0, maxResults).map((place: any, position: number) => {
-      let imageUrl = getEntityTypeFallbackImage('place')
+      let imageUrl: string | null = null
       if (place.photos?.[0]?.photo_reference) {
         imageUrl = `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-image?ref=${place.photos[0].photo_reference}&maxWidth=400`
       }
