@@ -316,3 +316,8 @@ A (entity own thumbnail → shared type icon): AdminEntityManagementPanel (Entit
 
 ## Post-6 Step 2
 - ImageWithFallback no longer supplies any stock photo. Location search keeps its own caller-provided food photo as a deliberate location exception. The review ImageUploader was dead code and has been deleted.
+
+## Post-6 Step 3 — stock-photo lists deleted (2026-09-25)
+- All four client `getEntityTypeFallbackImage` copies (imageUtils, urlUtils, entityImageUtils, entityTypeHelpers) and `fallbackImageUtils.ts` (`getCategoryFallbackImage`, `getRecommendationFallbackImage`) deleted after repo-wide zero-caller proof. See `post6-step3-stock-helpers.md`.
+- The legacy-placeholder registry in `entityImageFallback.ts` stays: old saved records still hold those links.
+- Step 3f (separate approval): server-side stock producers — `unified-search-v2` (own type list), `search-places`, `search-google-books`; `proxy-external-image` mention to be checked.
