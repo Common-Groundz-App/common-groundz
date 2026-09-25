@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Lightbulb, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { ImageFailedState } from '@/components/common/ImageFailedState';
 
 import type { EntityDraft } from '@/types/entityDraft';
 import { DraftReviewBody, DraftApplyOverrides } from './entity-create/DraftReviewBody';
@@ -385,8 +386,8 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
                         key={`${src}-${i}`}
                         src={src}
                         alt={metadataOnly!.title || `Metadata image ${i + 1}`}
-                        entityType="product"
                         className="aspect-square w-full rounded object-cover"
+                        failedContent={<ImageFailedState className="aspect-square w-full rounded" />}
                       />
                     ))}
                   </div>
@@ -503,8 +504,8 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
                 <ImageWithFallback
                   src={pred.image_url}
                   alt={pred.name || 'Primary image'}
-                  entityType={pred.type || 'product'}
                   className="mt-2 rounded-md max-h-32 object-cover w-full"
+                  failedContent={<ImageFailedState name={pred.name || undefined} className="mt-2 h-32 w-full rounded-md" />}
                 />
               </div>
             )}

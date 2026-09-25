@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Search, ExternalLink, Loader2, PenSquare, X, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { ImageFailedState } from '@/components/common/ImageFailedState';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRecentSearches } from '@/hooks/useRecentSearches';
@@ -592,7 +593,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                   <div key={m.id} className="flex items-center gap-3 rounded-lg border bg-card p-3">
                     <div className="h-14 w-14 shrink-0 overflow-hidden rounded bg-muted">
                       {m.imageUrl ? (
-                        <ImageWithFallback src={m.imageUrl} alt={m.name} className="h-full w-full object-cover" />
+                        <ImageWithFallback src={m.imageUrl} alt={m.name} className="h-full w-full object-cover" failedContent={<ImageFailedState name={m.name} />} />
                       ) : null}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -678,7 +679,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                         {showSkeleton ? (
                           <Skeleton className="h-full w-full" />
                         ) : rowImageUrl ? (
-                          <ImageWithFallback src={rowImageUrl} alt={c.name} className="h-full w-full object-cover" />
+                          <ImageWithFallback src={rowImageUrl} alt={c.name} className="h-full w-full object-cover" failedContent={<ImageFailedState name={c.name} />} />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
                             {initials}
