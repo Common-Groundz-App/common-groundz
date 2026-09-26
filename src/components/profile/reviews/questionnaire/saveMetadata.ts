@@ -84,7 +84,10 @@ export function buildReviewMetadataForSave({
   const removeKeys: string[] = [];
   if (envelopePatch.action === 'remove') removeKeys.push(QUESTIONNAIRE_METADATA_KEY);
   if (questionnaireReset) {
-    if (storedEnvelope.status !== 'absent') removeKeys.push(QUESTIONNAIRE_METADATA_KEY);
+    // Drop the old subject's envelope — but never the fresh one written above.
+    if (storedEnvelope.status !== 'absent' && envelopePatch.action !== 'write') {
+      removeKeys.push(QUESTIONNAIRE_METADATA_KEY);
+    }
     if (!hasFoodTagsField) removeKeys.push('food_tags');
   }
 

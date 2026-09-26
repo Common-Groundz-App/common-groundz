@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, ImageOff, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { ImageFailedState } from '@/components/common/ImageFailedState';
 import type { ImageCandidate } from '@/types/entityDraft';
 import {
   ImageSelectionV2,
@@ -356,6 +357,7 @@ export const ImageCandidateGrid: React.FC<Props> = ({
                         src={t.url} alt="Candidate"
                         className="aspect-square w-full object-cover bg-muted"
                         onFailure={() => markBroken(t.url)}
+                        failedContent={<ImageFailedState className="aspect-square w-full" />}
                       />
                     )}
                   </button>

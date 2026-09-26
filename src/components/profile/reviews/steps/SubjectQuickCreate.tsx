@@ -269,7 +269,8 @@ const SubjectQuickCreate: React.FC<SubjectQuickCreateProps> = ({
 
         {step === 'type' && (
           <div className="grid grid-cols-3 gap-2">
-            {CANONICAL_ENTITY_TYPES.map((t) => (
+            {/* 'service' is rejected by create_entity_subject — don't offer a dead end. */}
+            {CANONICAL_ENTITY_TYPES.filter((t) => t !== 'service').map((t) => (
               <Button key={t} variant="outline" className="h-auto py-3" onClick={() => pickType(t)}>
                 {TYPE_LABELS[t]}
               </Button>
