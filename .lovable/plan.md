@@ -31,10 +31,16 @@ This covers both earlier discussions: the 8-phase roadmap and the original "how 
 | Skip the subject step when you open the form from an entity page | Step 2 still shows, just locked |
 | One review per person per entity ("Update your review" instead of a second one) | Nothing stops you writing a second review |
 | Entity page summary: % recommend, % choose again, what people love, common complaints, recommended for | Missing |
-| Circle-first review order on the entity page | Not checked yet. Will check before starting Wave C. |
-| "Helpful" count, with no "not helpful" | A helpful button exists on some review cards. Will check whether it counts properly. |
-| Reviews showing up in the feed | Not in scope for this plan |
+| Circle-first review order on the entity page | **Already done.** Reviews from your Circle and reviews with a timeline come first. |
+| Answers shown after posting | Saved, but review cards don't show choose-again, stood out, best for, value, etc. People get nothing back for answering. |
+| "Best for" on every type | Only course, place and experience have it |
+| Star wording | Labels exist, but the feedback reads like the business talking ("Awesome! We're glad…") and blurs into "would you recommend" |
+| "Helpful" count, with no "not helpful" | Reviews have a heart/like, not a Helpful signal |
+| Reviews showing up in the feed | The review form doesn't create a feed item |
+| Measuring which questions people answer or skip | Missing |
 | Questions for specific categories (headphones, skincare…) | Later |
+
+**Main point (agreed with Codex):** the next step is to make what we already built useful and visible — not to rewrite it again, and not to add a pile of new questions.
 
 ## What to build, in waves (each wave needs its own go-ahead)
 
@@ -57,39 +63,33 @@ This covers both earlier discussions: the 8-phase roadmap and the original "how 
    - Who can see this
 4. **Remove the headline question.** Old headlines stay saved and keep showing on old reviews. New reviews save no headline.
 5. A rating on its own is enough to post. A gentle hint appears: "Add a few words to help your circle."
+6. **Split "What stood out" into "What you liked" and "What could be better",** using the positive/negative labels the tags already have. Old answers show up in the right group, and nothing is lost.
+7. A review-box hint for each type (for example "What did you order? Anything people should know?").
+8. Star wording that describes your experience ("Avoid … Highly recommend") and doesn't sound like the business, kept clearly separate from the recommend question.
 
-### Wave B — The questions that were never added
-1. "Could be better" chip list for every type, shown as its own group. It uses the same "unknown data is kept" rule as the other answers.
-2. Experience level for each type, with the right wording (used for / visited / watched), all optional.
-3. Rate the details: up to 4 optional star rows per type. For example:
-   - Food: Taste / Portion / Value
-   - Place: Service / Ambience / Value / Cleanliness
-   - Product: Quality / Value / Ease of use
-   - Movie/TV: Story / Performances / Visuals
-4. Spoiler toggle for movies, TV shows and books. When it's on, the review text stays hidden on cards until you tap it.
-5. All new answers are optional. Rating and subject stay the only required fields.
+### Wave B — Show the answers (people get something back for answering)
+1. Review cards show a short line of chips: Recommends / Would buy again · Liked: … · Could be better: … · Best for: …. Old reviews with no answers look exactly as they do now.
+2. Entity page summary (only shows once there are at least 3 reviews): recommend %, choose-again %, **What people love**, **Common complaints**, **Recommended for**, plus what your Circle thinks. Worked out on the server side and fresh after each review.
 
-### Wave C — One review per entity + trust
-1. If you already reviewed something, "Review" opens "Update your review" (your timeline) instead of a new form.
-2. Existing duplicate reviews are kept as they are, and a list is made for you to see them first. No database lock is added until you approve it.
-3. Check the Helpful button and make it count properly (no "not helpful").
-4. Entity page review order: your Circle first, then most helpful, then newest.
+### Wave C — The missing questions (optional, kept short)
+1. "Best for" for the other types that don't have it yet.
+2. Experience level (used for / visited / watched) for each type.
+3. Up to 3–4 optional detail ratings per type (for example Food: Taste / Portion / Value; Movie/TV: Story / Performances / Visuals). Their averages then join the entity summary.
+4. Spoiler toggle for movies, TV shows, books and games. Spoiler text stays hidden on cards until tapped.
 
-### Wave D — Entity page summary (where Common Groundz stands out)
-It only shows once an entity has at least 3 reviews:
-- 4.4 stars · 91% recommend · 78% would choose again
-- **What people love** (top "stood out" tags with %) and **Common complaints** (top "could be better" tags with %)
-- **Recommended for** (top "best for" tags) and the average for each detail rating
-- **From your circle:** people you follow and how they rated it
-
-The numbers are worked out on the server side and stay fresh after each review.
+### Wave D — Trust and social
+1. One review per person per entity: if you already reviewed it, "Review" opens "Update your review". Existing duplicates are listed for you first, and no database lock is added without your approval.
+2. Rename the like on reviews to "Helpful" and show "18 people found this helpful". Helpful becomes the second sort after Circle.
+3. Posting a review can also show it in the feed as "X reviewed Y" (one feed item linked to the review, never a copy).
+4. Track which questions people open, answer or skip, so we know which ones earn their place.
 
 ### Later (not in this plan)
-Questions for specific categories (headphones, skincare…), matching you with people who have similar taste, AI review summaries, and reviews appearing as feed posts.
+Questions for specific categories (headphones, skincare…), "people with similar taste" ranking, "recommended by runners you follow" explanations, and AI review summaries.
 
 ## Technical notes
-- Everything new is stored in the existing review answers format and keeps a version number. No new database columns are needed for Waves A–B.
-- Headline: stop showing the question. The `subtitle` column stays in the database, so old reviews keep theirs.
-- Wave C's one-per-person rule is checked when you open the form. A database uniqueness rule would come only after the duplicates are cleaned up, with separate approval.
-- Wave D: a server-side summary per entity that reads the saved answers from reviews that aren't deleted.
+- Everything new goes into the existing `metadata.questionnaire` answers, as a new registry field kind (`detail_ratings`), bumping the version where needed. No new columns and no separate hardcoded forms.
+- Liked / could-be-better are views over the existing tag sentiment. The stored `stood_out` stays readable.
+- Headline: stop asking for it. `reviews.subtitle` stays, and cards still show old headlines.
+- Entity summary: one server-side function per entity over reviews that aren't deleted, and it respects visibility.
+- One-per-person: checked when you open the form. A database uniqueness rule comes only after the duplicates are cleaned up, with separate approval.
 - The tests, type check and build are run for every wave, and each wave stops for your check before the next one starts.
