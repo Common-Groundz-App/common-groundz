@@ -31,10 +31,16 @@ This covers both earlier discussions: the 8-phase roadmap and the original "how 
 | Skip the subject step when you open the form from an entity page | Step 2 still shows, just locked |
 | One review per person per entity ("Update your review" instead of a second one) | Nothing stops you writing a second review |
 | Entity page summary: % recommend, % choose again, what people love, common complaints, recommended for | Missing |
-| Circle-first review order on the entity page | Not checked yet. Will check before starting Wave C. |
-| "Helpful" count, with no "not helpful" | A helpful button exists on some review cards. Will check whether it counts properly. |
-| Reviews showing up in the feed | Not in scope for this plan |
+| Circle-first review order on the entity page | **Already done.** Reviews from your Circle and reviews with a timeline come first. |
+| Answers shown after posting | Saved, but review cards don't show choose-again, stood out, best for, value, etc. People get nothing back for answering. |
+| "Best for" on every type | Only course, place and experience have it |
+| Star wording | Labels exist, but the feedback reads like the business talking ("Awesome! We're glad…") and blurs into "would you recommend" |
+| "Helpful" count, with no "not helpful" | Reviews have a heart/like, not a Helpful signal |
+| Reviews showing up in the feed | The review form doesn't create a feed item |
+| Measuring which questions people answer or skip | Missing |
 | Questions for specific categories (headphones, skincare…) | Later |
+
+**Main point (agreed with Codex):** the next step is to make what we already built useful and visible — not to rewrite it again, and not to add a pile of new questions.
 
 ## What to build, in waves (each wave needs its own go-ahead)
 
