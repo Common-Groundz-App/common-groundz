@@ -1,30 +1,95 @@
-# Review form: where we are against the original 8-phase roadmap
+# Review form: the full plan
 
-Checked in the code today. Nothing has been changed yet.
+This covers both earlier discussions: the 8-phase roadmap and the original "how should the review form work" brief. I checked everything against the code today. Nothing has been changed yet.
 
-## Status by phase
+## What's already done
 
-| # | Phase | Status | What the code shows |
-|---|---|---|---|
-| 1 | One list of entity types | **Done** | One module holds the 15 types, with a separate list of old names mapped onto them. Unknown types return "none" and are never turned into product/place. Service, event, professional and TV show all keep their own type. Tests cover this. |
-| 2 | Reviews use the entity's real type | **Done** | The old 5-bucket helper is gone from the app. `reviews.category` stores the real type, and a tested rule decides what gets saved. Old unlinked reviews still work. |
-| 3 | Question set for each type | **Done (went further)** | Each of the 15 types has its own entry, with no default fallback. A subject with a broken type blocks the form and never saves an empty review. |
-| 4 | Named steps instead of numbered ones | **Not started** | The form still uses steps 1–4 by number. When you open it from an entity page, step 2 ("What are you reviewing?") still shows, just locked. The step you don't need hasn't been removed. |
-| 5 | Search first when reviewing from anywhere | **Mostly done** | Step 2 is now one search across all types, plus quick-create. The 5-tile picker is gone. Search still comes after the rating instead of first, and that waits on Phase 4. There are no type filter chips (optional). |
-| 6a | First wave of answers | **Mostly done** | Would recommend, would choose again (worded per type, e.g. "Rewatch?", "Buy again?"), written review, media, date and visibility are all built. **Missing: experience context** (for example "how long / how often did you use it"). |
-| 6b | Second wave of answers | **Partial** | "What stood out" and "Best for" exist as curated tags, plus a few type-specific questions (value, portion, worth the time). **Missing: negatives/complaints.** |
-| 7 | Questions for specific categories (restaurants, headphones…) | **Not started** | Questions only depend on the 15 types. Nothing uses the product category. |
-| 8 | Summaries on entity pages ("88% recommend", "People love…") | **Not started** | "Would you recommend" feeds the recommending count and the review timeline. No entity page shows recommend %, choose-again %, top tags or complaints. |
-| 9 | Recommendations using these answers | **Not started** | The recommending feature reads the recommend answer only. It doesn't use choose-again, best-for or stood-out. |
-| — | Keep reviews and recommendations separate | **Followed** | The recommend answer sits inside the review. Nothing was merged. |
+- **One list of 15 types.** Old names map onto them, and no unknown type ever becomes "product".
+- **Reviews use the real type.** The 5-bucket system is gone from the form. Old reviews still open and edit correctly.
+- **Each of the 15 types has its own question set,** with no default fallback.
+- **One search to pick what you're reviewing,** plus quick-create. The 5-tile picker is gone.
+- **Required fields:** overall rating (stars) and the subject.
+- **"Would you recommend it?"** (Yes / Maybe / No), kept separate from the stars. It feeds the recommending count and the review timeline.
+- **"Would you choose it again?"** with wording per type ("Rewatch?", "Buy again?", "Order again?", "Go back?").
+- **"What stood out?" and "Best for" tag chips** for each type. Food keeps its Food Tags.
+- **Photos/videos, experience date and visibility** (Everyone / Circle / Private).
+- **Update your review later:** a timeline of rating changes, add-only, where you can only undo your newest update.
+- **Saving is safe:** answers are stored in a versioned format, and data the form doesn't recognise is never lost.
 
-## Proposed order for what's left (each step needs its own go-ahead)
+## What's missing from the original brief
 
-1. **Phase 4:** Named steps. Opening from an entity page skips the subject step, so it becomes Rating → Details → Final (3 steps). Opening from anywhere else starts with Subject. Saved data and how the form looks stay the same.
-2. **Phase 6 gaps:** Add an optional "experience context" question and an optional "what didn't work" tag set, stored in the same way answers are stored today.
-3. **Phase 8:** Entity page summary: recommend %, choose-again %, top "stood out" tags, top "best for" tags. Only shows once there are at least 3 reviews.
-4. **Phase 7 and 9:** Later, once there's real usage data.
+| Idea | Current state |
+|---|---|
+| Remove the review headline | A "Headline" box is still on the last step. |
+| Stars that mean something (1 Avoid … 5 Highly recommend) | The stars have no words under them. |
+| "Tell your circle about your experience" with a hint per type | The box is generic: "Tell us what you liked or didn't like…" |
+| "What could be better?" as its own chip group | Some tags are marked negative, but they're mixed in with the positive ones. There's no separate "could be better" question. |
+| Experience level ("How long have you used it?" / "How often have you visited?") | Missing |
+| Rate the details (for example Food / Service / Ambience) | Missing |
+| Spoiler toggle for movies, TV shows and books | Missing |
+| Short form first, "Add more details" folded underneath | Everything is spread across 4 numbered steps |
+| Skip the subject step when you open the form from an entity page | Step 2 still shows, just locked |
+| One review per person per entity ("Update your review" instead of a second one) | Nothing stops you writing a second review |
+| Entity page summary: % recommend, % choose again, what people love, common complaints, recommended for | Missing |
+| Circle-first review order on the entity page | Not checked yet. Will check before starting Wave C. |
+| "Helpful" count, with no "not helpful" | A helpful button exists on some review cards. Will check whether it counts properly. |
+| Reviews showing up in the feed | Not in scope for this plan |
+| Questions for specific categories (headphones, skincare…) | Later |
+
+## What to build, in waves (each wave needs its own go-ahead)
+
+### Wave A — The new form (biggest difference users will notice)
+1. Replace the numbered steps with named ones. From an entity page: Review → Details. From anywhere else: Subject → Review → Details.
+2. The main screen shows:
+   - the item you're reviewing (picture, name, type)
+   - stars with words under them
+   - "Would you recommend it?"
+   - "Tell your circle…" box with a hint per type
+   - photos
+   - Post button
+3. A folded "Add more details" section holds:
+   - What stood out
+   - Could be better
+   - Would you choose again
+   - Best for
+   - Experience level
+   - Date
+   - Who can see this
+4. **Remove the headline question.** Old headlines stay saved and keep showing on old reviews. New reviews save no headline.
+5. A rating on its own is enough to post. A gentle hint appears: "Add a few words to help your circle."
+
+### Wave B — The questions that were never added
+1. "Could be better" chip list for every type, shown as its own group. It uses the same "unknown data is kept" rule as the other answers.
+2. Experience level for each type, with the right wording (used for / visited / watched), all optional.
+3. Rate the details: up to 4 optional star rows per type. For example:
+   - Food: Taste / Portion / Value
+   - Place: Service / Ambience / Value / Cleanliness
+   - Product: Quality / Value / Ease of use
+   - Movie/TV: Story / Performances / Visuals
+4. Spoiler toggle for movies, TV shows and books. When it's on, the review text stays hidden on cards until you tap it.
+5. All new answers are optional. Rating and subject stay the only required fields.
+
+### Wave C — One review per entity + trust
+1. If you already reviewed something, "Review" opens "Update your review" (your timeline) instead of a new form.
+2. Existing duplicate reviews are kept as they are, and a list is made for you to see them first. No database lock is added until you approve it.
+3. Check the Helpful button and make it count properly (no "not helpful").
+4. Entity page review order: your Circle first, then most helpful, then newest.
+
+### Wave D — Entity page summary (where Common Groundz stands out)
+It only shows once an entity has at least 3 reviews:
+- 4.4 stars · 91% recommend · 78% would choose again
+- **What people love** (top "stood out" tags with %) and **Common complaints** (top "could be better" tags with %)
+- **Recommended for** (top "best for" tags) and the average for each detail rating
+- **From your circle:** people you follow and how they rated it
+
+The numbers are worked out on the server side and stay fresh after each review.
+
+### Later (not in this plan)
+Questions for specific categories (headphones, skincare…), matching you with people who have similar taste, AI review summaries, and reviews appearing as feed posts.
 
 ## Technical notes
-- Step machine: replace `currentStep: number` in `ReviewForm.tsx` / `StepIndicator` / `StepNavigation` with computed step ids (`subject|rating|experience|review`). Validation moves with its step, and there's no change to how things are saved.
-- The Phase 8 numbers come from the `metadata.questionnaire.answers` saved on non-deleted reviews. This happens on the database side, so reviews are never downloaded one by one in the browser.
+- Everything new is stored in the existing review answers format and keeps a version number. No new database columns are needed for Waves A–B.
+- Headline: stop showing the question. The `subtitle` column stays in the database, so old reviews keep theirs.
+- Wave C's one-per-person rule is checked when you open the form. A database uniqueness rule would come only after the duplicates are cleaned up, with separate approval.
+- Wave D: a server-side summary per entity that reads the saved answers from reviews that aren't deleted.
+- The tests, type check and build are run for every wave, and each wave stops for your check before the next one starts.
