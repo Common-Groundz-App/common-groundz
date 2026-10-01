@@ -354,3 +354,11 @@ cross-read between them.
 - [x] Post-6 Step 5 — getOptimalEntityImageUrl left unchanged (documented); final inventory classified; 862 tests, tsgo, build, live search OK. Entity-image fallback programme complete.
 - [x] Post-6 cleanup (ImageWithFallback, stock helpers, optional DB, resolver decision, final audit)
 - [x] Image-fallback project closed (2026-09-25): Steps 1–5 verified, 0 stock links in entities, only documented exceptions remain.
+
+## Review Experience & Structured Insights (contract: docs/review-experience-contract.md)
+- [x] Phase 0 — decisions locked + read-only audits (docs/verification/review-phase-0.md) — awaiting approval of 2 open decisions
+- [ ] Phase 1 — core form (no headline, recommend promoted, type hints, star wording, observations v2, details fold)
+- [ ] Phase 2 — 15-type matrix (approve first), then build
+- [ ] Phase 3 — answers on reviews, shared full view, spoilers, Helpful (likes reset re-approved), tracking
+- [ ] Phase 4 — layout decision (steps vs single form)
+- [ ] Phase 5 — entity summaries (public + Circle, per-metric minimums)
