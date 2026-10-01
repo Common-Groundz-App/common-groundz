@@ -1,4 +1,4 @@
-# Review Experience & Structured Insights — final plan (revised)
+# Review Experience & Structured Insights — master plan (lock candidate)
 
 **Goal:** finish, tidy up and show off the review system we already built. We are not rebuilding it. Every important answer should go all the way through: set up → asked → saved → editable → shown → added up → later used to help people find things.
 
@@ -6,71 +6,83 @@
 
 ## Rules that apply to every phase
 1. **One active review per person per entity.** If you come back, you update your review. Your history is kept.
-2. **A rating alone is valid,** but the app always knows the difference. *Rating* = stars only. *Review* = stars plus text, photos or at least one answer. Rating-only entries count toward the star average, but not toward tag summaries or Helpful ranking.
-3. **Stars describe how good the experience was, never whether you'd recommend it.** So no "Avoid" or "Highly recommend" on the stars. Five stars with "Maybe" on recommend must make sense.
-4. **Editing brings back every saved answer exactly,** including reviews saved with older question versions. Nothing resets or disappears.
-5. **Saved values never change when wording changes.** Saved codes are fixed. Labels can change freely.
-6. **Every phase must work by keyboard and with screen readers,** with focus handled properly and tap targets big enough on phones.
-7. **The question list can later go type → category → subcategory** (Hotel under Place, Headphones under Product). We don't build that now.
+2. **Rating vs review, decided by one shared rule used everywhere** (worked out in Phase 0). *Rating* = stars only. *Review* = stars plus at least one real addition: text, photos, or a known structured answer.
+3. **Stars describe how good the experience was, never whether you'd recommend it.**
+4. **Editing:** answers saved with a question version the app understands come back exactly and can be edited. Answers from older or newer versions it doesn't understand are kept exactly as they are, and editing anything else never damages them. They only become editable after a deliberate upgrade.
+5. **Saved codes never change.** Wording can.
+6. **Answers are the person's current view.** When you update your review, your answers update too. Each person counts once per number.
+7. **Show what the author gave, never invent anything.** No made-up balance and no guessed feelings for tags you typed yourself.
+8. **The date you used something and the date the review was updated are different facts.** Both can show, and neither ever stands in for the other.
+9. **Every phase must work by keyboard and with screen readers,** with focus handled properly and tap targets big enough on phones.
+10. The questions can later go type → category → subcategory. We don't build that now.
 
-## Phase 0 — Settle the rules first (decisions only, no visible change)
-1. **One review per person:** find out whether duplicates exist today and how creating a review behaves now. Then decide: when you've already reviewed something, "Review" opens "Update your review". A database rule is added only after the duplicates are sorted, with your approval.
-2. **List every place a review is shown** (profile, entity page, timeline, feed cards) and choose the one place that shows the **full review**. Every other place shows the short version.
-3. **Rating-only vs full review:** agree what a rating-only card looks like and how each is counted.
-4. **What "% recommend" means:** only people who actually answered Yes / Maybe / No count. The automatic guess from the stars is never used in this number. The existing "recommending" count keeps working as it does today.
-5. **Neutral tags** ("Quiet", "Crowded", "Slow burn", "Technical"): my suggestion is a small third group, **"Worth knowing"**, instead of forcing them into liked or disliked.
-6. **Food:** keep Food Tags (what it is: spicy, vegan…) and **also** add "What did you like?" / "What could be better?" for food (taste, portion, wait, price). They answer different questions.
+## Phase 0 — Decisions (no visible change; presented to you for approval)
+**Counting**
+1. **What counts as a review:** text, photos, or at least one known answer = review. Stars only = rating. A rating that later gets a timeline update with text becomes a review. Answers the app doesn't understand don't count by themselves.
+2. **% recommend** = Yes ÷ (Yes + Maybe + No), counting only real answers. Maybe stays a separate number and is never half a Yes. If your latest timeline update set it back to "auto", you're counted as **not answered**, and an older Yes/No is not brought back. "Choose again" works the same way, in the type's own words ("74% would buy again").
+3. **Detail ratings and other answers** use your current answer. If you update your stars on the timeline and leave the detail ratings alone, they stay as you last saved them, and the page shows when they were saved.
 
-You approve these before Phase 1 starts.
+**Data shape**
+
+4. **Liked / Could be better / Worth knowing** are saved as one answer with three groups, each holding chosen tags and your own tags. The version number goes up by one. Older answers: chosen tags land in their group by their existing mood label. Tags you typed yourself go to **"Other notes"**, are never guessed, and stay editable — you can move them into a group yourself.
+5. **Your own tags** are allowed (the current limits stay). They show on your review but are **never added into entity summaries**. Only the curated tags count there.
+6. **Food:** keeps Food Tags, and also gets Liked / Could be better / Worth knowing.
+
+**Display**
+
+7. **Which page shows the full review:** we list every place a review appears and pick one. Every other place shows the short version.
+8. **Short card:** shows Liked and Could-be-better only if the author picked them. If they picked only positives, only positives show.
+9. **Order:** your Circle always first, then the sort you chose (Recent / Most helpful / Highest / Lowest) applies inside the Circle group and to everyone else.
+10. **Helpful:** decide whether past likes on reviews become Helpful votes, or the count starts again from zero. My suggestion is to keep them, with a note in the history, because the data is dummy right now. Rating-only entries can still get Helpful votes, but they rank below reviews.
+11. **Spoilers** cover all text you write, your own tags, photos, and any curated tag marked "can spoil". General facts (stars, type, date) stay visible.
+
+**Privacy**
+
+12. **Entity summaries:** the public summary uses public reviews only. A separate **"Your Circle"** summary uses the reviews you're allowed to see and only shows once enough people are in it, so nobody's private opinion can be worked out from it.
 
 ## Phase 1 — The core form (steps stay as they are)
-1. Remove the headline from new reviews. Old headlines are kept and still show.
-2. Move "Would you recommend it?" up right under the stars and make it look like a main question.
-3. A review-box question and hint for each type ("What should people know?", "What did you order?").
-4. Star words that describe the experience only, for example: Poor · Below expectations · Good · Very good · Exceptional. You pick the exact wording.
-5. Split "What stood out" into **Liked / Could be better / Worth knowing**. Old answers land in the right group, and nothing is lost.
-6. An "Add more details" fold, **using only questions that already exist** (choose again, best for, value, etc.). Phase 2 adds its new questions into this same fold.
-7. Rating and subject stay the only required fields.
+- Remove the headline from new reviews (old ones are kept and still show).
+- Move "Would you recommend it?" up under the stars.
+- A review-box hint for each type.
+- Star words that describe the experience (you pick the exact wording).
+- Liked / Could be better / Worth knowing, with the "Other notes" group for tags you typed yourself.
+- An "Add more details" fold holding the questions that already exist.
+- Rating and subject stay the only required fields.
 
-## Phase 2 — The full review table for all 15 types (you approve it first)
-For each type, the table gives the exact wording and tag list, not just yes/no:
-- review hint
-- recommend
-- choose-again wording (buy / visit / watch / keep using…)
-- liked, could be better and worth-knowing tags
-- best for
-- experience context (question and answers)
-- up to 3–4 optional detail ratings
-- spoilers (movie / TV / book / game)
+## Phase 2 — Full review table for all 15 types (you approve it first)
+For every type and every question, the table records the exact wording, the answer options and tags, and:
+- whether it shows on the short card and/or the full review
+- whether it counts toward the entity summary, and its minimum number of answers
+- whether it can contain spoilers
 
-A box is left empty on purpose wherever a question doesn't fit. Product gets no detail ratings until its categories exist.
+Questions covered: review hint, recommend, choose again, liked / could be better / worth knowing, best for, experience context, up to 3–4 detail ratings, spoilers (movie / TV / book / game). A box is left empty on purpose where a question doesn't fit. Product gets no detail ratings until its categories exist.
 
-## Phase 3 — Make the answers useful on each review
-1. **Short card,** fixed order every time: rating · recommend · experience context ("Used 6+ months", "Regular") · date or "Updated 2 months ago" · text · **one Liked line and one Could-be-better line** (never only the positives) · media. The full review shows everything.
-2. A rating-only card looks tidy, with a hint for the author: "Add a few words".
-3. **Spoilers:** when a review is marked as a spoiler, the text, your own tags and photos stay hidden until tapped. This also applies later to feed items, notifications, search snippets and AI summaries.
-4. The like on reviews becomes **Helpful** ("23 people found this helpful"), and a **Most helpful** sort is added. The Circle still comes first.
-5. Tracking: how many open the fold and fill in each question, where people drop off, plus post and edit rates.
+## Phase 3 — Make answers useful on each review
+- Short card: rating · recommend · experience context · "Used July 2026" and/or "Updated 2 months ago" (each labelled) · text · the tags the author picked · media.
+- A tidy rating-only card.
+- Spoilers hidden until tapped, following the Phase 0 rule.
+- Helpful + Most helpful sort, following the Phase 0 ordering rule.
+- Tracking of which questions people open, answer and skip, plus post and edit rates.
 
-## Phase 4 — Choose the form layout (your call)
-We look at it on desktop and phone, together with the Phase 3 numbers (drop-off, time to finish, starting from an entity page vs elsewhere). Options: 4 steps, 3 steps (skip the subject step when you start from an entity page), or one single form.
+## Phase 4 — Choose the form layout (your call, based on how it looks and the Phase 3 numbers)
+4 steps, 3 steps, or one single form.
 
 ## Phase 5 — Entity page summary
-- **Each number has its own minimum.** For example, "% recommend" only shows once at least 3 people have answered that question. A question nobody answered never shows as 0%.
-- Shown: % recommend (real answers only) · choose-again % **in the type's own words** ("74% would buy again") · People love · Common complaints · Worth knowing · Best for · detail-rating averages · your Circle's reviews first.
-- Stars show as "4.4 from 38 ratings · 12 reviews".
-- Worked out on the server side, respects who can see each review, and counts one review per person.
+- Each number has its own minimum, and an unanswered question never shows as 0%.
+- Shown: % recommend · choose-again % (in the type's own words) · People love · Common complaints · Worth knowing · Best for · detail-rating averages · "4.4 from 38 ratings · 12 reviews".
+- Public summary and Your Circle summary are kept separate. Worked out on the server side, one entry per person.
 
 ## Later (separate plans)
-- Reviews in the feed as "X reviewed Y", linked to the review rather than copied
+- Reviews appearing in the feed
 - Category and subcategory questions
-- **Using these answers in search, filters and discovery** ("best for date night", "praised for reliability")
+- Using these answers in search, filters and discovery
 - Ranking by people with similar taste
 - AI summaries
+- An automatic mood label for tags you type yourself
 
 ## Technical notes
-- Everything is saved in `metadata.questionnaire.answers` with fixed field names. New field kinds: `detail_rating`, `experience_context`. The tags gain a `neutral` group. The version number goes up only when the saved format changes.
-- "Rating vs review" is worked out from the saved data, with no new column.
-- Explicit recommend % reads `answers.would_recommend` (and the latest timeline answer) and ignores the guess from the stars.
-- Helpful reuses `review_likes`.
-- Each phase: tests (including a save → edit → save round-trip for every type), type check, build, and a keyboard/screen-reader check, then stop for your review.
+- Saved in `metadata.questionnaire.answers`. Liked / could be better / worth knowing are stored as one field, `observations: { liked, could_be_better, worth_knowing, other: {selected, custom} }`, with version 2. Version 1 `stood_out` is read and moved over the first time you save it, and versions the app doesn't know are kept exactly as they are.
+- New field kinds: `detail_rating`, `experience_context`. Curated tags gain an optional `spoiler` flag.
+- One shared function decides rating vs review, used on the cards, in the counts and in the summary.
+- Helpful reuses `review_likes`. Past likes are kept or reset depending on the Phase 0 decision.
+- Each phase: tests (including save → edit → save for every type and every saved version), type check, build, and a keyboard/screen-reader check, then stop for your review.
