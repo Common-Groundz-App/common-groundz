@@ -41,3 +41,27 @@ Queries: grouped by `jsonb_typeof(metadata)`, `metadata->'questionnaire'->>'vers
 ## Decisions still needed before Phase 1
 1. What to do with the 2 duplicate pairs.
 2. Confirm `ReviewTimelineViewer` as the shared full-review view.
+
+## Phase 0 close-out (2026-10-02) — both decisions resolved
+
+### Decision 1 — duplicate pairs (user deletes manually, we re-verify)
+Full decision table (all four rows by rishab.devp, `c8508bd3-35a9-4cce-a7c8-0b5fc2bca965`; no likes, saves, or dependent records on any row):
+
+**Pair A — "Zero to One" (book, entity `2f8e671d-434e-4eb1-8c9b-c73724acdb13`)**
+- `01bd8519-fcee-4780-a269-6bcf28a3e098` — created 2025-11-11, rating 4, text "After this you must also read atomic habits by james clear", headline "Must read book.", experience_date 2025-11-11, book-cover image (Google Books proxy), no timeline, is_recommended=true, public/published.
+- `2dc27d4d-3d2e-434e-8e2a-855a775f8fb8` — created 2026-08-26, rating 3 (latest_rating 2.0), no text, has_timeline=true with 1 update, is_recommended=false, public/published.
+
+**Pair B — "Classic burger" (food, entity `0bd3f317-ff5c-4469-b684-56655489f3fd`)** — accidental double-submit, one minute apart:
+- `59e96f18-503b-44a6-be85-4a5989a6da0c` — created 2026-08-30 04:16, rating 4, text "Very juicy", food_tags empty, public/published.
+- `32a4a951-275d-4b7f-8ffb-fbc90221bf98` — created 2026-08-30 04:17, rating 4, text "tender", food_tags empty, public/published.
+
+Status: awaiting the user's manual deletion. After deletion, the duplicate query is re-run and must show zero duplicate user/entity pairs; the removed IDs and remover are recorded here.
+
+### Decision 2 — shared full-review view (approved as foundation)
+`ReviewTimelineViewer` is approved as the **foundation** of the shared full-review view, with the clarification that it must eventually open for every review — with or without timeline history — show the complete original review and all supported structured answers, and treat the timeline as one section. It may be renamed or extracted into a general full-review component during Phase 3. Admin preview stays separate. No dedicated link for now.
+
+Assessment recorded: today it shows the initial review (author, date, stars, text, media), materialized recommendation with provenance, AI summary card, timeline updates with owner undo, and the add-update composer; it opens from profile cards and the entity page. Missing vs the planned experience: structured answers (Liked / Could be better / Worth knowing, Best for, experience context, detail ratings), Food Tags, legacy headline display, spoiler gating, Helpful, and opening for reviews without a timeline.
+
+### Also recorded
+- The 17 legacy type-mismatched reviews keep their existing compatibility behavior and are **not** migrated in Phase 1.
+- **First implementation gate before Phase 1:** the database rule enforcing one review per person per entity, plus the "Review" → "Update your review" routing, must be in place before Phase 1 creates more review data. Planned separately, starts only after approval.
