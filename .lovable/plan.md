@@ -1,39 +1,49 @@
-# Phase 1 — Core review form
+# Review consistency fixes (Phases 1–5 on hold)
 
-Phase 1 runs in two parts. Part A is the safety gate the contract requires. Part B, the visible form work, only starts after Part A is verified. The approved scope stays as it is: no new questions, no data migration, and legacy reviews saved under the wrong type keep how they behave today.
+The phased plan is paused but not discarded. These three fixes come first, done one at a time. When they are finished, Phase 1 resumes and builds on top of them.
 
-## Part A — One review per person per entity (gate)
+## Fix 1 — Edit a review from the entity page, within 1 hour
 
-Today the database allows the same person to review the same thing twice. The only rules on reviews are the primary key, the two links, and a status check.
+What happens today:
+- On the entity page, a review with updates has a 3-dot menu with only Delete. A review without updates has no menu at all.
+- Editing is only possible from your profile, and it has no time limit.
 
-1. **Database rule:** a partial unique index on (user_id, entity_id) where entity_id is not null and status is not 'deleted'. Old reviews with no linked subject are not affected. Before adding it, re-run the duplicate check. If any pair exists, stop and show it to you instead of adding the rule.
-2. **Routing:** every "Write a review" entry point first checks whether you already reviewed that subject. If you did, the button says "Update your review" and opens your existing review's timeline update. It never opens a blank form.
-3. **Form guard:** when you pick a subject in the form that you already reviewed, it explains this and offers "Update your review" instead of submitting.
-4. **Friendly error:** if the database rule ever blocks a save (for example from a double-tap), you see the same message rather than a raw error.
+What changes:
+- Every review you wrote shows the 3-dot menu on the entity page. Other people's reviews never show it.
+- The menu has **Edit**, which only appears within 1 hour of publishing, and **Delete**, which is always there.
+- After the hour, Edit disappears. You add a timeline update instead, or delete the review and write a new one.
+- The same 1-hour rule applies on your profile's review cards, so both places behave the same.
+- Edit opens the same review form your profile uses today.
+- The database also enforces the window, the same way posts do, so an edit after the hour is rejected even if the screen is stale. Timeline updates, deleting, and admin moderation are not affected.
 
-## Part B — Visible form changes
+## Fix 2 — One review per person per subject, everywhere
 
-5. **No headline authoring:** remove the "Review headline (optional)" box from the last step. Existing headlines stay saved and editing a review never wipes them. Showing them on cards is Phase 3.
-6. **Recommend promoted:** "Would you recommend it?" (Yes / Maybe / No, optional) moves next to the stars. It stays a separate answer, never set from the stars.
-7. **Star wording:** labels describe quality only (for example 1 Poor through 5 Excellent). No wording suggests recommending.
-8. **Type-aware hints:** the main text box shows a short, type-specific prompt (for example book: "What stayed with you?"). Unknown types use one neutral prompt.
-9. **Observations v2:** the current "what stood out" picker splits into Liked / Could be better / Worth knowing, plus your own custom tags (kept unsorted). Old v1 answers display as they are and only upgrade when you deliberately edit them. Food keeps Food Tags and also gets observations.
-10. **Details fold:** the existing extra questions (repeat intent, best for, value, worth the time, portion, trust, and so on) move into an optional collapsed "Add more detail" section. No questions are added.
-11. **Rating-only allowed:** stars alone can be published. The shared classifier from the contract decides what counts as a "review" and what is rating-only.
+What happens today:
+- The entity page swaps "Write review" for "Add timeline update" when you already reviewed that subject.
+- The Create → Review path from the home page has no such check, so it creates a second review.
 
-## Out of scope for Phase 1
-Showing answers on cards, the full-review view, spoilers, Helpful, the 15-type matrix, layout changes and entity summaries.
+What changes:
+- In the review form, after you pick a subject you already reviewed, the form stops. It says "You've already reviewed this" and offers **Add a timeline update**, which opens the existing review's update form, or **Cancel**. It never saves a second review.
+- The database gets a rule: one active review per person per subject. This is the final safeguard against a double-tap or an old tab. Old reviews with no linked subject are not affected. The duplicate check currently reads zero; it is re-run right before the rule is added, and if anything turns up I stop and show you.
+- If the rule ever blocks a save, you see the same friendly message, not an error.
 
-## Verification
-- Duplicate check reads zero before and after the index. Attempting a second insert is rejected.
-- Focused tests for routing, the form guard, the classifier, observations v1/v2 round-trip, and headline preservation. Then the full test suite, a type check, and the build log.
-- Screenshots of the form on desktop and mobile for your visual approval. Signed-in flows can't be checked automatically on this project, so you will need to try them yourself, and I will say exactly which.
-- Update roadmap.md and docs/verification/review-phase-1.md.
+## Fix 3 — Review form vs timeline update form (discussion only, nothing built)
+
+My recommendation: don't merge them into one identical form. They do different jobs.
+- **The first review** captures the full picture: subject, stars, recommend, text, media, date, and the questions.
+- **A timeline update** captures what changed: a new star rating, whether you still recommend it, what's different now, and new photos.
+
+Build both from the same shared pieces, so the star picker, recommend choice, text box and media upload look and behave identically. The update also gets an optional "Update your answers" section that reuses the review's questions, pre-filled, so you can change one without retyping the others.
+
+I'll bring a side-by-side list of what each form has today and what's missing, for us to decide on, after Fixes 1 and 2 are done.
+
+## Order and checks
+1. Fix 1, then you check it.
+2. Fix 2, then you check it.
+3. Fix 3 discussion, then a separate plan.
+
+Each fix gets focused tests, the full test suite, a type check and a build check. I can't sign in automatically on this project, so I will list exactly what you should try while signed in. roadmap.md records the pause and these three fixes.
 
 ## Technical details
-- Index: `create unique index reviews_one_active_per_user_entity on public.reviews(user_id, entity_id) where entity_id is not null and status <> 'deleted';`
-- Existing-review lookup: one small query on reviews by (user_id, entity_id), reused by every entry point and by the form.
-- Headline: stop writing `subtitle` on create, and send the existing value back unchanged on edit.
-- Observations: a new registry version for `stood_out` with sentiment groups. The resolver reads both v1 and v2. Saving writes v2 only when that section was touched (saveMetadata already supports touch-only writes).
-- Classifier: one pure function next to the registry, built from registry answer keys rather than a hand-written list.
-- Files touched (main): ReviewForm.tsx, steps/StepFour.tsx, steps/StepOne.tsx, questionnaire/registry.ts, resolve.ts, QuestionnaireSections.tsx, plus the review entry-point buttons.
+- Fix 1: add a `canEditReview` helper next to `postEditPolicy.ts` (same 1-hour window, admin bypass). Use it in `entity-v4/TimelineReviewCard.tsx` and in `components/ReviewCard.tsx` (add an owner-only dropdown) and `profile/reviews/ReviewCard.tsx`. Edit mounts `ReviewForm` with `isEditMode`. Add a DB trigger on `reviews` mirroring `enforce_post_edit_window`. It covers only author-authored content columns, so timeline/system columns (`has_timeline`, `timeline_count`, `latest_rating`, `is_recommended`, `status`, `ai_summary`) still update.
+- Fix 2: an existing-review lookup by (user_id, entity_id) in the subject step of `ReviewForm` (create mode only), reused by `SmartComposerButton`'s flow. Index: `create unique index reviews_one_active_per_user_entity on public.reviews(user_id, entity_id) where entity_id is not null and status <> 'deleted';`. Map error 23505 to the friendly message.
