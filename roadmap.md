@@ -357,7 +357,7 @@ cross-read between them.
 
 ## Review Experience & Structured Insights (contract: docs/review-experience-contract.md)
 - [x] Phase 0 — decisions locked + read-only audits (docs/verification/review-phase-0.md); close-out decisions recorded 2026-10-02: duplicate pairs identified for manual user deletion (re-check pending), ReviewTimelineViewer approved as full-review foundation, legacy type mismatches not migrated, uniqueness gate required before Phase 1
-- [ ] Phase 0 final approval — blocked on user manually deleting the duplicate rows, then re-run duplicate check (must show zero pairs)
+- [x] Phase 0 final approval — duplicate rows deleted manually by the user; re-check 2026-10-02 07:20 UTC shows zero duplicate user/entity pairs (74 reviews, 26 unlinked). PHASE 0 COMPLETE
 - [ ] Phase 1 — core form (no headline, recommend promoted, type hints, star wording, observations v2, details fold)
 - [ ] Phase 2 — 15-type matrix (approve first), then build
 - [ ] Phase 3 — answers on reviews, shared full view, spoilers, Helpful (likes reset re-approved), tracking

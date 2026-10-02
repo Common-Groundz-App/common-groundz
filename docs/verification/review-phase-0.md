@@ -70,3 +70,12 @@ Assessment recorded: today it shows the initial review (author, date, stars, tex
 - Pair "Zero to One" (`2f8e671d…`): resolved — one row removed by the user.
 - Pair "Classic burger" (`0bd3f317…`): still present — `59e96f18-503b-44a6-be85-4a5989a6da0c` (2026-08-30 04:16, rating 4) and `32a4a951-275d-4b7f-8ffb-fbc90221bf98` (04:17, rating 4), neither has timeline updates.
 - Phase 0 final approval remains blocked until this pair is resolved.
+
+### Re-check 2026-10-02 07:20 UTC — RESOLVED
+- Pair "Classic burger" (`0bd3f317…`): resolved — one row removed by the user.
+- Duplicate query (user_id, entity_id, count > 1, entity_id not null) returns **zero pairs**. The only remaining multi-row group is `entity_id IS NULL` (unlinked reviews), which is not a duplicate condition.
+- Totals after both manual deletions: **74 reviews** (was 78), 26 unlinked.
+- Removed rows (both deletions performed manually by the user): one of `01bd8519…` / `2dc27d4d…` (Zero to One), one of `59e96f18…` / `32a4a951…` (Classic burger).
+
+## Phase 0 — COMPLETE (2026-10-02)
+All decisions locked, all audits recorded, duplicates resolved and verified. Next gate: the database uniqueness rule (one review per person per entity) plus "Review" → "Update your review" routing must be in place before Phase 1 creates more review data. Phase 1 visible form work starts only after approval.
