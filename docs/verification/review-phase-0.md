@@ -65,3 +65,8 @@ Assessment recorded: today it shows the initial review (author, date, stars, tex
 ### Also recorded
 - The 17 legacy type-mismatched reviews keep their existing compatibility behavior and are **not** migrated in Phase 1.
 - **First implementation gate before Phase 1:** the database rule enforcing one review per person per entity, plus the "Review" → "Update your review" routing, must be in place before Phase 1 creates more review data. Planned separately, starts only after approval.
+
+### Re-check 2026-10-02 07:15 UTC
+- Pair "Zero to One" (`2f8e671d…`): resolved — one row removed by the user.
+- Pair "Classic burger" (`0bd3f317…`): still present — `59e96f18-503b-44a6-be85-4a5989a6da0c` (2026-08-30 04:16, rating 4) and `32a4a951-275d-4b7f-8ffb-fbc90221bf98` (04:17, rating 4), neither has timeline updates.
+- Phase 0 final approval remains blocked until this pair is resolved.
