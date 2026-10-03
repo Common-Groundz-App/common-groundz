@@ -20,6 +20,7 @@ import { EntityRecommendationModal } from '@/components/entity/EntityRecommendat
 import { Entity } from '@/services/recommendation/types';
 import { useUserFollowing } from '@/hooks/useUserFollowing';
 import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
+import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { useEntitySiblings } from '@/hooks/use-entity-siblings';
 import { useNavigate } from 'react-router-dom';
 import { EntityV4LoadingWrapper } from '@/components/entity/EntityV4LoadingWrapper';
