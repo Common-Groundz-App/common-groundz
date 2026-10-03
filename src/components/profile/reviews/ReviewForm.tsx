@@ -206,6 +206,8 @@ const ReviewForm = ({
   
   // Update the type of selectedEntity to be compatible with both Entity types
   const [selectedEntity, setSelectedEntity] = useState<RecommendationEntity | null>(null);
+  // True while an outside search result is being saved to Groundz.
+  const [isAddingSubject, setIsAddingSubject] = useState(false);
 
   const navigate = useNavigate();
   
@@ -601,8 +603,9 @@ const ReviewForm = ({
   }, [isOpen, runExistingCheck]);
 
   const existingBlocks =
-    needsExistingCheck &&
-    !(existingCheck?.status === 'none' && existingCheck.entityId === entityId);
+    isAddingSubject ||
+    (needsExistingCheck &&
+      !(existingCheck?.status === 'none' && existingCheck.entityId === entityId));
   const existingNoticeState =
     needsExistingCheck && existingCheck && existingCheck.entityId === entityId && existingCheck.status !== 'none'
       ? existingCheck.status
@@ -1196,6 +1199,8 @@ const ReviewForm = ({
                   }
                   contextLine={subjectContextLine}
                   isResolvingContext={isResolvingSubjectContext}
+                  onAddingChange={setIsAddingSubject}
+                  isAdding={isAddingSubject}
                 />
               )}
               
