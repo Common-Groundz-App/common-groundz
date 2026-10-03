@@ -550,6 +550,7 @@ const ReviewForm = ({
 
   
   const handleClose = () => {
+    existingCheckRef.current += 1;
     if (hasUnsavedChanges) {
       setShowExitConfirmation(true);
     } else {
