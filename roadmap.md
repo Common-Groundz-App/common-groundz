@@ -363,3 +363,9 @@ cross-read between them.
 - [ ] Phase 3 — answers on reviews, shared full view, spoilers, Helpful (likes reset re-approved), tracking
 - [ ] Phase 4 — layout decision (steps vs single form)
 - [ ] Phase 5 — entity summaries (public + Circle, per-metric minimums)
+
+
+## Review Lifecycle Consistency (Review Experience Phases 1–5 paused, not discarded)
+- [x] Step 1 — one review per person per subject (unique index, shared own-review lookup, form guard, entity-page any-visibility check, race recovery) — awaiting user approval; docs/verification/review-lifecycle-step-1.md
+- [ ] Step 2 — shared owner menu on every own review + 1-hour edit window (client + review-specific DB trigger) — waits for Step 1 approval
+- [ ] Step 3 — review form vs timeline update comparison (discussion, then separate plan)
