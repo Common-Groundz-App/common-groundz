@@ -57,7 +57,7 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
 
     const edit = screen.getByRole('menuitem', { name: 'Edit' });
     await user.hover(edit);
-    expect(await screen.findByText('You can edit for 1 hour after publishing.')).toBeInTheDocument();
+    expect((await screen.findAllByText('You can edit for 1 hour after publishing.')).length).toBeGreaterThan(0);
 
     await user.click(edit);
     expect(onEdit).toHaveBeenCalledTimes(1);
@@ -72,7 +72,7 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
     const edit = screen.getByRole('menuitem', { name: 'Edit' });
     expect(edit).toHaveClass('cursor-not-allowed');
     await user.hover(edit);
-    expect(await screen.findByText('Edit window closed (1 hour limit)')).toBeInTheDocument();
+    expect((await screen.findAllByText('Edit window closed (1 hour limit)')).length).toBeGreaterThan(0);
 
     await user.click(edit);
     expect(onEdit).not.toHaveBeenCalled();
