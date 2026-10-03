@@ -4,6 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { createReview, updateReview, Review } from '@/services/reviewService';
+import { addReviewUpdate } from '@/services/review/timeline';
+import { isEditWindowClosedError } from '@/utils/reviewEditPolicy';
+import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { findOwnReviewForEntity, isOwnReviewUniqueViolation } from '@/services/review/ownReview';
 import ExistingReviewNotice from './ExistingReviewNotice';
@@ -1229,7 +1232,7 @@ const ReviewForm = ({
                 <p className="font-medium">The one-hour edit window has closed.</p>
                 <p className="text-muted-foreground">
                   Nothing you typed is lost. You can add it as a timeline update instead — your rating,
-                  text, photos and recommending choice carry over. Answers the timeline form can't hold
+                  text and photos carry over. Answers the timeline form can't hold
                   stay visible here to copy.
                 </p>
                 <div className="flex gap-2">
