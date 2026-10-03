@@ -14,45 +14,39 @@ export const useTimelineReviews = (reviews: ReviewWithUser[]) => {
   const [timelineData, setTimelineData] = useState<Map<string, TimelineReviewData>>(new Map());
 
   useEffect(() => {
-    const loadTimelineData = async () => {
-      const timelineReviews = reviews.filter(
-        review => review.has_timeline && review.timeline_count && review.timeline_count > 0
-      );
+    // Generation guard: answers from an older run (e.g. for a review that has
+    // since been deleted) must never write back into state.
+    let cancelled = false;
 
-      if (timelineReviews.length === 0) return;
+    const timelineReviews = reviews.filter(
+      review => review.has_timeline && review.timeline_count && review.timeline_count > 0
+    );
 
-      // Initialize loading states
-      const newTimelineData = new Map<string, TimelineReviewData>();
-      timelineReviews.forEach(review => {
-        newTimelineData.set(review.id, {
-          review,
-          updates: [],
-          isLoading: true
-        });
-      });
-      setTimelineData(newTimelineData);
+    const initial = new Map<string, TimelineReviewData>();
+    timelineReviews.forEach(review => {
+      initial.set(review.id, { review, updates: [], isLoading: true });
+    });
+    setTimelineData(initial);
 
-      // Fetch timeline updates for each review
+    (async () => {
       for (const review of timelineReviews) {
+        let updates: ReviewUpdate[] = [];
         try {
-          const updates = await fetchReviewUpdates(review.id);
-          setTimelineData(prev => new Map(prev).set(review.id, {
-            review,
-            updates,
-            isLoading: false
-          }));
+          updates = await fetchReviewUpdates(review.id);
         } catch (error) {
           console.error(`Error loading timeline for review ${review.id}:`, error);
-          setTimelineData(prev => new Map(prev).set(review.id, {
-            review,
-            updates: [],
-            isLoading: false
-          }));
         }
+        if (cancelled) return;
+        setTimelineData(prev => {
+          if (!prev.has(review.id)) return prev;
+          return new Map(prev).set(review.id, { review, updates, isLoading: false });
+        });
       }
-    };
+    })();
 
-    loadTimelineData();
+    return () => {
+      cancelled = true;
+    };
   }, [reviews]);
 
   return timelineData;

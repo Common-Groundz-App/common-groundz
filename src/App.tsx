@@ -47,6 +47,7 @@ import { ComposerFocusProvider } from '@/contexts/ComposerFocusContext';
 import { NotificationDrawer } from '@/components/notifications/NotificationDrawer';
 import { networkStatusService } from '@/services/networkStatusService';
 import PrewarmFlagBridge from '@/components/system/PrewarmFlagBridge';
+import ReviewChangeInvalidationBridge from '@/components/system/ReviewChangeInvalidationBridge';
 
 /**
  * Global Error & Network Policy:
@@ -108,6 +109,7 @@ function App() {
             <Router>
               <ScrollToTop />
               <PrewarmFlagBridge />
+              <ReviewChangeInvalidationBridge />
               <AuthInitializer>
               <AuthPromptProvider>
                 <NotificationsProvider>

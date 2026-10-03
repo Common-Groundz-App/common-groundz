@@ -117,6 +117,26 @@ export const deleteReviewThread = async (
   }
 };
 
+/**
+ * Confirmed existence check. `gone` only when the query succeeded and returned
+ * no row; a failed request is `error`, never `gone`.
+ */
+export const checkReviewExists = async (
+  reviewId: string,
+): Promise<'exists' | 'gone' | 'error'> => {
+  try {
+    const { data, error } = await supabase
+      .from('reviews')
+      .select('id')
+      .eq('id', reviewId)
+      .maybeSingle();
+    if (error) return 'error';
+    return data ? 'exists' : 'gone';
+  } catch {
+    return 'error';
+  }
+};
+
 /** Retryable, silent media cleanup (one retry per file). */
 export const cleanupReviewMedia = async (urls: string[]): Promise<void> => {
   const { deleteMedia } = await import('@/services/mediaService');
