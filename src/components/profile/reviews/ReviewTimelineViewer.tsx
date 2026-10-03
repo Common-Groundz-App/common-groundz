@@ -11,6 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import {
   canEditTimelineUpdate,
@@ -630,10 +631,36 @@ export const ReviewTimelineViewer = ({
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              {canEditThis && (
-                                <DropdownMenuItem onClick={() => startEditUpdate(update)} className="flex items-center gap-2">
-                                  <Pencil className="h-4 w-4" /> Edit
-                                </DropdownMenuItem>
+                              {canEditThis ? (
+                                <TooltipProvider delayDuration={150}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <DropdownMenuItem onClick={() => startEditUpdate(update)} className="flex items-center gap-2">
+                                        <Pencil className="h-4 w-4" /> Edit
+                                      </DropdownMenuItem>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                      You can edit for 1 hour after publishing.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <TooltipProvider delayDuration={150}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <DropdownMenuItem
+                                        onClick={(event) => event.preventDefault()}
+                                        onSelect={(event) => event.preventDefault()}
+                                        className="flex items-center gap-2 opacity-50 cursor-not-allowed"
+                                      >
+                                        <Pencil className="h-4 w-4" /> Edit
+                                      </DropdownMenuItem>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                      Edit window closed (1 hour limit)
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               )}
                               <DropdownMenuItem
                                 onClick={() => setConfirmDeleteId(update.id)}

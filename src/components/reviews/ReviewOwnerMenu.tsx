@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -61,6 +62,16 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
 
   const canEdit = canEditReview(review, user?.id, isAdmin);
   const afterHour = !isWithinEditWindow(review.created_at);
+  const hasEditAction = !!(onEdit || editableReview);
+
+  const editItem = hasEditAction ? (
+    <DropdownMenuItem
+      onClick={() => (onEdit ? onEdit() : setIsEditing(true))}
+      className="flex items-center gap-2"
+    >
+      <Pencil className="h-4 w-4" /> Edit
+    </DropdownMenuItem>
+  ) : null;
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -99,13 +110,34 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
               <Plus className="h-4 w-4" /> Add timeline update
             </DropdownMenuItem>
           )}
-          {canEdit && (onEdit || editableReview) && (
-            <DropdownMenuItem
-              onClick={() => (onEdit ? onEdit() : setIsEditing(true))}
-              className="flex items-center gap-2"
-            >
-              <Pencil className="h-4 w-4" /> Edit
-            </DropdownMenuItem>
+          {hasEditAction && (
+            isAdmin ? editItem : canEdit ? (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>{editItem}</TooltipTrigger>
+                  <TooltipContent side="left">
+                    You can edit for 1 hour after publishing.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuItem
+                      onClick={(event) => event.preventDefault()}
+                      onSelect={(event) => event.preventDefault()}
+                      className="flex items-center gap-2 opacity-50 cursor-not-allowed"
+                    >
+                      <Pencil className="h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    Edit window closed (1 hour limit)
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )
           )}
           {children}
           <DropdownMenuItem
