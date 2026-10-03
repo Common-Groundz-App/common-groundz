@@ -83,7 +83,7 @@ describe('ReviewForm — one review per subject', () => {
   });
 
   it('stops and offers Add an update when already reviewed', async () => {
-    h.lookup.mockResolvedValue({ status: 'found', review: { id: 'r1' } });
+    h.lookup.mockResolvedValue({ status: 'found', review: { id: 'r1' }, canonicalPath: '/entity/zero-to-one' });
     const onClose = vi.fn();
     const user = userEvent.setup();
     render(<ReviewForm isOpen onClose={onClose} onSubmit={async () => {}} />);
@@ -91,9 +91,24 @@ describe('ReviewForm — one review per subject', () => {
     await screen.findByText("You've already reviewed this");
     expect(next()).toHaveProperty('disabled', true);
     await user.click(screen.getByRole('button', { name: 'Add an update' }));
-    expect(h.navigate).toHaveBeenCalledWith('/entity/book-1?compose=update');
+    expect(h.navigate).toHaveBeenCalledWith('/entity/zero-to-one', { state: { openReviewUpdate: { reviewId: 'r1' } } });
     expect(onClose).toHaveBeenCalled();
     expect(h.createReview).not.toHaveBeenCalled();
+  });
+
+  it('retries a missing canonical address without navigating to an ID', async () => {
+    h.lookup.mockResolvedValueOnce({ status: 'found', review: { id: 'r1' }, canonicalPath: null })
+      .mockResolvedValueOnce({ status: 'found', review: { id: 'r1' }, canonicalPath: null })
+      .mockResolvedValueOnce({ status: 'found', review: { id: 'r1' }, canonicalPath: '/entity/books/zero-to-one' });
+    const user = userEvent.setup();
+    renderNew();
+    await pickSubject(user);
+    await screen.findByText("You've already reviewed this");
+    await user.click(screen.getByRole('button', { name: 'Add an update' }));
+    await screen.findByText(/couldn't open this update/i);
+    expect(h.navigate).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(h.navigate).toHaveBeenCalledWith('/entity/books/zero-to-one', { state: { openReviewUpdate: { reviewId: 'r1' } } });
   });
 
   it('a failed check blocks and Try again re-checks', async () => {
