@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getEntityUrl, getHierarchicalEntityUrl } from '@/utils/entityUrlUtils';
 
 /**
  * Review Lifecycle Step 1 — the single definition of "have I already reviewed
@@ -20,7 +21,7 @@ export interface OwnReviewSummary {
 }
 
 export type OwnReviewLookup =
-  | { status: 'found'; review: OwnReviewSummary }
+  | { status: 'found'; review: OwnReviewSummary; canonicalPath: string | null }
   | { status: 'none' }
   | { status: 'error' };
 
@@ -46,7 +47,33 @@ export async function findOwnReviewForEntity(
     const { data, error } = await query.limit(1).maybeSingle();
     if (error) return { status: 'error' };
     if (!data) return { status: 'none' };
-    return { status: 'found', review: data as OwnReviewSummary };
+    // Routing is best-effort: a failed slug read must not turn a known owned
+    // review into "none" or permit another review to be created.
+    let canonicalPath: string | null = null;
+    try {
+      const { data: entity, error: entityError } = await supabase
+        .from('entities')
+        .select('id, slug, parent_id')
+        .eq('id', entityId)
+        .eq('is_deleted', false)
+        .maybeSingle();
+      if (!entityError && entity?.slug) {
+        if (entity.parent_id) {
+          const { data: parent, error: parentError } = await supabase
+            .from('entities')
+            .select('id, slug')
+            .eq('id', entity.parent_id)
+            .eq('is_deleted', false)
+            .maybeSingle();
+          if (!parentError && parent?.slug) canonicalPath = getHierarchicalEntityUrl(parent, entity);
+        } else {
+          canonicalPath = getEntityUrl(entity);
+        }
+      }
+    } catch {
+      // The button can retry the route lookup without losing the owned review.
+    }
+    return { status: 'found', review: data as OwnReviewSummary, canonicalPath };
   } catch {
     return { status: 'error' };
   }
