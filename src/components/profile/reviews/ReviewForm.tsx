@@ -585,6 +585,8 @@ const ReviewForm = ({
   const [openUpdateError, setOpenUpdateError] = useState(false);
   const existingCheckRef = React.useRef(0);
   const openingRef = React.useRef(false);
+  const isOpenRef = React.useRef(isOpen);
+  isOpenRef.current = isOpen;
   const excludeReviewId = isEditMode ? review?.id : undefined;
 
   const runExistingCheck = React.useCallback(async () => {
@@ -628,10 +630,15 @@ const ReviewForm = ({
     if (!path) {
       setIsOpeningUpdate(true);
       const result = await findOwnReviewForEntity(targetId, { excludeReviewId });
-      if (requestId !== existingCheckRef.current || !isOpen) { openingRef.current = false; setIsOpeningUpdate(false); return; }
+      if (requestId !== existingCheckRef.current || !isOpenRef.current) { openingRef.current = false; setIsOpeningUpdate(false); return; }
       if (result.status === 'found' && result.review.id === reviewId) path = result.canonicalPath;
     }
-    if (!path || requestId !== existingCheckRef.current || !isOpen) {
+    if (!isOpenRef.current || requestId !== existingCheckRef.current) {
+      setIsOpeningUpdate(false);
+      openingRef.current = false;
+      return;
+    }
+    if (!path) {
       setOpenUpdateError(true);
       setIsOpeningUpdate(false);
       openingRef.current = false;
