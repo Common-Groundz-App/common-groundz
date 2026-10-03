@@ -77,10 +77,20 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   });
   const [selectedTimelineReview, setSelectedTimelineReview] = useState<ReviewWithUser | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
+  // Reviews deleted in this session are hidden at once; the refetch reconciles.
+  const [hiddenReviewIds, setHiddenReviewIds] = useState<Set<string>>(new Set());
+  const handleReviewDeleted = (reviewId: string) => {
+    setHiddenReviewIds(prev => new Set(prev).add(reviewId));
+    if (selectedTimelineReview?.id === reviewId) {
+      setIsTimelineViewerOpen(false);
+      setSelectedTimelineReview(null);
+    }
+  };
+  const visibleReviews = reviews.filter(r => !hiddenReviewIds.has(r.id));
 
   const hasCircleData = isAuthenticated && !circleLoading && circleUserIds.length > 0;
 
-  const filteredReviews = filterReviews(reviews, {
+  const filteredReviews = filterReviews(visibleReviews, {
     search: searchQuery || undefined,
     verified: activeFilters.verified || undefined,
     rating: activeFilters.starRating || undefined,
@@ -491,6 +501,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
               key={review.id}
               review={review}
               onTimelineClick={handleTimelineClick}
+              onDeleted={() => handleReviewDeleted(review.id)}
               isCircleReview={true}
               circleUserName={review.user.displayName || review.user.username}
             />
@@ -513,6 +524,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   review={review} 
                   onHelpfulClick={onHelpfulClick}
                   onTimelineClick={handleTimelineClick}
+                  onDeleted={handleReviewDeleted}
                 />
               </CardContent>
             </Card>
@@ -523,6 +535,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
               key={review.id}
               review={review}
               onTimelineClick={handleTimelineClick}
+              onDeleted={() => handleReviewDeleted(review.id)}
               isCircleReview={false}
               circleUserName={review.user.displayName || review.user.username}
             />
@@ -535,12 +548,13 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 review={review} 
                 onHelpfulClick={onHelpfulClick}
                 onTimelineClick={handleTimelineClick}
+                onDeleted={handleReviewDeleted}
               />
             ))
           ) : (
             !hybridReviews.length && !circleOnlyReviews.length && !timelineOnlyReviews.length && (
               <div className="text-center py-8 text-gray-500">
-                {reviews.length === 0 ? (
+                {visibleReviews.length === 0 ? (
                   <p>No reviews yet. Be the first to share your experience!</p>
                 ) : (
                   <p>No reviews match your current filters.</p>
@@ -617,6 +631,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           isOpen={isTimelineViewerOpen}
           onClose={handleTimelineViewerClose}
           reviewId={selectedTimelineReview.id}
+          onReviewGone={() => handleReviewDeleted(selectedTimelineReview.id)}
           reviewOwnerId={selectedTimelineReview.user_id}
           reviewTitle={selectedTimelineReview.title}
           initialRating={selectedTimelineReview.rating}

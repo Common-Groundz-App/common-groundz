@@ -21,6 +21,8 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { fetchReviewWithSummary, type Review } from '@/services/reviewService';
+import { checkReviewExists } from '@/services/review/core';
+import { notifyReviewsChanged } from '@/services/review/reviewChangeEvents';
 import {
   addReviewUpdate,
   deleteLatestReviewUpdate,
@@ -60,6 +62,8 @@ interface ReviewTimelineViewerProps {
   reviewTitle: string;
   initialRating: number;
   onTimelineUpdate?: () => void;
+  /** Called when the review is confirmed deleted (window closes itself). */
+  onReviewGone?: () => void;
 }
 
 export const ReviewTimelineViewer = ({
@@ -69,7 +73,8 @@ export const ReviewTimelineViewer = ({
   reviewOwnerId,
   reviewTitle,
   initialRating,
-  onTimelineUpdate
+  onTimelineUpdate,
+  onReviewGone
 }: ReviewTimelineViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -90,6 +95,7 @@ export const ReviewTimelineViewer = ({
   const [isUndoing, setIsUndoing] = useState(false);
   const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const MAX_MEDIA_COUNT = 4;
 
@@ -104,33 +110,35 @@ export const ReviewTimelineViewer = ({
 
   const loadTimelineData = async () => {
     setIsLoading(true);
+    setLoadFailed(false);
     try {
-      console.log('🔄 Loading timeline data for review:', reviewId);
-      
-      // Load both timeline updates and complete review data
       const [updates, review] = await Promise.all([
         fetchReviewUpdates(reviewId),
         fetchReviewWithSummary(reviewId)
       ]);
-      
-      console.log('📋 Timeline updates loaded:', updates?.length || 0);
-      console.log('📊 Review data loaded:', {
-        id: review?.id,
-        hasAiSummary: !!review?.ai_summary,
-        aiSummaryLength: review?.ai_summary?.length || 0,
-        timelineCount: review?.timeline_count,
-        hasTimeline: review?.has_timeline
-      });
-      
+
+      if (!review) {
+        // Distinguish "confirmed gone" from "request failed".
+        const existence = await checkReviewExists(reviewId);
+        if (existence === 'gone') {
+          setTimelineUpdates([]);
+          setReviewData(null);
+          toast({ title: 'This review was deleted' });
+          notifyReviewsChanged();
+          onReviewGone?.();
+          onClose();
+          return;
+        }
+        // Keep whatever was already shown; offer retry.
+        setLoadFailed(true);
+        return;
+      }
+
       setTimelineUpdates(updates);
       setReviewData(review);
     } catch (error) {
       console.error('❌ Error loading timeline data:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load timeline data',
-        variant: 'destructive'
-      });
+      setLoadFailed(true);
     } finally {
       setIsLoading(false);
     }
@@ -204,6 +212,13 @@ export const ReviewTimelineViewer = ({
           variant: 'destructive',
         });
         await Promise.all([loadTimelineData(), loadLatestIntent(), loadParentReview()]);
+      } else if (result === 'not_found') {
+        // Already gone: reconcile instead of erroring.
+        setConfirmDeleteId(null);
+        toast({ title: 'This timeline update was already deleted' });
+        notifyReviewsChanged();
+        await Promise.all([loadTimelineData(), loadLatestIntent()]);
+        if (onTimelineUpdate) onTimelineUpdate();
       } else {
         throw new Error(result);
       }
@@ -669,7 +684,16 @@ export const ReviewTimelineViewer = ({
                 );
               })}
 
-              {timelineUpdates.length === 0 && (
+              {loadFailed && (
+                <div className="text-center py-4 text-sm text-muted-foreground" role="status">
+                  <p>Couldn't load this timeline.</p>
+                  <Button variant="outline" size="sm" className="mt-2" onClick={() => loadTimelineData()}>
+                    Try again
+                  </Button>
+                </div>
+              )}
+
+              {!loadFailed && timelineUpdates.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <p>No timeline updates yet.</p>
                   {isOwner && (

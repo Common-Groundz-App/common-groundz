@@ -11,6 +11,7 @@ import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { deleteReviewThread } from '@/services/review/core';
+import { notifyReviewsChanged } from '@/services/review/reviewChangeEvents';
 import {
   canEditReview,
   isWithinEditWindow,
@@ -68,6 +69,12 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
     if (result === 'deleted') {
       setConfirmOpen(false);
       toast({ title: 'Review deleted', description: 'Your review and its timeline were removed.' });
+      onDeleted?.();
+    } else if (result === 'not_found') {
+      // Already gone (e.g. deleted in another tab): reconcile, not an error.
+      setConfirmOpen(false);
+      notifyReviewsChanged();
+      toast({ title: 'This review was already deleted' });
       onDeleted?.();
     } else {
       toast({ title: 'Could not delete', description: 'Please try again.', variant: 'destructive' });

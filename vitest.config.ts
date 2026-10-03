@@ -93,6 +93,8 @@ export default defineConfig({
           // (e.g. LightboxPreview.handoff.test.tsx) with no executable tests.
           include: [
             'src/contexts/ComposerFocusContext.test.tsx',
+            'src/hooks/__tests__/useTimelineReviews.test.ts',
+            'src/components/profile/reviews/__tests__/SubjectSelectStepLocked.test.tsx',
             'src/hooks/useSoftwareKeyboardOpen.test.tsx',
             'src/hooks/useBlurComposerOnKeyboardDismiss.test.tsx',
             'src/hooks/useDockCorrection.test.tsx',

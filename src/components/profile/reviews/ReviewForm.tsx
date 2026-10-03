@@ -16,6 +16,7 @@ import { ensureHttps } from '@/utils/urlUtils';
 import { MediaItem } from '@/types/media';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
+import { supabase } from '@/integrations/supabase/client';
 import {
   parseEntityType,
   parseEntityTypeAtBoundary,
@@ -213,6 +214,59 @@ const ReviewForm = ({
   const [selectedEntity, setSelectedEntity] = useState<RecommendationEntity | null>(null);
   // True while an outside search result is being saved to Groundz.
   const [isAddingSubject, setIsAddingSubject] = useState(false);
+
+  /**
+   * Edit of a linked review: the subject is locked. When the loaded review
+   * doesn't carry its subject's details, fetch them by the stored entity_id.
+   * Linked = entity_id present, whatever this fetch returns; a failed fetch
+   * never turns into an unlinked review and saving keeps the stored subject.
+   */
+  const isLockedLinkedEdit = isEditMode && !!review?.entity_id;
+  const [subjectHydration, setSubjectHydration] = useState<'ready' | 'loading' | 'error'>('ready');
+  const hydrationRequestRef = React.useRef(0);
+  const hydrateLockedSubject = React.useCallback(async () => {
+    if (!isOpen || !isEditMode || !review?.entity_id || review.entity) {
+      setSubjectHydration('ready');
+      return;
+    }
+    const requestId = ++hydrationRequestRef.current;
+    const targetId = review.entity_id;
+    // Let the open/reset effect run first so it can't overwrite this result.
+    await Promise.resolve();
+    if (requestId !== hydrationRequestRef.current) return;
+    if (entity && entity.id === targetId) {
+      setSelectedSubject({
+        id: entity.id, name: entity.name, type: entity.type, venue: entity.venue,
+        image_url: entity.image_url, description: entity.description, metadata: entity.metadata,
+      } as EntityAdapter);
+      setSubjectHydration('ready');
+      return;
+    }
+    setSubjectHydration('loading');
+    const { data, error } = await supabase
+      .from('entities')
+      .select('id, name, type, venue, image_url, description, metadata')
+      .eq('id', targetId)
+      .maybeSingle();
+    if (requestId !== hydrationRequestRef.current) return; // stale: closed or switched review
+    if (error || !data) {
+      setSubjectHydration('error');
+      return;
+    }
+    setSelectedSubject({
+      id: data.id, name: data.name, type: data.type as any, venue: data.venue,
+      image_url: data.image_url, description: data.description, metadata: data.metadata as any,
+    } as EntityAdapter);
+    setSelectedEntity((current) => current ?? ({ ...data, type: mapStringToEntityType(data.type as any) ?? data.type } as any));
+    setSubjectHydration('ready');
+  }, [isOpen, isEditMode, review?.id, review?.entity_id, review?.entity, entity]);
+
+  useEffect(() => {
+    void hydrateLockedSubject();
+    return () => {
+      hydrationRequestRef.current += 1;
+    };
+  }, [hydrateLockedSubject]);
 
   const navigate = useNavigate();
   
@@ -1046,9 +1100,8 @@ const ReviewForm = ({
           rating,
           image_url,
           media: selectedMedia,
-          category: persistedCategory,
+          // Subject identity (entity_id, category) is locked in Edit and never sent.
           visibility: visibility as "public" | "private" | "circle_only", // Match what the API expects
-          entity_id: entityId,
           experience_date: formattedExperienceDate,
           metadata,
         });
@@ -1174,7 +1227,11 @@ const ReviewForm = ({
     switch (currentStep) {
       case 1: return rating === 0;
       // Step 2: Next requires a subject unless this is a legacy-optional edit.
-      case 2: return !allowsMissingSubject(requirement) && !selectedSubject;
+      case 2:
+        // Locked linked edit: the stored subject is kept on save, so only a
+        // still-loading lookup blocks; a failed lookup can still continue.
+        if (isLockedLinkedEdit) return subjectHydration === 'loading';
+        return !allowsMissingSubject(requirement) && !selectedSubject;
       case 3:
         // Only legacy unlinked reviews still carry an editable identity field.
         return resolution.mode === 'legacy-unlinked' && !legacyTitle.trim();
@@ -1272,6 +1329,9 @@ const ReviewForm = ({
                   subject={selectedSubject}
                   onSubjectChange={handleSubjectChange}
                   disabled={isFromEntityPage || isEditMode}
+                  locked={isLockedLinkedEdit}
+                  lockedStatus={subjectHydration}
+                  onRetryLocked={() => void hydrateLockedSubject()}
                   requirement={requirement}
                   onContinueWithoutSubject={
                     allowsMissingSubject(requirement) ? handleContinueWithoutSubject : undefined
