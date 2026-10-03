@@ -24,7 +24,9 @@ These are fixes for problems found while testing Step 1. Step 1 isn't done until
 5. Run the Step 1 "already reviewed?" check on that saved item.
 6. Let you continue.
 
-While steps 2–5 run, the selected row says "Adding to Groundz…" and Next and Publish stay disabled. If it fails, nothing stays selected and you can try again. A retry reuses the item if it was already created, so you don't get duplicates.
+While steps 2–5 run, the selected row says "Adding to Groundz…" and Next and Publish stay disabled. If it fails, nothing stays selected and you can try again.
+
+**Duplicate protection (checked):** the database already allows only one item per outside source and outside ID. There are 0 duplicates today. What's missing is the recovery when two saves hit at the same moment (two tabs, or two people). Today the second one fails with an error. Both the composer and the review form will share one "find or create" step: if the database says the item already exists, it fetches the saved one and carries on, instead of showing an error. Any other error is still shown.
 
 ## 3. The rating on the entity page doesn't change after a review
 **Why (confirmed):** your review is saved correctly: public, published, rating 4. The page reads its numbers from a summary that is rebuilt once an hour, and that summary still shows 0 reviews.
@@ -36,7 +38,9 @@ While steps 2–5 run, the selected row says "Adding to Groundz…" and Next and
 - Recommending is counted from the review's current recommending state.
 - Deleted subjects show nothing, and a subject with no reviews shows zero.
 
-To stop the two sets of rules drifting apart, they are written down once in a shared database definition. The fresh count reads from it, and a check confirms the hourly summary gives the same numbers after its next rebuild. The hourly summary itself stays as it is for lists and trending.
+For now there will be two copies of these rules: the new fresh count and the hourly summary. They are kept in step by a comparison check, which is run now and written up. Making the hourly summary read from the same shared rules is a later, separate step. The hourly summary itself stays as it is for lists and trending.
+
+**Privacy:** the fresh count only ever returns totals: how many reviews, how many recommending, and the average. It never returns individual reviews or who wrote them, and it runs with the visitor's own access, not elevated access. A check confirms that a signed-out visitor gets only those totals, and that private or Circle-only reviews don't change them.
 
 The page re-reads the count right after any of these:
 - publishing, editing or deleting a review
@@ -64,6 +68,15 @@ The page re-reads the count right after any of these:
 
 ## Technical details
 - URL: `getEntityUrlWithParent` (stored `slug`/`parent_slug`) in `handleAddUpdateToExisting`. In EntityV4, if `isUUID(param)` and the canonical path is not equal to `location.pathname`, then `navigate(canonical + location.search + location.hash, { replace: true })`. Audit `/entity/${…id}` with `rg`, and convert only call sites that have slug data.
-- External: SubjectSelectStep `externalResultPolicy="createIfMissing"` with `allowInlineCreate={false}`. Keep strict `parseEntityTypeAtBoundary` for review subjects. Expose an `isResolving` callback from UnifiedEntitySelector so ReviewForm can block progression. `onSubjectChange` only receives the persisted entity. Dedupe uses `findEntityByApiRef`, so retries are idempotent.
-- Stats: a new security-invoker view `public.entity_review_stats_canonical`, with exactly the canonical CTE and aggregation of `entity_stats_v2` (`DISTINCT ON (user_id, entity_id)` newest, `COALESCE(latest_rating, rating)`, `is_recommended`, public + published, `entities.is_deleted = false`). Plus `get_entity_live_stats(p_entity_id uuid)`, which reads from it. Grants go to anon, authenticated and service_role. The materialized view is not rebuilt now. Re-basing it on the shared view is a later, separate step, so a parity query stands in for that until then. One React Query key covers the header and tiles. It is invalidated by review create/update/delete, visibility/entity changes, timeline insert and timeline undo.
+- External: SubjectSelectStep `externalResultPolicy="createIfMissing"` with `allowInlineCreate={false}`. Keep strict `parseEntityTypeAtBoundary` for review subjects. Expose an `isResolving` callback from UnifiedEntitySelector so ReviewForm can block progression. `onSubjectChange` only receives the persisted entity.
+  - The existing `entities_api_source_ref_idx` (unique `(api_source, api_ref)` where both are not null) is the atomic guard. No new index is needed.
+  - Add a shared `findOrCreateExternalEntity` used by both the composer and the review form: find, then create, and on a 23505 naming `entities_api_source_ref_idx`, re-run the find and return the winner.
+  - If the existing row is soft-deleted, show a clear message rather than a silent failure.
+- Stats: plain SQL function `get_entity_live_stats(p_entity_id uuid)`:
+  - `SECURITY INVOKER`, `STABLE`, `SET search_path = public`.
+  - Returns only `review_count`, `recommendation_count` and `average_rating`. It is the same CTE and aggregation as `entity_stats_v2`: `DISTINCT ON (user_id, entity_id)` newest, `COALESCE(latest_rating, rating)`, `is_recommended`, `visibility='public'`, `status='published'`, `is_deleted=false`.
+  - No new view. `REVOKE ALL FROM PUBLIC`, then `GRANT EXECUTE` to anon, authenticated and service_role.
+  - Parity query against `entity_stats_v2` for all entities with no review change since the last refresh, recorded in the verification doc.
+  - A signed-out RPC call is checked to return aggregates only.
+  - One React Query key covers the header and tiles. It is invalidated by review create/update/delete, visibility/entity changes, timeline insert and timeline undo.
 - roadmap.md gets these three fixes as Step 1 follow-ups once building starts.
