@@ -108,6 +108,8 @@ const ReviewForm = ({
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editWindowClosed, setEditWindowClosed] = useState(false);
+  const [isSavingAsUpdate, setIsSavingAsUpdate] = useState(false);
   
   // Form validation error state
   const [showRatingError, setShowRatingError] = useState(false);
@@ -1109,6 +1111,12 @@ const ReviewForm = ({
         await runExistingCheck();
         return;
       }
+      // Step 2 — the one-hour window closed while editing: keep everything
+      // and offer to add it as a timeline update instead.
+      if (isEditMode && isEditWindowClosedError(error)) {
+        setEditWindowClosed(true);
+        return;
+      }
       toast({
         title: 'Error',
         description: 'Failed to save review. Please try again.',
@@ -1119,6 +1127,25 @@ const ReviewForm = ({
     }
   };
   
+  const handleSaveAsTimelineUpdate = async () => {
+    if (!user || !review) return;
+    setIsSavingAsUpdate(true);
+    try {
+      const ok = await addReviewUpdate(review.id, user.id, rating || null, description.trim(), selectedMedia);
+      if (ok) {
+        toast({ title: 'Timeline update added' });
+        setEditWindowClosed(false);
+        await onSubmit();
+        setHasUnsavedChanges(false);
+        onClose();
+      } else {
+        toast({ title: 'Error', description: 'Could not add the timeline update.', variant: 'destructive' });
+      }
+    } finally {
+      setIsSavingAsUpdate(false);
+    }
+  };
+
   // Fires once per time the subject step becomes visible.
   useEffect(() => {
     if (isOpen && currentStep === 2) {
@@ -1197,6 +1224,25 @@ const ReviewForm = ({
               onStepClick={handleStepClick}
             />
             
+            {editWindowClosed && review && (
+              <div className="mb-4 rounded-lg border border-border bg-muted/40 p-4 text-sm space-y-3">
+                <p className="font-medium">The one-hour edit window has closed.</p>
+                <p className="text-muted-foreground">
+                  Nothing you typed is lost. You can add it as a timeline update instead — your rating,
+                  text, photos and recommending choice carry over. Answers the timeline form can't hold
+                  stay visible here to copy.
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleSaveAsTimelineUpdate} disabled={isSavingAsUpdate || !description.trim()}>
+                    {isSavingAsUpdate ? 'Adding…' : 'Add as timeline update'}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditWindowClosed(false)}>
+                    Keep editing
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {currentStep >= 2 && existingNoticeState && (
               <ExistingReviewNotice
                 state={existingNoticeState}
@@ -1222,7 +1268,7 @@ const ReviewForm = ({
                 <SubjectSelectStep
                   subject={selectedSubject}
                   onSubjectChange={handleSubjectChange}
-                  disabled={isFromEntityPage}
+                  disabled={isFromEntityPage || isEditMode}
                   requirement={requirement}
                   onContinueWithoutSubject={
                     allowsMissingSubject(requirement) ? handleContinueWithoutSubject : undefined
@@ -1243,9 +1289,9 @@ const ReviewForm = ({
                   invalidMessage={invalidMessage}
                   legacyMode={resolution.mode === 'legacy-unlinked'}
                   legacyTitle={legacyTitle}
-                  onLegacyTitleChange={setLegacyTitle}
+                  onLegacyTitleChange={isEditMode ? () => {} : setLegacyTitle}
                   legacyVenue={legacyVenue}
-                  onLegacyVenueChange={setLegacyVenue}
+                  onLegacyVenueChange={isEditMode ? () => {} : setLegacyVenue}
                   selectedMedia={selectedMedia}
                   onMediaAdd={handleAddMedia}
                   onMediaRemove={handleRemoveMedia}
