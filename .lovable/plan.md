@@ -2,32 +2,38 @@
 
 ## What I found
 
-**Bug 2 (delete) — the delete actually worked.** Hana's review of The Bier Library and its timeline update are both gone from the database (checked: no review, no leftover timeline updates). The problem is the page: it kept showing the old card because nothing told it to reload. The "refresh after any review change" listener exists but is never switched on in the app. Then:
-- opening the timeline on that ghost card showed "Anonymous" with no updates, because the review no longer exists;
+**Bug 2 (delete) — the delete actually worked.** Hana's review of The Bier Library and its timeline update are both gone from the database (and your reload confirmed it). The page kept showing the old card because nothing told it to reload: the "refresh after any review change" signal is sent, but nothing in the app is listening. Then:
+- opening the timeline on that leftover card showed "Anonymous" with no updates, because the review no longer exists;
 - deleting it again failed with "Could not delete", because there was nothing left to delete.
 
-The same missing listener means other changes (new review, edit, timeline add/edit/delete) can also look stale on the entity page until a hard reload.
+The same gap means new reviews, edits and timeline changes can also look stale on the entity page until a reload.
 
-**Bug 1 (subject lock in Edit).** Edit only shows the locked subject card when the review already carries its subject's details. Reviews opened from the entity page and some profile cards don't, so the form shows an empty search box instead of the locked card.
+**Bug 1 (subject lock in Edit).** Edit only shows the locked subject card when the review already carries its subject's details. Reviews opened from the entity page and some profile cards don't, so the form falls back to an empty search box.
 
 ## What will change
 
-1. **Turn on the refresh listener** so the entity page reloads its reviews, numbers and timelines right after any review is created, edited or deleted, or a timeline update is added, edited or deleted.
-2. **Delete on the entity page:** after a successful delete, the card disappears immediately. If the review is already gone ("not found"), treat it as deleted — remove the card and show "This review was already deleted" instead of an error.
-3. **Timeline window:** if the review no longer exists, close the window and refresh instead of showing "Anonymous".
-4. **Edit always shows the locked subject**, exactly like writing a review from the entity page (picture, name, type, tick, "You're reviewing …"). No search box, no remove button. If the subject details aren't on hand, the form loads them from the review's linked subject and shows a placeholder card while loading; Next stays available because the subject can't change anyway.
-5. Older unlinked reviews (no subject) keep their current text-only behaviour in Edit; they still can't pick a subject.
+1. **A small dedicated refresh listener** (not the old unused cache helper, which would also switch on unrelated background behaviour). After any successful review create, edit, visibility change, delete, or timeline add/edit/delete, the entity page and profile reload their reviews, numbers and timelines. Failed actions send no signal.
+2. **Delete:** on success the card disappears immediately, then the page reloads to confirm. If the review is already gone, it's treated as already deleted: the card is removed and you see "This review was already deleted." Permission problems and connection failures still show an error.
+3. **Timeline window:** if the review is confirmed gone, the window closes and the page refreshes. If loading just failed (e.g. offline), it keeps what it showed with a "Try again" option instead of "Anonymous". The same "already gone" handling applies to deleting the latest timeline update.
+4. **No leftover timeline cards:** the timeline list is cleared when no timeline reviews remain, and late answers from older requests are ignored, so a deleted review can't reappear.
+5. **Edit always shows the locked subject**, exactly like writing a review from the entity page (picture, name, type, tick, "You're reviewing …"). Never a search box, remove button, or new-subject creation.
+   - Subject details missing: the form loads them and shows a placeholder locked card meanwhile.
+   - Loading fails: shows "Subject unavailable — this review stays linked to its original subject and can't be reassigned", with "Try again". Moving on and saving stay blocked until the subject loads, so nothing is saved with incomplete subject information. A failure is never treated as an old unlinked review.
+6. Older unlinked reviews (no subject) keep their current behaviour; they still can't pick a subject.
 
 ## Checks
 
-- Tests: edit opened without subject details shows the locked card and no search; delete "not found" is treated as deleted; refresh fires after delete.
-- Full test suite and build.
-- Manual check for you (signed in): edit a review from the entity page and from your profile — locked card shows; delete a review with a timeline update — the card disappears immediately and doesn't come back.
+- Tests: locked card in Edit with missing details (loading, loaded, failed, retry; never a search box); "already deleted" treated as deleted while permission/connection errors stay errors; refresh signal only after success; old timeline requests can't restore a deleted review; timeline window closes only on confirmed "gone".
+- Full test suite, type check, build.
+- Manual checklist for you (signed in): edit from the entity page and your profile shows the locked card; delete a review with a timeline update — the card disappears immediately and doesn't come back, and the counts update; delete the latest timeline update — only it disappears; add a review or timeline update — it shows without reloading.
+
+No Step 3 work and no paused phases.
 
 ## Technical details
 
-- Mount `CacheProvider` inside the `QueryClientProvider` in `App.tsx` (its `REVIEWS_CHANGED_EVENT` listener invalidates `['entity-detail']`). Its existing `setInterval` cleanup is replaced with a visibility-guarded `setTimeout` loop per project rule.
-- `useTimelineReviews`: clear map when no timeline reviews remain (currently returns early and keeps stale entries).
-- `ReviewOwnerMenu.handleDelete`: `not_found` → success path (`notifyReviewsChanged`, `onDeleted`); `TimelineReviewCard`/`ReviewCard` on the entity page get an `onDeleted` that invalidates the entity query.
-- `ReviewTimelineViewer`: if the review fetch returns nothing, close and notify.
-- `ReviewForm` edit mode: when `review.entity` is missing but `entity_id` exists, fetch the entity by id (also accept the page `entity` prop when ids match) and hydrate `selectedSubject`/`selectedEntity`; `SubjectSelectStep` in edit mode never renders search/clear, renders a skeleton locked card while loading.
+- New `src/components/system/ReviewChangeInvalidationBridge.tsx`, mounted inside `QueryClientProvider` in `App.tsx`; listens only to `REVIEWS_CHANGED_EVENT` and invalidates `['entity-detail']`, `['reviews']`, plus live stats keys. `CacheProvider` stays unmounted; its listener is removed to avoid two definitions. Audit `notifyReviewsChanged` call sites so each fires only after success (including visibility change and `editLatestReviewUpdate`).
+- `useTimelineReviews`: clear map when empty; per-run generation counter (or cancelled flag in cleanup) so stale callbacks are dropped.
+- `ReviewOwnerMenu.handleDelete`: `not_found` → `notifyReviewsChanged`, `onDeleted`, info toast; entity-page `TimelineReviewCard`/`ReviewCard` get `onDeleted` that removes the card locally (hidden-id set in `ReviewsSection`) plus invalidation. Profile already refreshes.
+- `ReviewTimelineViewer`: distinguish confirmed not-found from fetch error; latest-update delete `not_found` → refresh.
+- `ReviewForm` edit mode: subject hydration state `loading | loaded | error`; when `review.entity` is missing, fetch by `entity_id` (or use page `entity` when ids match); `SubjectSelectStep` gets a locked mode with skeleton and error+retry; Next/submit disabled unless `loaded` for linked reviews; `resolution` never falls to legacy-unlinked while `entity_id` exists.
+- Add the bridge rule to `AGENTS.md`; add these fixes to `roadmap.md` under Step 2.
