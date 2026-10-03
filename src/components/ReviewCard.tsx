@@ -113,6 +113,15 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimel
             {transformedReview.verified && (
               <Badge variant="secondary" className="text-xs">Verified</Badge>
             )}
+            {isOwner && 'user' in review && (
+              <div className="ml-auto">
+                <ReviewOwnerMenu
+                  review={review}
+                  onAddTimelineUpdate={onTimelineClick ? () => onTimelineClick(review) : undefined}
+                  editableReview={review as unknown as Review}
+                />
+              </div>
+            )}
           </div>
           
           <div className="flex items-center gap-2 mb-2">
