@@ -370,4 +370,5 @@ cross-read between them.
 - [ ] Step 2 — shared owner menu on every own review + 1-hour edit window (client + review-specific DB trigger) — waits for Step 1 approval
 - [ ] Step 3 — review form vs timeline update comparison (discussion, then separate plan)
 - [x] Step 1 follow-ups: readable update links, outside results in review form, live entity stats (awaiting signed-in checks)
-- [ ] Step 1 navigation polish: open updates directly on readable URLs with one-time state; verify signed-in Back/Forward and legacy links
+- [x] Step 1 navigation polish implemented: pre-resolved readable destination, one-time state consumed after ownership check, same-URL history replacement, missing-address retry, legacy query links retained. Focused tests (43), full suite (891), type check and preview build pass.
+- [ ] Step 1 signed-in acceptance: confirm immediate readable URL and update opening, Back/Forward does not reopen, missing-address retry and legacy UUID query links; blocked by external-unmanaged authentication in automated preview.
