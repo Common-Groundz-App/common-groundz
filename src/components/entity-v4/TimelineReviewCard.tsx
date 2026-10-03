@@ -49,11 +49,8 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   
   const { user } = useAuth();
-  const { toast } = useToast();
   
   const isOwner = user?.id === review.user_id;
 
