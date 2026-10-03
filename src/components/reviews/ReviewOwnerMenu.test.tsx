@@ -42,16 +42,15 @@ async function openMenu(user: ReturnType<typeof userEvent.setup>) {
 
 describe('ReviewOwnerMenu edit-window presentation', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(NOW);
+    vi.spyOn(Date, 'now').mockReturnValue(NOW.getTime());
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('keeps owner Edit enabled inside the hour and explains the window', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     const onEdit = vi.fn();
     renderMenu('2026-10-03T11:00:01Z', { onEdit });
     await openMenu(user);
@@ -65,7 +64,7 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
   });
 
   it('keeps owner Edit visible but inert at the exact one-hour boundary', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     const onEdit = vi.fn();
     renderMenu('2026-10-03T11:00:00Z', { onEdit });
     await openMenu(user);
@@ -80,7 +79,7 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
   });
 
   it('keeps the admin bypass enabled without owner-only one-hour copy', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
     const onEdit = vi.fn();
     renderMenu('2026-10-03T10:00:00Z', { isAdmin: true, onEdit });
     await openMenu(user);
