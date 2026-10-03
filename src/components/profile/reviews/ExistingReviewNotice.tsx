@@ -9,6 +9,8 @@ interface ExistingReviewNoticeProps {
   onAddUpdate: () => void;
   onCancel: () => void;
   onRetry: () => void;
+  isOpening?: boolean;
+  openError?: boolean;
 }
 
 /**
@@ -16,7 +18,7 @@ interface ExistingReviewNoticeProps {
  * already has (or may have) a review by this person. Creation stays blocked
  * for every state shown here.
  */
-const ExistingReviewNotice = ({ state, onAddUpdate, onCancel, onRetry }: ExistingReviewNoticeProps) => {
+const ExistingReviewNotice = ({ state, onAddUpdate, onCancel, onRetry, isOpening = false, openError = false }: ExistingReviewNoticeProps) => {
   if (state === 'checking') {
     return (
       <div className="rounded-lg border border-border p-4 space-y-2" aria-live="polite" aria-busy="true">
@@ -49,13 +51,14 @@ const ExistingReviewNotice = ({ state, onAddUpdate, onCancel, onRetry }: Existin
         </p>
       </div>
       <div className="flex gap-2">
-        <Button type="button" size="sm" onClick={onAddUpdate}>
-          Add an update
+        <Button type="button" size="sm" onClick={onAddUpdate} disabled={isOpening}>
+          {isOpening ? 'Opening update…' : openError ? 'Try again' : 'Add an update'}
         </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+        <Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={isOpening}>
           Cancel
         </Button>
       </div>
+      {openError && <p className="text-sm text-destructive" role="status">We couldn't open this update. Please try again.</p>}
     </div>
   );
 };

@@ -576,11 +576,14 @@ const ReviewForm = ({
   type ExistingCheck =
     | { status: 'checking'; entityId: string }
     | { status: 'none'; entityId: string }
-    | { status: 'found'; entityId: string; reviewId: string }
+    | { status: 'found'; entityId: string; reviewId: string; canonicalPath: string | null }
     | { status: 'error'; entityId: string };
   const needsExistingCheck = !!entityId && (!isEditMode || entityId !== originalEntityId);
   const [existingCheck, setExistingCheck] = useState<ExistingCheck | null>(null);
+  const [isOpeningUpdate, setIsOpeningUpdate] = useState(false);
+  const [openUpdateError, setOpenUpdateError] = useState(false);
   const existingCheckRef = React.useRef(0);
+  const openingRef = React.useRef(false);
   const excludeReviewId = isEditMode ? review?.id : undefined;
 
   const runExistingCheck = React.useCallback(async () => {
@@ -591,7 +594,7 @@ const ReviewForm = ({
     const result = await findOwnReviewForEntity(checkedEntityId, { excludeReviewId });
     if (requestId !== existingCheckRef.current) return;
     if (result.status === 'found') {
-      setExistingCheck({ status: 'found', entityId: checkedEntityId, reviewId: result.review.id });
+      setExistingCheck({ status: 'found', entityId: checkedEntityId, reviewId: result.review.id, canonicalPath: result.canonicalPath ?? null });
     } else {
       setExistingCheck({ status: result.status, entityId: checkedEntityId });
     }
@@ -613,21 +616,36 @@ const ReviewForm = ({
         ? 'checking'
         : null;
 
-  const handleAddUpdateToExisting = () => {
-    const targetEntityId = entityId;
+  const handleAddUpdateToExisting = async () => {
+    if (openingRef.current || existingCheck?.status !== 'found' || existingCheck.entityId !== entityId) return;
+    openingRef.current = true;
+    setOpenUpdateError(false);
+    const requestId = existingCheckRef.current;
+    const targetId = existingCheck.entityId;
+    const reviewId = existingCheck.reviewId;
+    let path = existingCheck.canonicalPath;
+    if (!path) {
+      setIsOpeningUpdate(true);
+      const result = await findOwnReviewForEntity(targetId, { excludeReviewId });
+      if (requestId !== existingCheckRef.current || !isOpen) { openingRef.current = false; setIsOpeningUpdate(false); return; }
+      if (result.status === 'found' && result.review.id === reviewId) path = result.canonicalPath;
+    }
+    if (!path || requestId !== existingCheckRef.current || !isOpen) {
+      setOpenUpdateError(true);
+      setIsOpeningUpdate(false);
+      openingRef.current = false;
+      return;
+    }
     setHasUnsavedChanges(false);
     resetForm();
     onClose();
-    // Stored slug when it is a top-level entity; offerings go via the id so the
-    // entity page can build the canonical /entity/<parent>/<child> address.
-    const target = selectedEntity && selectedEntity.id === targetEntityId ? selectedEntity : null;
-    const pathKey = target?.slug && !(target as { parent_id?: string | null }).parent_id
-      ? target.slug
-      : targetEntityId;
-    navigate(`/entity/${pathKey}?compose=update`);
+    navigate(path, { state: { openReviewUpdate: { reviewId } } });
+    setIsOpeningUpdate(false);
+    openingRef.current = false;
   };
 
   const handleCancelExisting = () => {
+    existingCheckRef.current += 1;
     setHasUnsavedChanges(false);
     resetForm();
     onClose();
@@ -733,6 +751,8 @@ const ReviewForm = ({
   };
 
   const handleSubjectChange = (subject: EntityAdapter | null) => {
+    existingCheckRef.current += 1;
+    setOpenUpdateError(false);
     subjectRequestRef.current += 1;
     const requestId = subjectRequestRef.current;
 
@@ -1175,6 +1195,8 @@ const ReviewForm = ({
                 onAddUpdate={handleAddUpdateToExisting}
                 onCancel={handleCancelExisting}
                 onRetry={runExistingCheck}
+                isOpening={isOpeningUpdate}
+                openError={openUpdateError}
               />
             )}
 

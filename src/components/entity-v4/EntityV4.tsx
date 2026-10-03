@@ -275,6 +275,26 @@ const EntityV4 = () => {
 
   const userReview = ownReviewLookup?.status === 'found' ? ownReviewLookup.review : null;
 
+  // A normal in-app action arrives at the readable URL with a one-time marker.
+  // Confirm the review against the session-derived lookup before opening it.
+  const consumedUpdateLocation = useRef<string | null>(null);
+  useEffect(() => {
+    const marker = location.state?.openReviewUpdate;
+    if (!marker || typeof marker.reviewId !== 'string' || !entity || !user) return;
+    if (!ownReviewLookup || ownReviewLookup.status === 'error') return;
+    if (consumedUpdateLocation.current === location.key) return;
+    consumedUpdateLocation.current = location.key;
+    if (userReview?.id === marker.reviewId && userReview.entity_id === entity.id && userReview.user_id === user.id) {
+      setTimelineReviewId(userReview.id);
+      setIsTimelineViewerOpen(true);
+    }
+    const { openReviewUpdate: _consumed, ...remainingState } = location.state;
+    navigate(`${location.pathname}${location.search}${location.hash}`, {
+      replace: true,
+      state: remainingState,
+    });
+  }, [location, entity, user, ownReviewLookup, userReview, navigate]);
+
   // Arriving from the review form's "Add an update" (?compose=update).
   const composeUpdateHandledRef = useRef(false);
   useEffect(() => {
