@@ -279,14 +279,17 @@ export const getEntityStats = async (entityId: string, userId: string | null = n
   averageRating: number | null;
   circleRecommendationCount: number;
 }> => {
-  const { data: stats, error: statsError } = await supabase
-    .from('entity_stats_v2')
-    .select('recommendation_count, review_count, average_rating')
-    .eq('entity_id', entityId)
-    .maybeSingle();
+  // Live counts (same rules as entity_stats_v2, which only refreshes hourly).
+  const { data: liveRows, error: statsError } = await supabase.rpc(
+    'get_entity_live_stats' as any,
+    { p_entity_id: entityId } as any,
+  );
+  const stats = (Array.isArray(liveRows) ? liveRows[0] : liveRows) as
+    | { recommendation_count: number; review_count: number; average_rating: number | string | null }
+    | undefined;
 
   if (statsError) {
-    console.error('Error fetching canonical entity stats:', statsError);
+    console.error('Error fetching live entity stats:', statsError);
   }
 
   // Get circle recommendation count if user is logged in

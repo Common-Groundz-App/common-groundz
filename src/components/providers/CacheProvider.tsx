@@ -2,6 +2,7 @@
 import React, { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCacheInvalidationService } from '@/services/cacheInvalidationService';
+import { REVIEWS_CHANGED_EVENT } from '@/services/review/reviewChangeEvents';
 
 interface CacheProviderProps {
   children: React.ReactNode;
@@ -49,6 +50,15 @@ export const CacheProvider: React.FC<CacheProviderProps> = ({ children }) => {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [queryClient]);
+
+  // Any review / timeline write refreshes entity pages (live stats + list).
+  useEffect(() => {
+    const handleReviewsChanged = () => {
+      queryClient.invalidateQueries({ queryKey: ['entity-detail'] });
+    };
+    window.addEventListener(REVIEWS_CHANGED_EVENT, handleReviewsChanged);
+    return () => window.removeEventListener(REVIEWS_CHANGED_EVENT, handleReviewsChanged);
   }, [queryClient]);
 
   return <>{children}</>;

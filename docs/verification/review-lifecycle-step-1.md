@@ -22,3 +22,15 @@ Date: 2026-10-03. Project uyjtgybbktgapspodajy.
 2. Same from Profile → Reviews → add new.
 3. Entity page of something you reviewed as private or Circle-only → button says Update / Add Timeline Update, not Write Review.
 4. A subject you haven't reviewed → form works as before.
+
+## Step 1 follow-up fixes (2026-10-03)
+
+1. **Readable addresses.** "Add an update" goes to the stored slug, or to the id for offerings. EntityV4 turns `/entity/<uuid>` into the canonical `/entity/<slug>` or `/entity/<parent>/<child>`. It uses `replace`, keeps search and hash, and only fires when the param is a UUID and the path differs, so it can't loop.
+2. **Outside results in the review form.** `createIfMissing` is on, and review subjects use strict type parsing, so unknown types are refused. The shared `findOrCreateExternalEntity` (composer and review form) relies on the existing unique `entities_api_source_ref_idx` and re-reads the winner after a lost insert race. Next and Publish are blocked while the subject is being added.
+3. **Live stats.** `get_entity_live_stats(uuid)` is SECURITY INVOKER, STABLE, with `search_path=public`, and returns aggregates only.
+   - It uses the same rules as `entity_stats_v2`. There are still two copies of the SQL; rebasing the materialised view is a later step.
+   - Parity: 0 mismatches across 333 entities with no review change in the last 75 minutes.
+   - Madagascar live: 1 review, 4.0. Isha: live and the hourly summary agree (6 reviews, 4.5), using `COALESCE(latest_rating, rating)`.
+   - A signed-out RPC call returns `[{review_count, recommendation_count, average_rating}]` only.
+   - Refresh: every review write path calls `notifyReviewsChanged()` (create, edit, status, delete, timeline add, timeline undo), in both `services/review/*` and the legacy `reviewService.ts`. CacheProvider then invalidates `entity-detail`.
+4. **Unverified.** Concurrent entity creation, which needs an isolated database. Signed-in runtime flows can't be signed in automatically on this project.

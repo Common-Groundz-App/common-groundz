@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { notifyReviewsChanged } from './reviewChangeEvents';
 import { Review, ReviewCreateData, ReviewUpdateData } from './types';
 
 // Create a new review
@@ -24,6 +25,7 @@ export const createReview = async (reviewData: ReviewCreateData): Promise<Review
       throw error;
     }
 
+    notifyReviewsChanged();
     return data;
   } catch (error) {
     console.error('Error in createReview:', error);
@@ -54,6 +56,7 @@ export const updateReview = async (reviewId: string, updates: ReviewUpdateData):
       throw error;
     }
 
+    notifyReviewsChanged();
     return data;
   } catch (error) {
     console.error('Error in updateReview:', error);
@@ -74,6 +77,7 @@ export const deleteReview = async (reviewId: string): Promise<boolean> => {
       return false;
     }
 
+    notifyReviewsChanged();
     return true;
   } catch (error) {
     console.error('Error in deleteReview:', error);
@@ -94,6 +98,7 @@ export const updateReviewStatus = async (reviewId: string, status: string): Prom
       return false;
     }
 
+    notifyReviewsChanged();
     return true;
   } catch (error) {
     console.error('Error in updateReviewStatus:', error);

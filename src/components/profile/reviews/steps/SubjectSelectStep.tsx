@@ -27,6 +27,9 @@ interface SubjectSelectStepProps {
   /** Async parent-context line for offerings (e.g. "Dish at Toit"). */
   contextLine?: string | null;
   isResolvingContext?: boolean;
+  /** Reports while an outside search result is being saved to Groundz. */
+  onAddingChange?: (adding: boolean) => void;
+  isAdding?: boolean;
 }
 
 export const SubjectThumbnail = ({ subject }: { subject: EntityAdapter }) => {
@@ -66,6 +69,8 @@ const SubjectSelectStep = ({
   onContinueWithoutSubject,
   contextLine,
   isResolvingContext = false,
+  onAddingChange,
+  isAdding = false,
 }: SubjectSelectStepProps) => {
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const { log: logFunnel } = useSearchFunnel();
@@ -112,12 +117,19 @@ const SubjectSelectStep = ({
           maxEntities={1}
           recentsSurface="review_subject"
           allowInlineCreate={false}
-          externalResultPolicy="existingOnly"
+          externalResultPolicy="createIfMissing"
+          onResolvingChange={onAddingChange}
           onEntitiesChange={(entities) => onSubjectChange(entities[0] ?? null)}
         />
       )}
 
-      {!subject && !disabled && (
+      {!subject && isAdding && (
+        <p className="text-center text-sm text-muted-foreground" role="status">
+          Adding to Groundz…
+        </p>
+      )}
+
+      {!subject && !disabled && !isAdding && (
         <div className="text-center space-y-2">
           <Button
             type="button"

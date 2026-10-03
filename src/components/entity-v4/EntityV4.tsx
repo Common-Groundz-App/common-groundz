@@ -19,6 +19,7 @@ import { EntityFollowerModal } from '@/components/entity/EntityFollowerModal';
 import { EntityRecommendationModal } from '@/components/entity/EntityRecommendationModal';
 import { Entity } from '@/services/recommendation/types';
 import { useUserFollowing } from '@/hooks/useUserFollowing';
+import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
 import { useEntitySiblings } from '@/hooks/use-entity-siblings';
 import { useNavigate } from 'react-router-dom';
@@ -139,6 +140,20 @@ const EntityV4 = () => {
     entity?.id || null,
     entity?.parent_id || null
   );
+
+  // Old /entity/<uuid> links switch to the stored readable address (with the
+  // parent for offerings), keeping ?query and #hash. Replace, so Back skips it.
+  useEffect(() => {
+    if (!entity?.slug) return;
+    if (!isUUID(entitySlug)) return;
+    if (entity.parent_id && isLoadingHierarchy) return;
+    const canonical =
+      entity.parent_id && parentEntity?.slug
+        ? getHierarchicalEntityUrl(parentEntity, entity)
+        : getEntityUrl(entity);
+    if (canonical === location.pathname) return;
+    navigate(`${canonical}${location.search}${location.hash}`, { replace: true });
+  }, [entity, entitySlug, parentEntity, isLoadingHierarchy, location.pathname, location.search, location.hash, navigate]);
 
   // Fetch circle rating data and user following data
   const { user, isLoading: authLoading } = useAuth();

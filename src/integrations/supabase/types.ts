@@ -4384,6 +4384,14 @@ export type Database = {
           username: string
         }[]
       }
+      get_entity_live_stats: {
+        Args: { p_entity_id: string }
+        Returns: {
+          average_rating: number
+          recommendation_count: number
+          review_count: number
+        }[]
+      }
       get_entity_recommenders: {
         Args: {
           p_entity_id: string

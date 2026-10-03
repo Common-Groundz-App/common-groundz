@@ -58,6 +58,8 @@ const nodeIncludes = [
   'src/services/review/__tests__/recommendationResolver.test.ts',
   'src/services/review/__tests__/timelineRecommendation.test.ts',
   'src/services/review/__tests__/ownReview.test.ts',
+  'src/services/review/__tests__/reviewChangeEvents.test.ts',
+  'src/services/__tests__/externalEntityImport.test.ts',
   'src/components/profile/reviews/__tests__/questionnaireVocabularyLint.test.ts',
   'src/components/profile/reviews/__tests__/questionnaireMatrix.test.ts',
   'src/components/profile/reviews/__tests__/curatedTagInput.test.ts',
