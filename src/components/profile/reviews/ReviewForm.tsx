@@ -1100,9 +1100,8 @@ const ReviewForm = ({
           rating,
           image_url,
           media: selectedMedia,
-          category: persistedCategory,
+          // Subject identity (entity_id, category) is locked in Edit and never sent.
           visibility: visibility as "public" | "private" | "circle_only", // Match what the API expects
-          entity_id: entityId,
           experience_date: formattedExperienceDate,
           metadata,
         });
