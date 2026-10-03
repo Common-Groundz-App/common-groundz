@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { ReviewOwnerMenu } from '@/components/reviews/ReviewOwnerMenu';
-import { deleteReview, updateReviewStatus } from '@/services/reviewService';
+import { updateReviewStatus } from '@/services/reviewService';
 import ReviewForm from './ReviewForm';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
@@ -61,9 +61,7 @@ const ReviewCard = ({
 }: ReviewCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   
   const isOwner = user?.id === review.user_id;
@@ -134,37 +132,6 @@ const ReviewCard = ({
     return colors[canonical] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
   };
 
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!user) return;
-    
-    setIsDeleting(true);
-    try {
-      await deleteReview(review.id);
-      
-      toast({
-        title: "Review deleted",
-        description: "Your review has been deleted successfully"
-      });
-      
-      setIsDeleteDialogOpen(false);
-      refreshReviews();
-    } catch (error) {
-      console.error("Error deleting review:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete review",
-        variant: "destructive"
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const handleStatusChange = async (status: 'published' | 'flagged' | 'deleted') => {
     try {
@@ -405,14 +372,6 @@ const ReviewCard = ({
         )}
 
         {/* Delete Confirmation Dialog */}
-        <DeleteConfirmationDialog
-          isOpen={isDeleteDialogOpen}
-          onClose={() => setIsDeleteDialogOpen(false)}
-          onConfirm={handleDeleteConfirm}
-          title="Delete Review"
-          description="Are you sure you want to delete this review? This action cannot be undone."
-          isLoading={isDeleting}
-        />
         
         {/* Edit Form Dialog */}
         {isEditing && (
@@ -651,14 +610,6 @@ const ReviewCard = ({
       )}
 
       {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Review"
-        description="Are you sure you want to delete this review? This action cannot be undone."
-        isLoading={isDeleting}
-      />
       
       {/* Edit Form Dialog */}
       {isEditing && (
