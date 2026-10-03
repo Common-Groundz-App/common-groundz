@@ -4063,6 +4063,7 @@ export type Database = {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
       }
+      delete_review_thread: { Args: { p_review_id: string }; Returns: Json }
       detect_potential_duplicates:
         | {
             Args: never
@@ -4074,6 +4075,17 @@ export type Database = {
             }[]
           }
         | { Args: { similarity_threshold?: number }; Returns: number }
+      edit_latest_review_update: {
+        Args: {
+          p_comment: string
+          p_media: Json
+          p_rating: number
+          p_review_id: string
+          p_update_id: string
+          p_would_recommend: string
+        }
+        Returns: Json
+      }
       entity_slug_is_taken: {
         Args: { candidate: string; exclude_entity_id?: string }
         Returns: boolean
