@@ -1,4 +1,5 @@
 import type { Json } from '@/integrations/supabase/types';
+import { notifyReviewsChanged } from './reviewChangeEvents';
 import { supabase } from '@/integrations/supabase/client';
 import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
 import { ReviewUpdate } from './types';
@@ -152,6 +153,7 @@ export const addReviewUpdate = async (
       return false;
     }
 
+    notifyReviewsChanged();
     return true;
   } catch (error) {
     console.error('Error in addReviewUpdate:', error);
@@ -181,7 +183,10 @@ export const deleteLatestReviewUpdate = async (
     }
 
     const status = (data as { status?: string } | null)?.status;
-    if (status === 'deleted') return 'deleted';
+    if (status === 'deleted') {
+      notifyReviewsChanged();
+      return 'deleted';
+    }
     if (status === 'conflict') return 'conflict';
     if (status === 'not_found') return 'not_found';
     return 'error';

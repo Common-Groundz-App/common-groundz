@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { notifyReviewsChanged } from './review/reviewChangeEvents';
 import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
 import { resolveSubjectRelation, type SubjectLookupOutcome, type SubjectRelation } from '@/services/reviewSubjectRelation';
 
@@ -130,6 +131,7 @@ export const createReview = async (reviewData: {
       throw error;
     }
 
+    notifyReviewsChanged();
     return data;
   } catch (error) {
     console.error('Error in createReview:', error);
@@ -234,6 +236,7 @@ export const updateReview = async (reviewId: string, updates: {
       throw error;
     }
 
+    notifyReviewsChanged();
     return data;
   } catch (error) {
     console.error('Error in updateReview:', error);
@@ -254,6 +257,7 @@ export const deleteReview = async (reviewId: string): Promise<boolean> => {
       return false;
     }
 
+    notifyReviewsChanged();
     return true;
   } catch (error) {
     console.error('Error in deleteReview:', error);
@@ -274,6 +278,7 @@ export const updateReviewStatus = async (reviewId: string, status: string): Prom
       return false;
     }
 
+    notifyReviewsChanged();
     return true;
   } catch (error) {
     console.error('Error in updateReviewStatus:', error);
@@ -483,6 +488,7 @@ export const addReviewUpdate = async (reviewId: string, userId: string, rating: 
       return false;
     }
 
+    notifyReviewsChanged();
     return true;
   } catch (error) {
     console.error('Error in addReviewUpdate:', error);
