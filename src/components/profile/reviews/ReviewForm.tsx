@@ -1160,6 +1160,15 @@ const ReviewForm = ({
               onStepClick={handleStepClick}
             />
             
+            {currentStep >= 2 && existingNoticeState && (
+              <ExistingReviewNotice
+                state={existingNoticeState}
+                onAddUpdate={handleAddUpdateToExisting}
+                onCancel={handleCancelExisting}
+                onRetry={runExistingCheck}
+              />
+            )}
+
             {/* Step content */}
             <div className="min-h-[400px]">
               {currentStep === 1 && (
