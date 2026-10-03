@@ -9,7 +9,8 @@ Make review editing behave like the existing post menu: **Edit remains visible a
    - Keep **Edit** visible whenever the review has an edit action, instead of removing it after one hour.
    - During the first hour, keep Edit enabled and show: **“You can edit for 1 hour after publishing.”**
    - After one hour, disable Edit using the same menu-item pattern already used by posts and show: **“Edit window closed (1 hour limit)”**.
-   - Preserve the existing admin bypass, Add timeline update, Delete, and confirmation behavior.
+   - Preserve the existing server-authorized admin bypass. An exempt admin keeps Edit enabled and receives no owner-only one-hour message.
+   - Preserve Add timeline update, Delete, and confirmation behavior.
 
 2. **Latest timeline update menu**
    - Apply the same enabled/disabled Edit presentation to the newest timeline update.
@@ -17,9 +18,9 @@ Make review editing behave like the existing post menu: **Edit remains visible a
    - Preserve the current delete action and confirmations.
 
 3. **Desktop and mobile interaction**
-   - Reuse the existing post tooltip components and interaction pattern so mouse hover and touch/tap behavior remain consistent with posts.
+   - Reuse the existing post tooltip components and menu-item interaction pattern so mouse hover, keyboard focus, and touch/tap behavior remain consistent with posts.
    - Do not change post menus, the one-hour calculation, database enforcement, or any other review actions.
 
 4. **Verification**
-   - Add focused coverage for enabled, expired, owner, admin, and latest/non-latest timeline-update states.
-   - Verify the menu visually on desktop and mobile: enabled Edit opens editing; expired Edit cannot open editing; both tooltip messages are reachable; Add timeline update and Delete still work as before.
+   - Add focused coverage for owner enabled/expired states, the admin bypass, and latest/non-latest timeline-update states, including the exact one-hour boundary.
+   - Verify the menu visually on desktop and mobile: enabled Edit opens editing; expired Edit cannot open editing; both owner tooltip messages are reachable by hover, keyboard focus, and touch/tap; admin copy is accurate; Add timeline update and Delete still work as before.
