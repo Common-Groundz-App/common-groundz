@@ -1,29 +1,69 @@
 # Fix three issues found while testing Step 1
 
+These are fixes for problems found while testing Step 1. Step 1 isn't done until they pass. Step 2, Step 3 and the paused phases have not started.
+
 ## 1. "Add an update" opens a link with a long ID instead of the readable name
-**Why:** the review form sends you to `/entity/<id>`, not the entity's readable name (for example `/entity/isha-foundation-chikkaballapura`). The page still loads, but the address bar shows the ID.
+**Why:** the review form sends you to `/entity/<id>`, not the entity's stored readable address (for example `/entity/isha-foundation-chikkaballapura` or `/entity/skin1004/madagascar-centella-quick-calming-pad`).
 
 **Fix:**
-- The form already has the selected subject, including its readable name and its parent if it has one. Build the link with the app's existing link helper, so it matches every other entity link: `/entity/<name>` or `/entity/<brand>/<name>`.
-- When the entity page is opened with an ID, it quietly swaps the address for the readable one. Your place in the page and the `?compose=update` that opens the update form are kept. This covers old links and any spot that still uses IDs.
-- Search the app for other links built from entity IDs and switch them to the shared helper.
+- The form already has the saved subject, with its stored readable name and its parent's. The link is built with the app's shared link helper, so it matches every other entity link. Readable names are never made up from the display name.
+- If someone opens an old `/entity/<id>` link, the page switches to the readable address once it knows which entity it is.
+  - Anything after the address is kept: `?compose=update` and any `#section`.
+  - The address is only changed when it's actually different, so it can't loop.
+  - Back doesn't land on the old ID address.
+- Other ID-based links in the app are checked one by one. A link only moves to the shared helper if it really takes you to an entity page and already has the readable name. Places that only have an ID keep it and rely on the switch above.
 
 ## 2. "We can't add this one yet" when you pick an outside search result
-**Why:** this is not a bug. During the earlier subject work, the review form's search was deliberately limited to things already on Groundz. Search results from outside sources (movies, books, places) are shown but blocked. Creating them in the background still works in the post composer. It was just switched off here.
+**Why:** this is not a bug. During the earlier subject work, the review form's search was deliberately limited to things already on Groundz. Creating items in the background still works in the post composer. It was just switched off here.
 
-**Fix:** turn creation back on for the review form. It will use the same tested path as the composer: first check whether the item is already on Groundz, then create it if not. After that, the duplicate-review check from Step 1 runs on the result as usual. Results whose type can't be read get a clear message instead of being guessed (taxonomy rule).
+**Fix:** turn creation back on in the review form, using the same tested path as the composer. The steps, in order:
+1. Read the result's type strictly. If the type isn't recognised, show a clear message. It is never saved as "others".
+2. Check whether the item is already on Groundz.
+3. Create it only if it's missing.
+4. Wait until it's saved and has a real ID.
+5. Run the Step 1 "already reviewed?" check on that saved item.
+6. Let you continue.
+
+While steps 2–5 run, the selected row says "Adding to Groundz…" and Next and Publish stay disabled. If it fails, nothing stays selected and you can try again. A retry reuses the item if it was already created, so you don't get duplicates.
 
 ## 3. The rating on the entity page doesn't change after a review
-**Why (confirmed):** the review is saved correctly: public, published, rating 4. But the page reads its numbers from a summary table that is only rebuilt once an hour (at :05 past each hour). That table still shows 0 reviews for this product. So every new review takes up to an hour to show, and refreshing the page doesn't help.
+**Why (confirmed):** your review is saved correctly: public, published, rating 4. The page reads its numbers from a summary that is rebuilt once an hour, and that summary still shows 0 reviews.
 
-**Fix:** the entity page's Overall Rating, review count and "Total Reviews / Average Rating" tiles will count straight from the reviews themselves, so they're correct as soon as a review is published, updated or deleted. The hourly summary stays as it is for lists and trending, where a short delay is fine. After you publish, the page refreshes these numbers right away.
+**Fix:** the entity page's Overall Rating, review count, Recommendations and Average tiles will all read one fresh count, taken straight from the reviews. That count follows exactly the same rules as the hourly summary (checked):
+- Only public, published reviews with a linked subject count. Your own private or Circle-only review never changes the public numbers.
+- One contribution per person per subject: their newest review.
+- The rating used is the **current** one. If a timeline update changed your rating, the latest update's rating counts, not the original one.
+- Recommending is counted from the review's current recommending state.
+- Deleted subjects show nothing, and a subject with no reviews shows zero.
+
+To stop the two sets of rules drifting apart, they are written down once in a shared database definition. The fresh count reads from it, and a check confirms the hourly summary gives the same numbers after its next rebuild. The hourly summary itself stays as it is for lists and trending.
+
+The page re-reads the count right after any of these:
+- publishing, editing or deleting a review
+- changing a review's visibility or subject
+- adding a timeline update
+- undoing a timeline update
 
 ## Checks
-- Focused tests for the update link, outside-result creation in the review form, and the live rating count. Then the full test suite, a type check and the build log.
-- Read-only check that the live count for Madagascar Centella shows 1 review at 4.0.
-- Signed-in checks for you: Add an update shows the readable address; pick an outside movie in Create → Review; publish a review and see the rating change without waiting.
+- Focused tests:
+  - The update link uses readable addresses, including brand/product ones. Old ID links switch over, keeping `?...` and `#...`, with no loop.
+  - Outside results: pending state, a failure that clears the selection, a retry with no duplicate, and an unknown type refused.
+  - The fresh count is re-read after every action in the list above.
+- Then the full test suite, a type check and the build log.
+- Read-only checks:
+  - Madagascar Centella shows 1 review at 4.0 in the fresh count.
+  - The fresh count and the hourly summary agree for every subject whose data hasn't changed since the last rebuild.
+  - Isha Foundation's average uses the latest timeline rating.
+- Signed-in checks for you:
+  - Add an update lands on the readable address and the update form opens. Refreshing it works, and Back behaves normally.
+  - Pick an outside movie in Create → Review.
+  - Publish a public review: the numbers change at once.
+  - A private or Circle-only review doesn't change them.
+  - Add a timeline rating, then undo it: the average moves, then moves back.
+  - Delete a review: the count drops.
 
 ## Technical details
-- ReviewForm `handleAddUpdateToExisting`: use `getEntityUrlWithParent`/`getEntityUrl` from `utils/entityUrlUtils`, plus `?compose=update`. EntityV4: when the route param is a UUID and the loaded entity has a slug, call `navigate(canonical + search, { replace: true })`. Use `rg` to find `/entity/${...id}` templates and replace them.
-- SubjectSelectStep: `externalResultPolicy="createIfMissing"`. Keep `allowInlineCreate={false}` and the strict `parseEntityTypeAtBoundary` path for review subjects, so unknown types are refused, not saved as `others`.
-- New `get_entity_live_stats(entity_id)` SQL function (stable, security invoker): count, average rating and recommending count over published public reviews, using the same rules as `entity_stats_v2`. EntityV4 stats hook uses it for the header and tiles. Invalidate the query after review publish, update or delete. `entity_stats_v2` and its hourly cron are unchanged.
+- URL: `getEntityUrlWithParent` (stored `slug`/`parent_slug`) in `handleAddUpdateToExisting`. In EntityV4, if `isUUID(param)` and the canonical path is not equal to `location.pathname`, then `navigate(canonical + location.search + location.hash, { replace: true })`. Audit `/entity/${…id}` with `rg`, and convert only call sites that have slug data.
+- External: SubjectSelectStep `externalResultPolicy="createIfMissing"` with `allowInlineCreate={false}`. Keep strict `parseEntityTypeAtBoundary` for review subjects. Expose an `isResolving` callback from UnifiedEntitySelector so ReviewForm can block progression. `onSubjectChange` only receives the persisted entity. Dedupe uses `findEntityByApiRef`, so retries are idempotent.
+- Stats: a new security-invoker view `public.entity_review_stats_canonical`, with exactly the canonical CTE and aggregation of `entity_stats_v2` (`DISTINCT ON (user_id, entity_id)` newest, `COALESCE(latest_rating, rating)`, `is_recommended`, public + published, `entities.is_deleted = false`). Plus `get_entity_live_stats(p_entity_id uuid)`, which reads from it. Grants go to anon, authenticated and service_role. The materialized view is not rebuilt now. Re-basing it on the shared view is a later, separate step, so a parity query stands in for that until then. One React Query key covers the header and tiles. It is invalidated by review create/update/delete, visibility/entity changes, timeline insert and timeline undo.
+- roadmap.md gets these three fixes as Step 1 follow-ups once building starts.
