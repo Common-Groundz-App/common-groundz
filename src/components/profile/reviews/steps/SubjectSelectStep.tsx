@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { X, Check, PlusCircle } from 'lucide-react';
 import { UnifiedEntitySelector } from '@/components/feed/UnifiedEntitySelector';
 import { EntityAdapter } from '@/components/profile/circles/types';
@@ -30,6 +31,14 @@ interface SubjectSelectStepProps {
   /** Reports while an outside search result is being saved to Groundz. */
   onAddingChange?: (adding: boolean) => void;
   isAdding?: boolean;
+  /**
+   * Edit mode for a linked review: the subject can never change. When the
+   * subject details are not loaded yet this shows a placeholder or an
+   * "unavailable" card — never the search box.
+   */
+  locked?: boolean;
+  lockedStatus?: 'loading' | 'error' | 'ready';
+  onRetryLocked?: () => void;
 }
 
 export const SubjectThumbnail = ({ subject }: { subject: EntityAdapter }) => {
@@ -71,7 +80,11 @@ const SubjectSelectStep = ({
   isResolvingContext = false,
   onAddingChange,
   isAdding = false,
+  locked = false,
+  lockedStatus = 'ready',
+  onRetryLocked,
 }: SubjectSelectStepProps) => {
+  const isLocked = locked || disabled;
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const { log: logFunnel } = useSearchFunnel();
 
@@ -98,7 +111,7 @@ const SubjectSelectStep = ({
                 : contextLine || getEntityTypeLabel(subject.type)}
             </p>
           </div>
-          {!disabled && (
+          {!isLocked && (
             <Button
               type="button"
               variant="ghost"
@@ -109,6 +122,26 @@ const SubjectSelectStep = ({
               <X className="h-4 w-4" />
             </Button>
           )}
+        </div>
+      ) : locked && lockedStatus === 'error' ? (
+        <div className="rounded-xl border bg-muted/30 p-4 text-center space-y-2" role="alert">
+          <p className="font-medium">Subject unavailable</p>
+          <p className="text-sm text-muted-foreground">
+            This review stays linked to its original subject and can't be reassigned.
+          </p>
+          {onRetryLocked && (
+            <Button type="button" variant="outline" size="sm" onClick={onRetryLocked}>
+              Try again
+            </Button>
+          )}
+        </div>
+      ) : locked ? (
+        <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3" aria-busy="true" data-testid="locked-subject-skeleton">
+          <Skeleton className="h-12 w-12 rounded-lg" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-3 w-1/4" />
+          </div>
         </div>
       ) : (
         <UnifiedEntitySelector
@@ -123,13 +156,13 @@ const SubjectSelectStep = ({
         />
       )}
 
-      {!subject && isAdding && (
+      {!subject && !isLocked && isAdding && (
         <p className="text-center text-sm text-muted-foreground" role="status">
           Adding to Groundz…
         </p>
       )}
 
-      {!subject && !disabled && !isAdding && (
+      {!subject && !isLocked && !isAdding && (
         <div className="text-center space-y-2">
           <Button
             type="button"
@@ -162,7 +195,7 @@ const SubjectSelectStep = ({
         }
       />
 
-      {disabled && subject && (
+      {isLocked && subject && (
         <p className="text-center text-sm text-muted-foreground">
           You're reviewing {subject.name}.
         </p>
