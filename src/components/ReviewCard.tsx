@@ -30,9 +30,11 @@ interface ReviewCardProps {
   onHelpfulClick?: (reviewId: string) => void;
   /** Opens the timeline viewer for this review (owner's Add timeline update). */
   onTimelineClick?: (review: ReviewWithUser) => void;
+  /** Called after the review is deleted (or found already deleted). */
+  onDeleted?: (reviewId: string) => void;
 }
 
-const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimelineClick }) => {
+const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimelineClick, onDeleted }) => {
   const { user } = useAuth();
   const isOwner = 'user' in review && !!user && user.id === review.user_id;
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -119,6 +121,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimel
                   review={review}
                   onAddTimelineUpdate={onTimelineClick ? () => onTimelineClick(review) : undefined}
                   editableReview={review as unknown as Review}
+                  onDeleted={onDeleted ? () => onDeleted(review.id) : undefined}
                 />
               </div>
             )}

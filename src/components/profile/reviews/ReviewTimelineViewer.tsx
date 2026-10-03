@@ -21,6 +21,8 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { fetchReviewWithSummary, type Review } from '@/services/reviewService';
+import { checkReviewExists } from '@/services/review/core';
+import { notifyReviewsChanged } from '@/services/review/reviewChangeEvents';
 import {
   addReviewUpdate,
   deleteLatestReviewUpdate,
@@ -682,7 +684,16 @@ export const ReviewTimelineViewer = ({
                 );
               })}
 
-              {timelineUpdates.length === 0 && (
+              {loadFailed && (
+                <div className="text-center py-4 text-sm text-muted-foreground" role="status">
+                  <p>Couldn't load this timeline.</p>
+                  <Button variant="outline" size="sm" className="mt-2" onClick={() => loadTimelineData()}>
+                    Try again
+                  </Button>
+                </div>
+              )}
+
+              {!loadFailed && timelineUpdates.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <p>No timeline updates yet.</p>
                   {isOwner && (
