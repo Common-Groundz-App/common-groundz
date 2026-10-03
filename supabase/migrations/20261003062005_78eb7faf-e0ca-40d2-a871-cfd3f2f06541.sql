@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX reviews_one_per_user_entity ON public.reviews (user_id, entity_id) WHERE entity_id IS NOT NULL;

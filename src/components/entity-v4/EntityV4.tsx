@@ -27,6 +27,7 @@ import { getHierarchicalEntityUrl, getEntityUrlWithParent } from '@/utils/entity
 import { formatSlugAsName } from '@/utils/formatSlug';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { useQueryClient } from '@tanstack/react-query';
+import { findOwnReviewForEntity, type OwnReviewLookup } from '@/services/review/ownReview';
 
 // Imported extracted components
 import { EntityHeader } from './EntityHeader';
@@ -238,10 +239,40 @@ const EntityV4 = () => {
   }, [searchParams, user, entity, setSearchParams]);
   
   
-  const userReview = React.useMemo(() => {
-    if (!user || !reviews) return null;
-    return reviews.find(review => review.user_id === user.id);
-  }, [user, reviews]);
+  // Review Lifecycle Step 1 — the viewer's own review at ANY visibility, from
+  // the shared lookup (the page's review list is public-only). A failed lookup
+  // leaves "Write Review"; the form's own check then blocks with Try again.
+  const [ownReviewLookup, setOwnReviewLookup] = useState<OwnReviewLookup | null>(null);
+  const [ownReviewRefresh, setOwnReviewRefresh] = useState(0);
+  useEffect(() => {
+    if (!user || !entity?.id) {
+      setOwnReviewLookup(null);
+      return;
+    }
+    let cancelled = false;
+    findOwnReviewForEntity(entity.id).then((result) => {
+      if (!cancelled) setOwnReviewLookup(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, entity?.id, reviews, ownReviewRefresh]);
+
+  const userReview = ownReviewLookup?.status === 'found' ? ownReviewLookup.review : null;
+
+  // Arriving from the review form's "Add an update" (?compose=update).
+  const composeUpdateHandledRef = useRef(false);
+  useEffect(() => {
+    if (composeUpdateHandledRef.current) return;
+    if (searchParams.get('compose') !== 'update') return;
+    if (!userReview) return;
+    composeUpdateHandledRef.current = true;
+    setTimelineReviewId(userReview.id);
+    setIsTimelineViewerOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('compose');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, userReview, setSearchParams]);
 
   const getSidebarButtonConfig = () => {
     if (!userReview) {
@@ -286,6 +317,7 @@ const EntityV4 = () => {
   const handleReviewSubmit = async () => {
     try {
       setIsReviewFormOpen(false);
+      setOwnReviewRefresh((n) => n + 1);
       toast({
         title: "Review submitted",
         description: "Your review has been added successfully"

@@ -4,6 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { createReview, updateReview, Review } from '@/services/reviewService';
+import { useNavigate } from 'react-router-dom';
+import { findOwnReviewForEntity, isOwnReviewUniqueViolation } from '@/services/review/ownReview';
+import ExistingReviewNotice from './ExistingReviewNotice';
 import { EntityType, Entity as RecommendationEntity } from '@/services/recommendation/types'; 
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import { ensureHttps } from '@/utils/urlUtils';
@@ -203,6 +206,8 @@ const ReviewForm = ({
   
   // Update the type of selectedEntity to be compatible with both Entity types
   const [selectedEntity, setSelectedEntity] = useState<RecommendationEntity | null>(null);
+
+  const navigate = useNavigate();
   
   /**
    * Phase 3A — questionnaire resolution. Three explicit modes; a linked subject
@@ -559,6 +564,65 @@ const ReviewForm = ({
   const handleCancelExit = () => {
     setShowExitConfirmation(false);
   };
+
+  /**
+   * Review Lifecycle Step 1 — one review per person per subject. Every new
+   * subject (create, or a changed subject while editing) is checked against
+   * the signed-in owner's reviews at every visibility. Anything other than a
+   * confirmed `none` for the CURRENT subject blocks progression and publish.
+   */
+  type ExistingCheck =
+    | { status: 'checking'; entityId: string }
+    | { status: 'none'; entityId: string }
+    | { status: 'found'; entityId: string; reviewId: string }
+    | { status: 'error'; entityId: string };
+  const needsExistingCheck = !!entityId && (!isEditMode || entityId !== originalEntityId);
+  const [existingCheck, setExistingCheck] = useState<ExistingCheck | null>(null);
+  const existingCheckRef = React.useRef(0);
+  const excludeReviewId = isEditMode ? review?.id : undefined;
+
+  const runExistingCheck = React.useCallback(async () => {
+    if (!needsExistingCheck) return;
+    const requestId = ++existingCheckRef.current;
+    const checkedEntityId = entityId;
+    setExistingCheck({ status: 'checking', entityId: checkedEntityId });
+    const result = await findOwnReviewForEntity(checkedEntityId, { excludeReviewId });
+    if (requestId !== existingCheckRef.current) return;
+    if (result.status === 'found') {
+      setExistingCheck({ status: 'found', entityId: checkedEntityId, reviewId: result.review.id });
+    } else {
+      setExistingCheck({ status: result.status, entityId: checkedEntityId });
+    }
+  }, [needsExistingCheck, entityId, excludeReviewId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    runExistingCheck();
+  }, [isOpen, runExistingCheck]);
+
+  const existingBlocks =
+    needsExistingCheck &&
+    !(existingCheck?.status === 'none' && existingCheck.entityId === entityId);
+  const existingNoticeState =
+    needsExistingCheck && existingCheck && existingCheck.entityId === entityId && existingCheck.status !== 'none'
+      ? existingCheck.status
+      : needsExistingCheck && existingBlocks
+        ? 'checking'
+        : null;
+
+  const handleAddUpdateToExisting = () => {
+    const targetEntityId = entityId;
+    setHasUnsavedChanges(false);
+    resetForm();
+    onClose();
+    navigate(`/entity/${targetEntityId}?compose=update`);
+  };
+
+  const handleCancelExisting = () => {
+    setHasUnsavedChanges(false);
+    resetForm();
+    onClose();
+  };
   
   // Handle adding a new media item
   const handleAddMedia = (media: MediaItem) => {
@@ -756,6 +820,8 @@ const ReviewForm = ({
       return;
     }
     
+    if (currentStep >= 2 && existingBlocks) return;
+
     if (currentStep === 2 && !allowsMissingSubject(requirement) && !selectedSubject) {
       toast({
         title: 'Subject required',
@@ -808,6 +874,9 @@ const ReviewForm = ({
   
   const handleFormSubmit = async () => {
     if (!requireAuth({ action: 'review', surface: 'review_form', entityId, entityName: selectedSubject?.name || legacyTitle })) return;
+
+    // Review Lifecycle Step 1 — never publish without a confirmed "not reviewed yet".
+    if (existingBlocks) return;
     
     // Phase 2.4 — new reviews and linked edits must have a real subject.
     if (!allowsMissingSubject(requirement) && !entityId) {
@@ -997,6 +1066,12 @@ const ReviewForm = ({
       onClose();
     } catch (error) {
       console.error('Error saving review:', error);
+      // A concurrent save (double-tap, another tab) already created this
+      // person's review for the subject: recover to "Add an update".
+      if (isOwnReviewUniqueViolation(error)) {
+        await runExistingCheck();
+        return;
+      }
       toast({
         title: 'Error',
         description: 'Failed to save review. Please try again.',
@@ -1024,6 +1099,7 @@ const ReviewForm = ({
   // Determine if the next button should be disabled
   const isNextDisabled = () => {
     if (isSubmitting) return true;
+    if (currentStep >= 2 && existingBlocks) return true;
     // A linked subject with an unusable type is not a questionnaire with zero
     // required fields — it is an unusable subject and blocks the whole wizard.
     if (resolution.mode === 'invalid' && currentStep >= 2) return true;
@@ -1084,6 +1160,15 @@ const ReviewForm = ({
               onStepClick={handleStepClick}
             />
             
+            {currentStep >= 2 && existingNoticeState && (
+              <ExistingReviewNotice
+                state={existingNoticeState}
+                onAddUpdate={handleAddUpdateToExisting}
+                onCancel={handleCancelExisting}
+                onRetry={runExistingCheck}
+              />
+            )}
+
             {/* Step content */}
             <div className="min-h-[400px]">
               {currentStep === 1 && (
