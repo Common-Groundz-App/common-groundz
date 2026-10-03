@@ -4,7 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Calendar, User, Sparkles, AlertCircle, Undo2 } from 'lucide-react';
+import { Plus, Calendar, User, Sparkles, AlertCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
+import {
+  canEditTimelineUpdate,
+  UPDATE_DELETE_DESCRIPTION,
+  UPDATE_DELETE_TITLE,
+} from '@/utils/reviewEditPolicy';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +24,7 @@ import { fetchReviewWithSummary, type Review } from '@/services/reviewService';
 import {
   addReviewUpdate,
   deleteLatestReviewUpdate,
+  editLatestReviewUpdate,
   fetchLatestRecommendationIntent,
   fetchReviewUpdates,
   type WouldRecommendValue,
@@ -75,6 +88,8 @@ export const ReviewTimelineViewer = ({
   const [wouldRecommend, setWouldRecommend] = useState<RecommendationIntent | null>(null);
   const [baseOnRating, setBaseOnRating] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);
+  const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const MAX_MEDIA_COUNT = 4;
 
@@ -178,7 +193,8 @@ export const ReviewTimelineViewer = ({
     try {
       const result = await deleteLatestReviewUpdate(reviewId, updateId);
       if (result === 'deleted') {
-        toast({ title: 'Update undone', description: 'Your timeline update has been removed' });
+        setConfirmDeleteId(null);
+        toast({ title: 'Timeline update deleted', description: 'Your review and earlier updates remain.' });
         await Promise.all([loadTimelineData(), loadLatestIntent(), loadParentReview()]);
         if (onTimelineUpdate) onTimelineUpdate();
       } else if (result === 'conflict') {
@@ -199,8 +215,71 @@ export const ReviewTimelineViewer = ({
     }
   };
 
+  const resetUpdateForm = () => {
+    setNewRating(null);
+    setNewComment('');
+    setSelectedMedia([]);
+    setWouldRecommend(null);
+    setBaseOnRating(false);
+    setIsAddingUpdate(false);
+    setEditingUpdateId(null);
+  };
+
+  const startEditUpdate = (update: ReviewUpdate) => {
+    setEditingUpdateId(update.id);
+    setNewRating(update.rating ?? null);
+    setNewComment(update.comment || '');
+    setSelectedMedia(update.media || []);
+    const wr = update.would_recommend;
+    if (wr === 'yes' || wr === 'maybe' || wr === 'no') {
+      setWouldRecommend(wr);
+      setBaseOnRating(false);
+    } else {
+      setWouldRecommend(null);
+      setBaseOnRating(wr === 'auto');
+    }
+    setIsAddingUpdate(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingUpdateId || !newComment.trim()) return;
+    setIsSubmitting(true);
+    try {
+      const result = await editLatestReviewUpdate(
+        reviewId,
+        editingUpdateId,
+        newRating,
+        newComment.trim(),
+        selectedMedia,
+        baseOnRating ? null : wouldRecommend,
+      );
+      if (result === 'ok') {
+        toast({ title: 'Timeline update saved' });
+        resetUpdateForm();
+        await Promise.all([loadTimelineData(), loadLatestIntent(), loadParentReview()]);
+        onTimelineUpdate?.();
+      } else if (result === 'expired') {
+        // Keep everything typed; offer to add it as a new timeline update.
+        setEditingUpdateId(null);
+        toast({
+          title: 'Edit window closed',
+          description: 'More than an hour has passed. You can add this as a new timeline update instead.',
+        });
+      } else if (result === 'not_latest') {
+        toast({ title: 'Cannot edit', description: 'A newer update exists.', variant: 'destructive' });
+        resetUpdateForm();
+        await loadTimelineData();
+      } else {
+        toast({ title: 'Error', description: 'Failed to save your edit', variant: 'destructive' });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleAddUpdate = async () => {
     if (!user) return;
+    if (editingUpdateId) return handleSaveEdit();
     if (!newComment.trim()) {
       toast({
         title: 'Error',
@@ -490,6 +569,7 @@ export const ReviewTimelineViewer = ({
                 const isNewest = index === 0;
                 const recommendationCopy = getTimelineEntryRecommendationCopy(update.would_recommend);
                 const showUndo = isOwner && isNewest;
+                const canEditThis = canEditTimelineUpdate(update, user?.id, isNewest);
                 return (
                 <div key={update.id} className="p-4 border rounded-lg bg-card">
                   <div className="flex items-start gap-3">
@@ -522,16 +602,32 @@ export const ReviewTimelineViewer = ({
                           {formatRelativeDate(update.created_at)}
                         </div>
                         {showUndo && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs gap-1 ml-auto"
-                            onClick={() => handleUndo(update.id)}
-                            disabled={isUndoing}
-                          >
-                            <Undo2 className="h-3 w-3" />
-                            Undo
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 ml-auto rounded-full"
+                                aria-label="Timeline update options"
+                                disabled={isUndoing}
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {canEditThis && (
+                                <DropdownMenuItem onClick={() => startEditUpdate(update)} className="flex items-center gap-2">
+                                  <Pencil className="h-4 w-4" /> Edit
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem
+                                onClick={() => setConfirmDeleteId(update.id)}
+                                className="text-destructive focus:text-destructive flex items-center gap-2"
+                              >
+                                <Trash2 className="h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         )}
                       </div>
                       
@@ -690,15 +786,12 @@ export const ReviewTimelineViewer = ({
                           disabled={isSubmitting || !newComment.trim()}
                           className="flex-1"
                         >
-                          {isSubmitting ? 'Adding...' : 'Add Update'}
+                          {editingUpdateId
+                            ? (isSubmitting ? 'Saving...' : 'Save changes')
+                            : (isSubmitting ? 'Adding...' : 'Add Update')}
                         </Button>
                         <Button
-                          onClick={() => {
-                            setIsAddingUpdate(false);
-                            setNewRating(null);
-                            setNewComment('');
-                            setSelectedMedia([]);
-                          }}
+                          onClick={resetUpdateForm}
                           variant="outline"
                         >
                           Cancel
@@ -712,6 +805,15 @@ export const ReviewTimelineViewer = ({
           )}
         </div>
         
+        <DeleteConfirmationDialog
+          isOpen={!!confirmDeleteId}
+          onClose={() => setConfirmDeleteId(null)}
+          onConfirm={() => confirmDeleteId && handleUndo(confirmDeleteId)}
+          title={UPDATE_DELETE_TITLE}
+          description={UPDATE_DELETE_DESCRIPTION}
+          isLoading={isUndoing}
+        />
+
         {/* Lightbox for viewing media */}
         {isLightboxOpen && lightboxMedia.length > 0 && (
           <LightboxPreview
