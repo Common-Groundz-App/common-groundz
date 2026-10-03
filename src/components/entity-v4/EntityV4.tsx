@@ -243,6 +243,7 @@ const EntityV4 = () => {
   // the shared lookup (the page's review list is public-only). A failed lookup
   // leaves "Write Review"; the form's own check then blocks with Try again.
   const [ownReviewLookup, setOwnReviewLookup] = useState<OwnReviewLookup | null>(null);
+  const [ownReviewRefresh, setOwnReviewRefresh] = useState(0);
   useEffect(() => {
     if (!user || !entity?.id) {
       setOwnReviewLookup(null);
@@ -255,7 +256,7 @@ const EntityV4 = () => {
     return () => {
       cancelled = true;
     };
-  }, [user, entity?.id, reviews]);
+  }, [user, entity?.id, reviews, ownReviewRefresh]);
 
   const userReview = ownReviewLookup?.status === 'found' ? ownReviewLookup.review : null;
 
@@ -316,6 +317,7 @@ const EntityV4 = () => {
   const handleReviewSubmit = async () => {
     try {
       setIsReviewFormOpen(false);
+      setOwnReviewRefresh((n) => n + 1);
       toast({
         title: "Review submitted",
         description: "Your review has been added successfully"
