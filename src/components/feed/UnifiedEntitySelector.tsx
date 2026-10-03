@@ -14,6 +14,7 @@ import { CreateEntityDialog } from '@/components/admin/CreateEntityDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
+import { findOrCreateExternalEntity } from '@/services/externalEntityImport';
 import { createEntityQuick } from '@/services/enhancedEntityService';
 import {
   normalize,
@@ -75,6 +76,8 @@ interface UnifiedEntitySelectorProps {
    *   creation is not yet available for offerings such as dishes.
    */
   externalResultPolicy?: 'createIfMissing' | 'existingOnly';
+  /** True while an external pick is being saved to Groundz (blocks progression). */
+  onResolvingChange?: (resolving: boolean) => void;
 }
 
 
@@ -161,6 +164,7 @@ export function UnifiedEntitySelector({
   recentsSurface = 'composer',
   allowInlineCreate = true,
   externalResultPolicy = 'createIfMissing',
+  onResolvingChange,
 }: UnifiedEntitySelectorProps) {
   const isModal = variant === 'modal';
   const isSubjectMode = mode === 'subject';
@@ -316,24 +320,33 @@ export function UnifiedEntitySelector({
       // `others` is a REAL canonical type, never an "unknown" bucket. In
       // existing-only mode an unparseable external type is simply not selectable
       // (nothing is created here, so nothing unparseable can be persisted).
-      const normalizedType =
-        externalResultPolicy === 'existingOnly'
-          ? parseEntityTypeAtBoundary(result.type)
-          : normalizeEntityType(result.type, result.api_source);
+      // Review subjects (and existing-only surfaces) parse types strictly: an
+      // unrecognised type is refused, never guessed or saved as `others`.
+      const strictType = externalResultPolicy === 'existingOnly' || isSubjectMode;
+      const normalizedType = strictType
+        ? parseEntityTypeAtBoundary(result.type)
+        : normalizeEntityType(result.type, result.api_source);
 
-      // Step 1: Dedupe — check if this external entity already exists locally
-      let entity = await findEntityByApiRef(result.api_source, result.api_ref);
-
-      // Step 2: Create if not found — unless this surface is existing-only.
-      if (!entity) {
-        if (externalResultPolicy === 'existingOnly') {
+      let entity: any;
+      if (externalResultPolicy === 'existingOnly') {
+        entity = await findEntityByApiRef(result.api_source, result.api_ref);
+        if (!entity) {
           toast({
             title: "We can't add this one yet",
             description: 'Only things already on Groundz can be picked here for now.',
           });
           return;
         }
-        entity = await createEntityQuick(
+      } else {
+        if (!normalizedType) {
+          toast({
+            title: "We can't add this one",
+            description: "We couldn't tell what kind of thing this is. Try another result.",
+          });
+          return;
+        }
+        onResolvingChange?.(true);
+        entity = await findOrCreateExternalEntity(
           {
             name: result.name,
             venue: result.venue,
@@ -343,10 +356,9 @@ export function UnifiedEntitySelector({
             api_ref: result.api_ref,
             metadata: result.metadata || {},
           },
-          normalizedType as string
+          normalizedType as string,
         );
       }
-
 
       if (!entity) throw new Error('Entity creation returned null');
 
@@ -378,8 +390,9 @@ export function UnifiedEntitySelector({
     } finally {
       isCreatingRef.current = false;
       setIsCreatingEntity(false);
+      onResolvingChange?.(false);
     }
-  }, [isMaxReached, handleEntitySelect, toast, externalResultPolicy, allowInlineCreate]);
+  }, [isMaxReached, handleEntitySelect, toast, externalResultPolicy, allowInlineCreate, isSubjectMode, onResolvingChange]);
 
   // Handle people click → insert @mention
   const handlePeopleClick = useCallback((user: any) => {
