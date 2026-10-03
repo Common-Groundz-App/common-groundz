@@ -85,6 +85,52 @@ export const deleteReview = async (reviewId: string): Promise<boolean> => {
   }
 };
 
+/**
+ * Step 2 — delete a whole review thread (review + all timeline updates) in one
+ * server transaction. Afterwards, best-effort cleanup of the owner's own
+ * uploaded files the server confirmed are unused. Cleanup never blocks or
+ * undoes the delete.
+ */
+export const deleteReviewThread = async (
+  reviewId: string,
+): Promise<'deleted' | 'not_found' | 'unauthorized' | 'error'> => {
+  try {
+    const { data, error } = await supabase.rpc('delete_review_thread', { p_review_id: reviewId });
+    if (error) {
+      console.error('Error deleting review thread:', error);
+      return 'error';
+    }
+    const result = data as { status?: string; mediaToClean?: string[] } | null;
+    const status = result?.status;
+    if (status !== 'deleted') {
+      return status === 'not_found' || status === 'unauthorized' ? status : 'error';
+    }
+    notifyReviewsChanged();
+    const urls = Array.isArray(result?.mediaToClean) ? result!.mediaToClean : [];
+    if (urls.length > 0) {
+      void cleanupReviewMedia(urls);
+    }
+    return 'deleted';
+  } catch (error) {
+    console.error('Error in deleteReviewThread:', error);
+    return 'error';
+  }
+};
+
+/** Retryable, silent media cleanup (one retry per file). */
+export const cleanupReviewMedia = async (urls: string[]): Promise<void> => {
+  const { deleteMedia } = await import('@/services/mediaService');
+  await Promise.all(
+    urls.map(async (url) => {
+      try {
+        if (!(await deleteMedia(url))) await deleteMedia(url);
+      } catch {
+        /* silent: orphan sweep handles leftovers */
+      }
+    }),
+  );
+};
+
 // Update review status (for admin actions)
 export const updateReviewStatus = async (reviewId: string, status: string): Promise<boolean> => {
   try {

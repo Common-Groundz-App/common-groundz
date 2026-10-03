@@ -195,3 +195,42 @@ export const deleteLatestReviewUpdate = async (
     return 'error';
   }
 };
+
+export type EditUpdateResult = 'ok' | 'expired' | 'not_latest' | 'unauthorized' | 'conflict' | 'error';
+
+/**
+ * Step 2 — owner edits the latest timeline update within its hour.
+ * Server enforces owner, latest-only, window, and recomputes the review.
+ */
+export const editLatestReviewUpdate = async (
+  reviewId: string,
+  updateId: string,
+  rating: number | null,
+  comment: string,
+  media: MediaItem[],
+  wouldRecommend: 'yes' | 'maybe' | 'no' | null,
+): Promise<EditUpdateResult> => {
+  try {
+    const { data, error } = await supabase.rpc('edit_latest_review_update', {
+      p_review_id: reviewId,
+      p_update_id: updateId,
+      p_rating: rating as number,
+      p_comment: comment,
+      p_media: (media || []) as unknown as Json,
+      p_would_recommend: wouldRecommend as string,
+    });
+    if (error) {
+      console.error('Error editing timeline update:', error);
+      return 'error';
+    }
+    const status = (data as { status?: string } | null)?.status as EditUpdateResult | undefined;
+    if (status === 'ok') {
+      notifyReviewsChanged();
+      return 'ok';
+    }
+    return status && ['expired', 'not_latest', 'unauthorized', 'conflict'].includes(status) ? status : 'error';
+  } catch (error) {
+    console.error('Error in editLatestReviewUpdate:', error);
+    return 'error';
+  }
+};
