@@ -52,5 +52,17 @@ After Step 3, the paused phases resume.
 - roadmap.md records the pause and these steps.
 
 ## Technical details
-- Step 1: add `findOwnReviewForEntity(userId, entityId)` in `src/services/review/` returning `{status:'found', review} | {status:'none'} | {status:'error'}`, not filtered by visibility. It is used by ReviewForm's subject step (create, plus edit when the subject changes, excluding the review itself), by the EntityV4 Write/Add-update button, and by race recovery. ReviewForm covers SmartComposerButton and ProfileReviews. Index: `create unique index reviews_one_per_user_entity on public.reviews(user_id, entity_id) where entity_id is not null;`. Only a 23505 whose constraint/message names `reviews_one_per_user_entity` triggers recovery. Tests: lookup states, pending-disabled buttons, edit-mode subject switch, the race (two parallel inserts leave one row, run as SQL on production in a transaction that is rolled back), and the duplicate pre-check before the migration.
+- Step 1: add `findOwnReviewForEntity(entityId, { excludeReviewId? })` in `src/services/review/`.
+  - It reads the owner from the signed-in session, never from a caller-supplied ID. No session counts as `error`.
+  - It returns `{status:'found', review} | {status:'none'} | {status:'error'}` and is not filtered by visibility. The existing read rule already lets an owner read all their own reviews: `visibility = 'public' OR user_id = auth.uid()`.
+  - It is used by ReviewForm's subject step (create, plus edit when the subject changes, excluding the review itself), by the EntityV4 Write/Add-update button, and by race recovery. ReviewForm covers SmartComposerButton and ProfileReviews.
+- Index: `create unique index reviews_one_per_user_entity on public.reviews(user_id, entity_id) where entity_id is not null;`. Only a 23505 whose constraint/message names `reviews_one_per_user_entity` triggers recovery.
+- Production checks are read-only: the duplicate count before the migration, then catalog queries confirming the index exists with the right columns and condition. No test writes go to production. There is no separate test database, so true two-session concurrency is reported as unverified.
+- Unit tests:
+  - lookups for public, Circle-only and private own reviews
+  - the pending, failure and retry states
+  - the Home, Profile and Entity entry points
+  - an edit-mode subject switch
+  - recovery only on this rule's error, while other errors still surface
+- Then the full test suite, a type check, the build, and a list of signed-in checks for you. Steps 2 and 3 are not started.
 - Step 2: generalise `postEditPolicy.ts` into a shared `editWindow` helper (posts keep their exact behaviour) and add `canEditReview`. Build one `ReviewOwnerMenu` used by `entity-v4/TimelineReviewCard.tsx`, `components/ReviewCard.tsx` and `profile/reviews/ReviewCard.tsx`. Add a review-specific DB trigger that checks only author-content columns, with an admin bypass. It is not a copy of the post trigger.
