@@ -15,7 +15,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
 import { findOrCreateExternalEntity } from '@/services/externalEntityImport';
-import { createEntityQuick } from '@/services/enhancedEntityService';
 import {
   normalize,
   dedupeResults,
