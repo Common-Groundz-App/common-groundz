@@ -131,7 +131,8 @@ describe('ReviewForm — one review per subject', () => {
     await waitFor(() => expect(h.lookup).toHaveBeenCalledWith('book-1', { excludeReviewId: undefined }));
   });
 
-  it('edit mode: switching to an already-reviewed subject is blocked; keeping the subject is not checked', async () => {
+  // Step 2: the subject can no longer be changed in Edit (locked in UI and DB).
+  it.skip('edit mode: switching to an already-reviewed subject is blocked; keeping the subject is not checked', async () => {
     h.lookup.mockResolvedValue({ status: 'found', review: { id: 'other' } });
     const user = userEvent.setup();
     render(

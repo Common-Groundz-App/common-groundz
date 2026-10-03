@@ -33,6 +33,7 @@ vi.mock('@/services/review/timeline', () => ({
   fetchLatestRecommendationIntent: vi.fn().mockResolvedValue({ status: 'none' }),
   addReviewUpdate: vi.fn().mockResolvedValue(true),
   deleteLatestReviewUpdate: vi.fn().mockResolvedValue('deleted'),
+  editLatestReviewUpdate: vi.fn().mockResolvedValue('ok'),
 }));
 
 vi.mock('@/components/ui/connected-rings', () => ({

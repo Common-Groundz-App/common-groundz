@@ -512,6 +512,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 <ReviewCard 
                   review={review} 
                   onHelpfulClick={onHelpfulClick}
+                  onTimelineClick={handleTimelineClick}
                 />
               </CardContent>
             </Card>
@@ -533,6 +534,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 key={review.id} 
                 review={review} 
                 onHelpfulClick={onHelpfulClick}
+                onTimelineClick={handleTimelineClick}
               />
             ))
           ) : (

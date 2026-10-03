@@ -372,3 +372,7 @@ cross-read between them.
 - [x] Step 1 follow-ups: readable update links, outside results in review form, live entity stats (awaiting signed-in checks)
 - [x] Step 1 navigation polish implemented: pre-resolved readable destination, one-time state consumed after ownership check, same-URL history replacement, missing-address retry, legacy query links retained. Focused tests (43), full suite (891), type check and preview build pass.
 - [ ] Step 1 signed-in acceptance: confirm immediate readable URL and update opening, Back/Forward does not reopen, missing-address retry and legacy UUID query links; blocked by external-unmanaged authentication in automated preview.
+
+- [x] Step 2 database rules (edit window, subject lock, system fields, timeline edit, thread delete)
+- [x] Step 2 screens: shared owner menu, timeline update menu, confirmations, subject lock in Edit, expired-edit fallback
+- [ ] Step 2 signed-in acceptance — needs your manual check (automated sign-in not available)

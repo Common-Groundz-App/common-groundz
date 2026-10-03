@@ -22,3 +22,12 @@ Principle: sharing an opinion first; structured data is secondary.
 14. Public summary = public reviews only. Circle summary = public + circle-only reviews from the viewer's Circle, never private (including own); separate denominators.
 15. Per-metric minimum of distinct people (start 3, configurable; final in Phase 5). Unanswered never shown as 0%/No.
 16. Phase 2 matrix covers per type × field: codes, wording/options, sentiment group, card/full display, aggregation + denominator + minimum, spoiler, intentional omission reason.
+
+## Edit, timeline update, Delete (Step 2)
+
+- **Review**: one person + one subject = one review (the thread root).
+- **Timeline update**: a later entry on that review; history is kept.
+- **Edit**: fixing a review or the latest timeline update within one hour of when it was first posted. Editing never restarts the hour. Everything except the subject can change. After the hour, add a timeline update instead. Visibility can change at any time.
+- **Delete (review)**: removes the whole thread in one server step (`delete_review_thread`); the owner's own unused uploads are cleaned afterwards (retryable, never blocks).
+- **Delete (timeline update)**: removes only the latest update (the former Undo).
+- Database enforces: author and subject never change; automatic fields only change through the app's own system code; status changes are for moderators/admins only.

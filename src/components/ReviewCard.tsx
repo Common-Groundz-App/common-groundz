@@ -10,6 +10,9 @@ import { MediaItem } from '@/types/media';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import UsernameLink from '@/components/common/UsernameLink';
 import { formatDateLong } from '@/utils/dateUtils';
+import { useAuth } from '@/contexts/AuthContext';
+import { ReviewOwnerMenu } from '@/components/reviews/ReviewOwnerMenu';
+import type { Review } from '@/services/reviewService';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
@@ -25,9 +28,13 @@ interface ReviewCardProps {
     media?: MediaItem[];
   };
   onHelpfulClick?: (reviewId: string) => void;
+  /** Opens the timeline viewer for this review (owner's Add timeline update). */
+  onTimelineClick?: (review: ReviewWithUser) => void;
 }
 
-const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
+const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimelineClick }) => {
+  const { user } = useAuth();
+  const isOwner = 'user' in review && !!user && user.id === review.user_id;
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 
@@ -105,6 +112,15 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
             )}
             {transformedReview.verified && (
               <Badge variant="secondary" className="text-xs">Verified</Badge>
+            )}
+            {isOwner && 'user' in review && (
+              <div className="ml-auto">
+                <ReviewOwnerMenu
+                  review={review}
+                  onAddTimelineUpdate={onTimelineClick ? () => onTimelineClick(review) : undefined}
+                  editableReview={review as unknown as Review}
+                />
+              </div>
             )}
           </div>
           

@@ -15,8 +15,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
-import { deleteReview, updateReviewStatus } from '@/services/reviewService';
+import { ReviewOwnerMenu } from '@/components/reviews/ReviewOwnerMenu';
+import { updateReviewStatus } from '@/services/reviewService';
 import ReviewForm from './ReviewForm';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
@@ -61,9 +61,7 @@ const ReviewCard = ({
 }: ReviewCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   
   const isOwner = user?.id === review.user_id;
@@ -134,37 +132,6 @@ const ReviewCard = ({
     return colors[canonical] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
   };
 
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!user) return;
-    
-    setIsDeleting(true);
-    try {
-      await deleteReview(review.id);
-      
-      toast({
-        title: "Review deleted",
-        description: "Your review has been deleted successfully"
-      });
-      
-      setIsDeleteDialogOpen(false);
-      refreshReviews();
-    } catch (error) {
-      console.error("Error deleting review:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete review",
-        variant: "destructive"
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const handleStatusChange = async (status: 'published' | 'flagged' | 'deleted') => {
     try {
@@ -261,54 +228,25 @@ const ReviewCard = ({
                 )}
                 
                 {/* Options Menu for own content */}
-                {(isOwner || isAdmin) && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="rounded-full p-0 h-6 w-6"
-                      >
-                        <MoreVertical className="h-3 w-3" />
-                        <span className="sr-only">Menu</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {isOwner && (
-                        <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
-                          <Pencil className="h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                      )}
-                      
-                      {isAdmin && review.status !== 'flagged' && (
-                        <DropdownMenuItem 
-                          onClick={() => handleStatusChange('flagged')}
-                          className="flex items-center gap-2"
-                        >
-                          <Flag className="h-4 w-4" /> Flag for Review
-                        </DropdownMenuItem>
-                      )}
-                      
-                      {isAdmin && review.status === 'flagged' && (
-                        <DropdownMenuItem 
-                          onClick={() => handleStatusChange('published')}
-                          className="flex items-center gap-2"
-                        >
-                          <Flag className="h-4 w-4" /> Remove Flag
-                        </DropdownMenuItem>
-                      )}
-                      
-                      {(isOwner || isAdmin) && (
-                        <DropdownMenuItem 
-                          onClick={handleDeleteClick} 
-                          className="text-destructive focus:text-destructive flex items-center gap-2"
-                        >
-                          <Trash2 className="h-4 w-4" /> Delete
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                <ReviewOwnerMenu
+                    review={review}
+                    isAdmin={isAdmin}
+                    size="xs"
+                    onAddTimelineUpdate={() => setIsTimelineViewerOpen(true)}
+                    onEdit={() => setIsEditing(true)}
+                    onDeleted={() => { void refreshReviews(); }}
+                  >
+                    {isAdmin && review.status !== 'flagged' && (
+                      <DropdownMenuItem onClick={() => handleStatusChange('flagged')} className="flex items-center gap-2">
+                        <Flag className="h-4 w-4" /> Flag for Review
+                      </DropdownMenuItem>
+                    )}
+                    {isAdmin && review.status === 'flagged' && (
+                      <DropdownMenuItem onClick={() => handleStatusChange('published')} className="flex items-center gap-2">
+                        <Flag className="h-4 w-4" /> Remove Flag
+                      </DropdownMenuItem>
+                    )}
+                  </ReviewOwnerMenu>
               </div>
             </div>
             
@@ -434,14 +372,6 @@ const ReviewCard = ({
         )}
 
         {/* Delete Confirmation Dialog */}
-        <DeleteConfirmationDialog
-          isOpen={isDeleteDialogOpen}
-          onClose={() => setIsDeleteDialogOpen(false)}
-          onConfirm={handleDeleteConfirm}
-          title="Delete Review"
-          description="Are you sure you want to delete this review? This action cannot be undone."
-          isLoading={isDeleting}
-        />
         
         {/* Edit Form Dialog */}
         {isEditing && (
@@ -496,54 +426,25 @@ const ReviewCard = ({
             </div>
             
             {/* Options Menu for own content */}
-            {(isOwner || isAdmin) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
+            <ReviewOwnerMenu
+                    review={review}
+                    isAdmin={isAdmin}
                     size="sm"
-                    className="rounded-full p-0 h-8 w-8"
+                    onAddTimelineUpdate={() => setIsTimelineViewerOpen(true)}
+                    onEdit={() => setIsEditing(true)}
+                    onDeleted={() => { void refreshReviews(); }}
                   >
-                    <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">Menu</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {isOwner && (
-                    <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
-                      <Pencil className="h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {isAdmin && review.status !== 'flagged' && (
-                    <DropdownMenuItem 
-                      onClick={() => handleStatusChange('flagged')}
-                      className="flex items-center gap-2"
-                    >
-                      <Flag className="h-4 w-4" /> Flag for Review
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {isAdmin && review.status === 'flagged' && (
-                    <DropdownMenuItem 
-                      onClick={() => handleStatusChange('published')}
-                      className="flex items-center gap-2"
-                    >
-                      <Flag className="h-4 w-4" /> Remove Flag
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {(isOwner || isAdmin) && (
-                    <DropdownMenuItem 
-                      onClick={handleDeleteClick} 
-                      className="text-destructive focus:text-destructive flex items-center gap-2"
-                    >
-                      <Trash2 className="h-4 w-4" /> Delete
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                    {isAdmin && review.status !== 'flagged' && (
+                      <DropdownMenuItem onClick={() => handleStatusChange('flagged')} className="flex items-center gap-2">
+                        <Flag className="h-4 w-4" /> Flag for Review
+                      </DropdownMenuItem>
+                    )}
+                    {isAdmin && review.status === 'flagged' && (
+                      <DropdownMenuItem onClick={() => handleStatusChange('published')} className="flex items-center gap-2">
+                        <Flag className="h-4 w-4" /> Remove Flag
+                      </DropdownMenuItem>
+                    )}
+                  </ReviewOwnerMenu>
           </div>
           
           {/* Title and Category */}
@@ -709,14 +610,6 @@ const ReviewCard = ({
       )}
 
       {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Review"
-        description="Are you sure you want to delete this review? This action cannot be undone."
-        isLoading={isDeleting}
-      />
       
       {/* Edit Form Dialog */}
       {isEditing && (

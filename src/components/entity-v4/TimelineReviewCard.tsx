@@ -4,13 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from "@/components/ui/button";
-import { Eye, Clock, Users, MoreVertical } from 'lucide-react';
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
+import { Eye, Clock, Users } from 'lucide-react';
 import { ReviewWithUser } from '@/types/entities';
 import { ReviewUpdate } from '@/services/review/types';
 import { fetchReviewUpdates } from '@/services/review/timeline';
@@ -21,10 +15,9 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
-import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
-import { deleteReview } from '@/services/review/core';
+import { ReviewOwnerMenu } from '@/components/reviews/ReviewOwnerMenu';
+import type { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 import UsernameLink from '@/components/common/UsernameLink';
 
 interface TimelineReviewCardProps {
@@ -56,11 +49,8 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   
   const { user } = useAuth();
-  const { toast } = useToast();
   
   const isOwner = user?.id === review.user_id;
 
@@ -151,29 +141,6 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   const timelineEntries = generateTimelineEntries();
   const transformedReview = transformReviewForUI(review);
 
-  const handleDelete = async () => {
-    if (!user) return;
-    setIsDeleting(true);
-    try {
-      await deleteReview(review.id);
-      toast({
-        title: 'Review deleted',
-        description: 'Your timeline review has been deleted successfully.',
-      });
-      setIsDeleteModalOpen(false);
-      if (onDeleted) {
-        onDeleted();
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Something went wrong',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Prevent navigation when clicking on buttons or dropdown menu
@@ -249,30 +216,12 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
               
               {/* Options Menu for own content */}
               {isOwner && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="rounded-full p-0 h-8 w-8"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                      <span className="sr-only">Menu</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem 
-                      className="text-destructive focus:text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsDeleteModalOpen(true);
-                      }}
-                    >
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <ReviewOwnerMenu
+                  review={review}
+                  onAddTimelineUpdate={() => onTimelineClick(review)}
+                  editableReview={review as unknown as Review}
+                  onDeleted={onDeleted}
+                />
               )}
             </div>
             
@@ -352,15 +301,6 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
           />
         )}
 
-        {/* Delete confirmation dialog */}
-        <DeleteConfirmationDialog
-          isOpen={isDeleteModalOpen}
-          onClose={() => setIsDeleteModalOpen(false)}
-          onConfirm={handleDelete}
-          title="Delete Timeline Review"
-          description="Are you sure you want to delete this timeline review? This action cannot be undone."
-          isLoading={isDeleting}
-        />
       </CardContent>
     </Card>
   );
