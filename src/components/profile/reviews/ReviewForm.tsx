@@ -4,6 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { createReview, updateReview, Review } from '@/services/reviewService';
+import { useNavigate } from 'react-router-dom';
+import { findOwnReviewForEntity, isOwnReviewUniqueViolation } from '@/services/review/ownReview';
+import ExistingReviewNotice from './ExistingReviewNotice';
 import { EntityType, Entity as RecommendationEntity } from '@/services/recommendation/types'; 
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import { ensureHttps } from '@/utils/urlUtils';
@@ -203,6 +206,8 @@ const ReviewForm = ({
   
   // Update the type of selectedEntity to be compatible with both Entity types
   const [selectedEntity, setSelectedEntity] = useState<RecommendationEntity | null>(null);
+
+  const navigate = useNavigate();
   
   /**
    * Phase 3A — questionnaire resolution. Three explicit modes; a linked subject
