@@ -14,11 +14,17 @@ Today you can start a review from three places:
 - **Entity page:** "Write review", or "Add timeline update" if you already reviewed it. This one is correct.
 - **Home → Create → Review:** no check, so a second review gets created. This is the bug.
 - **Your profile → Add new review:** same form, same bug.
+- **Entity page, extra gap:** the page only loads public reviews. If your review is private or Circle-only, it still shows "Write review" and can create a second one.
 
 What changes:
-- In the review form, once you pick a subject you already reviewed, the form stops. It shows "You've already reviewed this" with **Add an update**, which opens that review's update form, and **Cancel**.
-- A database rule allows only one active review per person per subject. This covers double-taps and old tabs. Old reviews with no linked subject are not affected. The duplicate check is re-run first; if anything turns up, I stop and show you.
-- If that rule ever blocks a save, you get the same friendly message, not an error.
+- One shared check answers "have I already reviewed this?" It looks at all your reviews, whatever their visibility. It is used by the entity page button, the review form, and the recovery below.
+- In the review form, after you pick a subject, the Next and Publish buttons wait while the check runs.
+  - **Not reviewed yet:** you carry on as normal.
+  - **Already reviewed:** the form stops and shows "You've already reviewed this" with **Add an update** (opens that review's update form) and **Cancel**.
+  - **The check itself fails** (for example you're offline): you can't continue, and you get **Try again**. A failed check is never treated as "not reviewed".
+- When editing a review, switching it to a subject you already reviewed elsewhere is blocked the same way.
+- A database rule allows exactly one review per person per subject. Reviews are fully deleted, so there's no exception for deleted ones. Old reviews with no linked subject are not affected. The duplicate check is re-run first; if anything turns up, I stop and show you.
+- If two saves land at the same moment (double-tap, two tabs), the rule keeps exactly one. The other screen finds the saved review and offers **Add an update**, instead of showing an error. Any other database error still shows as a real error, never hidden.
 
 ## Step 2 — Same review menu everywhere, plus the 1-hour edit window
 
@@ -46,5 +52,5 @@ After Step 3, the paused phases resume.
 - roadmap.md records the pause and these steps.
 
 ## Technical details
-- Step 1: an existing-review lookup by (user_id, entity_id) in ReviewForm's subject step, create mode only. It covers SmartComposerButton and ProfileReviews, which both mount ReviewForm. Index: `create unique index reviews_one_active_per_user_entity on public.reviews(user_id, entity_id) where entity_id is not null and status <> 'deleted';`. Map error 23505 to the friendly message.
+- Step 1: add `findOwnReviewForEntity(userId, entityId)` in `src/services/review/` returning `{status:'found', review} | {status:'none'} | {status:'error'}`, not filtered by visibility. It is used by ReviewForm's subject step (create, plus edit when the subject changes, excluding the review itself), by the EntityV4 Write/Add-update button, and by race recovery. ReviewForm covers SmartComposerButton and ProfileReviews. Index: `create unique index reviews_one_per_user_entity on public.reviews(user_id, entity_id) where entity_id is not null;`. Only a 23505 whose constraint/message names `reviews_one_per_user_entity` triggers recovery. Tests: lookup states, pending-disabled buttons, edit-mode subject switch, the race (two parallel inserts leave one row, run as SQL on production in a transaction that is rolled back), and the duplicate pre-check before the migration.
 - Step 2: generalise `postEditPolicy.ts` into a shared `editWindow` helper (posts keep their exact behaviour) and add `canEditReview`. Build one `ReviewOwnerMenu` used by `entity-v4/TimelineReviewCard.tsx`, `components/ReviewCard.tsx` and `profile/reviews/ReviewCard.tsx`. Add a review-specific DB trigger that checks only author-content columns, with an admin bypass. It is not a copy of the post trigger.
