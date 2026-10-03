@@ -615,7 +615,13 @@ const ReviewForm = ({
     setHasUnsavedChanges(false);
     resetForm();
     onClose();
-    navigate(`/entity/${targetEntityId}?compose=update`);
+    // Stored slug when it is a top-level entity; offerings go via the id so the
+    // entity page can build the canonical /entity/<parent>/<child> address.
+    const target = selectedEntity && selectedEntity.id === targetEntityId ? selectedEntity : null;
+    const pathKey = target?.slug && !(target as { parent_id?: string | null }).parent_id
+      ? target.slug
+      : targetEntityId;
+    navigate(`/entity/${pathKey}?compose=update`);
   };
 
   const handleCancelExisting = () => {
