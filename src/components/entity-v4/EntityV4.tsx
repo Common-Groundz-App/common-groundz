@@ -140,6 +140,22 @@ const EntityV4 = () => {
     entity?.parent_id || null
   );
 
+  // Old /entity/<uuid> links switch to the stored readable address (with the
+  // parent for offerings), keeping ?query and #hash. Replace, so Back skips it.
+  useEffect(() => {
+    if (!entity?.slug) return;
+    if (!isUUID(entitySlug)) return;
+    if (entity.parent_id && (isLoadingHierarchy || !parentEntity?.slug)) {
+      if (isLoadingHierarchy) return;
+    }
+    const canonical =
+      entity.parent_id && parentEntity?.slug
+        ? getHierarchicalEntityUrl(parentEntity, entity)
+        : getEntityUrl(entity);
+    if (canonical === location.pathname) return;
+    navigate(`${canonical}${location.search}${location.hash}`, { replace: true });
+  }, [entity, entitySlug, parentEntity, isLoadingHierarchy, location.pathname, location.search, location.hash, navigate]);
+
   // Fetch circle rating data and user following data
   const { user, isLoading: authLoading } = useAuth();
   const { isAdmin } = useIsAdmin();
