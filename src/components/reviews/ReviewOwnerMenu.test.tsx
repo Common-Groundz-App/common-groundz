@@ -4,10 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ReviewOwnerMenu } from './ReviewOwnerMenu';
 
-const auth = vi.hoisted(() => ({ userId: 'owner-1' }));
-
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: auth.userId } }),
+  useAuth: () => ({ user: { id: 'owner-1' } }),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({
@@ -46,7 +44,6 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(NOW);
-    auth.userId = 'owner-1';
   });
 
   afterEach(() => {
