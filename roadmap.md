@@ -376,4 +376,5 @@ cross-read between them.
 - [x] Step 2 database rules (edit window, subject lock, system fields, timeline edit, thread delete)
 - [x] Step 2 screens: shared owner menu, timeline update menu, confirmations, subject lock in Edit, expired-edit fallback
 - [x] Step 2 bug fixes: ReviewChangeInvalidationBridge (single review-change listener: entity-detail, reviews, entity-stats); deleted cards removed at once; already-deleted treated as deleted; timeline window closes only on confirmed gone; stale timeline requests ignored; Edit always shows locked subject (loading / unavailable + retry)
+- [x] Step 2 polish: keep eligible Edit actions visible, explain the one-hour window, and preserve accurate admin/latest-only behavior
 - [ ] Step 2 signed-in acceptance — needs your manual check (automated sign-in not available)
