@@ -16,6 +16,7 @@ import { ensureHttps } from '@/utils/urlUtils';
 import { MediaItem } from '@/types/media';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
+import { supabase } from '@/integrations/supabase/client';
 import {
   parseEntityType,
   parseEntityTypeAtBoundary,
@@ -230,6 +231,9 @@ const ReviewForm = ({
     }
     const requestId = ++hydrationRequestRef.current;
     const targetId = review.entity_id;
+    // Let the open/reset effect run first so it can't overwrite this result.
+    await Promise.resolve();
+    if (requestId !== hydrationRequestRef.current) return;
     if (entity && entity.id === targetId) {
       setSelectedSubject({
         id: entity.id, name: entity.name, type: entity.type, venue: entity.venue,
