@@ -369,3 +369,4 @@ cross-read between them.
 - [x] Step 1 — one review per person per subject (unique index, shared own-review lookup, form guard, entity-page any-visibility check, race recovery) — awaiting user approval; docs/verification/review-lifecycle-step-1.md
 - [ ] Step 2 — shared owner menu on every own review + 1-hour edit window (client + review-specific DB trigger) — waits for Step 1 approval
 - [ ] Step 3 — review form vs timeline update comparison (discussion, then separate plan)
+- [x] Step 1 follow-ups: readable update links, outside results in review form, live entity stats (awaiting signed-in checks)
