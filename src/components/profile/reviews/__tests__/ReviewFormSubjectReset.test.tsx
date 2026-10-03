@@ -199,7 +199,8 @@ describe('same-type subject replacement clears subject-specific answers', () => 
     pickers.nextCreate = null;
   });
 
-  it('product -> a different product clears the stored choice answers', async () => {
+  // Step 2: subject replacement in Edit is no longer possible (locked in UI and DB).
+  it.skip('product -> a different product clears the stored choice answers', async () => {
     const user = userEvent.setup();
     renderForm(editReviewFor(PRODUCT_A, productMetadata));
 
@@ -238,7 +239,7 @@ describe('same-type subject replacement clears subject-specific answers', () => 
     expect(await readAnswers()).toEqual(before);
   });
 
-  it('food -> a different food clears the choice answers and the food tags', async () => {
+  it.skip('food -> a different food clears the choice answers and the food tags', async () => {
     const user = userEvent.setup();
     renderForm(editReviewFor(FOOD_A, foodMetadata));
 
