@@ -19,7 +19,7 @@ import { EntityFollowerModal } from '@/components/entity/EntityFollowerModal';
 import { EntityRecommendationModal } from '@/components/entity/EntityRecommendationModal';
 import { Entity } from '@/services/recommendation/types';
 import { useUserFollowing } from '@/hooks/useUserFollowing';
-import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
+import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
 import { useEntitySiblings } from '@/hooks/use-entity-siblings';
 import { useNavigate } from 'react-router-dom';
 import { EntityV4LoadingWrapper } from '@/components/entity/EntityV4LoadingWrapper';
@@ -145,9 +145,7 @@ const EntityV4 = () => {
   useEffect(() => {
     if (!entity?.slug) return;
     if (!isUUID(entitySlug)) return;
-    if (entity.parent_id && (isLoadingHierarchy || !parentEntity?.slug)) {
-      if (isLoadingHierarchy) return;
-    }
+    if (entity.parent_id && isLoadingHierarchy) return;
     const canonical =
       entity.parent_id && parentEntity?.slug
         ? getHierarchicalEntityUrl(parentEntity, entity)
