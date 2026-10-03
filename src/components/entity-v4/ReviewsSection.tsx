@@ -554,7 +554,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           ) : (
             !hybridReviews.length && !circleOnlyReviews.length && !timelineOnlyReviews.length && (
               <div className="text-center py-8 text-gray-500">
-                {reviews.length === 0 ? (
+                {visibleReviews.length === 0 ? (
                   <p>No reviews yet. Be the first to share your experience!</p>
                 ) : (
                   <p>No reviews match your current filters.</p>
