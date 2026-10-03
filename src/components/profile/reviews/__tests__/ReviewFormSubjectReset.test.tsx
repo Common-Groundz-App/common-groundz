@@ -53,6 +53,13 @@ vi.mock('@/services/reviewService', () => ({
   updateReview: vi.fn().mockResolvedValue({}),
 }));
 
+vi.mock('@/services/review/ownReview', () => ({
+  findOwnReviewForEntity: vi.fn().mockResolvedValue({ status: 'none' }),
+  isOwnReviewUniqueViolation: () => false,
+}));
+
+vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
+
 vi.mock('@/hooks/recommendations/use-recommendation-uploads', () => ({
   useRecommendationUploads: () => ({
     handleImageUpload: vi.fn(),
