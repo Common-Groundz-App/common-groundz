@@ -16,7 +16,7 @@ Both reviewers approve the direction. Their remaining points are refinements, an
    - A new popup frame is built later only if there is a real need. It would hold the same new composer, never the old form.
    - Why: this avoids building and testing two frames before the page has proven itself.
 
-3. **Every page address carries what it works on, so refreshing never loses it** (details in "Clarifications" below).
+3. **One `/review` page address, like `/create` for posts.** Selecting an entity never changes the address (details in "Clarifications" below).
 
 4. **Timeline updates keep today's fields during the move.**
    - The fields are: what changed, an optional rating, "Would you still recommend it?" with its rating-based reset, and photos.
@@ -28,18 +28,23 @@ The timeline popup becomes read-only history. This happens only after both timel
 
 ## Clarifications the reviewers asked for
 
-**New review: how the subject survives a refresh**
-- **From an entity page:** `/reviews/new?entity=<entity id>`. The page looks the subject up in the database by ID, then shows it locked. An ID is used rather than a slug, so parent/child names can never be confused and a renamed slug never breaks the link.
-- **From Home or Profile:** `/reviews/new` with no subject. You pick the subject on the page. Once picked, the page swaps its own address to `?entity=<id>` without adding a history step, so a refresh keeps your choice.
-- Unknown, deleted or unreadable IDs show a clear "subject not found" message with a way to pick again. Nothing is guessed.
-- If you already reviewed that subject, the existing "update your review" notice appears, as it does today.
-- Return links to entity pages still use the stored entity and parent slugs (existing project rule).
+**Page address: one `/review` page, like `/create` for posts**
 
-**Other addresses**
-- `/reviews/:reviewId/edit` edits your review.
-- `/reviews/:reviewId/updates/new` adds a timeline update.
-- `/reviews/:reviewId/updates/:updateId/edit` edits a timeline update. It names the exact update, and if that update is no longer the latest it shows a clear message instead of editing anything.
-- All four are noindex and need sign-in. Navigation state carries only where to return and whether to reopen the timeline, never what is being edited.
+The earlier draft gave each case its own address, such as `/reviews/new?entity=...`. That is replaced with one `/review` page, the same pattern posts already use. Why:
+- **Selecting an entity never changes the address.** You pick, change or create a subject on the page, as you do in the post composer today.
+- **Background entity creation keeps working as it does now.** When a subject isn't found, the existing find-or-create step makes it behind the scenes and hands its ID to the form. A brand-new entity has no stored slug yet, which is one more reason not to put entity names in the address.
+- **One address for all four cases.** The page is told what to do (new review, edit, add update, edit update) and which review or update it is for, in the same way the post page is handed an entity today.
+
+What separate addresses would have bought, and how we cover it instead:
+- **Refresh mid-form.** A new review falls back to the subject picker, as `/create` does. Edit, add update and edit update show "This form was closed — open it again from your review" with a button back to the entity or profile. They never guess which review.
+- **Shareable links.** Nobody shares a link to their own edit form, so nothing is lost.
+- **Old `?compose=update` links** still open the timeline on the entity page, as today.
+
+Unchanged safety rules:
+- Edit, add update and edit update always re-check on the server that the review or update is yours, that an edit is still inside the hour, and that a timeline update is still the latest. Saving never trusts what was passed to the page.
+- If you already reviewed the chosen subject, the existing "update your review" notice appears.
+- Save and Cancel return to where you came from. Entity return links use stored entity and parent slugs (existing rule).
+- `/review` is noindex and needs sign-in.
 
 **Backup switch: exactly how it behaves**
 - **One switch for all four flows**, turned on only after all four pass their checks. Before that, the page is reachable only by its direct address, for testing. Switching per flow is rejected because it would split one person's experience across two systems mid-migration.
@@ -94,4 +99,4 @@ The timeline popup becomes read-only history. This happens only after both timel
   - The design gate checks whether `get_public_flags` already exposes new keys.
   - If it does not, extending it is the only database change. It is a small allow-list addition with no data impact, and it gets your approval like any migration.
   - The client reads the switch with the same pattern as the realtime switch: gate on a successful load, otherwise use the defined fallback.
-- The entity lookup for `?entity=<id>` reuses the existing typed own-review lookup and entity fetch. A UUID that fails validation is rejected before any query.
+- `/review` receives `{ mode, entityId?, reviewId?, updateId?, returnTo }` via navigation state, following the post composer's pattern. The page loads the review or update by ID from the server, and its loss on refresh is handled as described above. The existing typed own-review lookup and find-or-create entity persistence are reused unchanged. Optional `?entityId=` prefill can match `/create`'s existing parameter if wanted later.
