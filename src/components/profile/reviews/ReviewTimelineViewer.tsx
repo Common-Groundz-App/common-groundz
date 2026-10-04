@@ -11,7 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ReviewEditTooltipContent } from '@/components/reviews/ReviewEditTooltipContent';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import {
   canEditTimelineUpdate,
@@ -639,9 +640,9 @@ export const ReviewTimelineViewer = ({
                                         <Pencil className="h-4 w-4" /> Edit
                                       </DropdownMenuItem>
                                     </TooltipTrigger>
-                                    <TooltipContent side="left">
+                                    <ReviewEditTooltipContent>
                                       You can edit for 1 hour after publishing.
-                                    </TooltipContent>
+                                    </ReviewEditTooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
                               ) : (
@@ -656,9 +657,9 @@ export const ReviewTimelineViewer = ({
                                         <Pencil className="h-4 w-4" /> Edit
                                       </DropdownMenuItem>
                                     </TooltipTrigger>
-                                    <TooltipContent side="left">
+                                    <ReviewEditTooltipContent>
                                       Edit window closed (1 hour limit)
-                                    </TooltipContent>
+                                    </ReviewEditTooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
                               )}

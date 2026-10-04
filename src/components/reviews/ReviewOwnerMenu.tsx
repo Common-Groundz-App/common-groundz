@@ -7,7 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ReviewEditTooltipContent } from './ReviewEditTooltipContent';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -115,9 +116,9 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
               <TooltipProvider delayDuration={150}>
                 <Tooltip>
                   <TooltipTrigger asChild>{editItem}</TooltipTrigger>
-                  <TooltipContent side="left">
+                  <ReviewEditTooltipContent>
                     You can edit for 1 hour after publishing.
-                  </TooltipContent>
+                  </ReviewEditTooltipContent>
                 </Tooltip>
               </TooltipProvider>
             ) : (
@@ -132,9 +133,9 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
                       <Pencil className="h-4 w-4" /> Edit
                     </DropdownMenuItem>
                   </TooltipTrigger>
-                  <TooltipContent side="left">
+                  <ReviewEditTooltipContent>
                     Edit window closed (1 hour limit)
-                  </TooltipContent>
+                  </ReviewEditTooltipContent>
                 </Tooltip>
               </TooltipProvider>
             )
