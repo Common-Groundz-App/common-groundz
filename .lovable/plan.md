@@ -1,125 +1,126 @@
-# Step 3 — One shared review composer (final, design gate first)
+# Step 3: One shared review composer (final)
 
-## Final decisions and why
+The architecture is now locked. This round added five precise corrections. None of them change direction.
 
-1. **Three independent settings and one settings table.**
-   - `entryType` (review or timeline update) and `operation` (create or edit) combine into one of four modes.
-   - A settings table, keyed by mode, holds all of the business behaviour: which sections show, which are required, the wording, and which step each section belongs to.
-   - Presentation (page or popup) belongs only to the outer frame. It never affects fields, validation, permissions or saving.
-   - Why: every difference lives in one place.
+## Final decisions
 
-2. **Steps are configurable, not today's wizard copied.**
-   - The composer is built from shared sections, a section list, the settings table, and a step layout taken from that table.
-   - It is not today's fixed four-step form wrapped in a new name.
-   - Why: the richer review phases will reorder and add sections. Doing that later should mean editing configuration, not another rewrite.
-
-3. **The page is built now, with a temporary backup.**
-   - Only `ReviewComposerPage` is built.
-   - The old popup form and the old in-timeline form stay frozen as the rollback.
-   - A new popup frame is built later only if needed. It would hold the same composer.
-
-4. **One route family, one page, one composer** (details below).
-   - Creating a review uses `/review`, which never changes while you pick or create a subject.
-   - Saved reviews and updates get short addresses that carry their ID.
-
-5. **Timeline updates keep today's fields during the move.**
-   - What changed, an optional rating, "Would you still recommend it?" with its rating-based reset, and photos.
-   - Extra questions wait for a separate storage design.
-
-6. **The backup switch uses the app's existing settings system.** No new switch system is built.
+1. **One composer with configurable steps.**
+   - `entryType` (review or timeline update) and `operation` (create or edit) combine into four modes.
+   - A settings table holds each mode's sections, required rules, wording and step layout (`steps: SectionId[][]`).
+   - Presentation (page or popup) never affects fields, validation, permissions or saving.
+   - Today's four-step form is not copied in.
+2. **Only the page is built now.** The old popup form and the in-timeline form stay frozen as a temporary rollback.
+3. **One route family, one page.** The addresses are listed below.
+4. **Timeline updates keep exactly today's fields.** Extra questions wait for the separate storage design.
+5. **One switch for all four flows**, using the existing settings system.
 
 ## Route family
 
-All five addresses open the same page and composer.
-
 | Address | Purpose |
 |---|---|
-| `/review` | New review from Home or Profile. Pick the subject on the page. |
+| `/review` | New review. The subject is picked on the page, and the address never changes while you pick or create one. |
 | `/review?entityId=<id>` | New review from an entity page. The subject is loaded from the database and locked. |
-| `/review/:reviewId/edit` | Edit your review. |
-| `/review/:reviewId/timeline/new` | Add a timeline update. |
-| `/review/:reviewId/timeline/:updateId/edit` | Edit that exact timeline update. |
+| `/review/:reviewId/edit` | Edit your review |
+| `/review/:reviewId/timeline/new` | Add a timeline update |
+| `/review/:reviewId/timeline/:updateId/edit` | Edit that exact timeline update |
 
-**Creating a review**
-- `entityId` is only a starting value. It is not a separate mode and has no effect on saving.
-  - A valid ID loads the subject and locks it.
-  - No ID shows the normal subject picker.
-  - An unknown or deleted ID shows "subject not found" with a way to pick again.
-- Selecting, changing, clearing or creating a subject in the background never rewrites the address.
-- Background creation works exactly as today: find or create the subject, keep its real ID in the form, then run the existing-review check.
-- Refreshing a new review that was started from Home or Profile clears unsaved answers. This is an accepted limit while drafts are out of scope.
+- `entityId` is only a starting value. It is not a separate mode.
+- **Bad starting subject:** if `entityId` is unknown or deleted, a "subject not found" message appears. Choosing "Pick another subject" replaces the address with plain `/review`, so a refresh doesn't bring the error back. From then on, picking stays inside the form.
+- Background entity creation works exactly as today.
+- Refreshing an unsaved new review started from Home or Profile clears its answers. That is an accepted limit while drafts are out of scope.
+- Every `/review` address needs sign-in and is hidden from search engines.
 
-**Existing reviews**
-- These addresses carry IDs so a refresh, a sign-in redirect or an old tab reloads the exact record.
-- The server always re-checks four things: ownership, the one-hour window, that the update belongs to that review, and that it is still the latest. If a check fails, a clear message replaces the form ("Edit window closed", "This update is no longer the latest"). It never guesses or edits a different entry.
-- "Timeline" in the address matches the product wording. `/edit` corrects the review; `/timeline/...` is about timeline entries.
+## Checks per mode (enforced on the server; the page only mirrors them)
 
-**Return after Save or Cancel**
-1. Passed return info is used only if it is a safe address inside the app. Anything else is ignored.
-2. Otherwise the page returns to the review's entity page, built from the stored entity and parent slugs (existing rule).
-3. After a timeline save, a one-time marker reopens the timeline. The entity page consumes it, so Back and Forward never reopen it.
+| Mode | Checks |
+|---|---|
+| Create review | Signed in. The subject is saved before submit. No existing review by you for that subject: the shared lookup runs, plus the database uniqueness rule. |
+| Edit review | The review exists. You own it, or you are an admin checked on the server. It is inside its one-hour window. The subject is locked. |
+| Add timeline update | The review exists, you own it, and it can still take updates. There is **no** one-hour limit; adding updates after the hour is the whole point. |
+| Edit timeline update | The review and update both exist, you own them, the update belongs to that review, it is still the latest, and it is inside its own one-hour window. |
 
-**Old `?compose=update` links**
-- During the migration they behave as today.
-- After cutover, if you own a review for that entity, the link redirects to `/review/:reviewId/timeline/new`. Otherwise the entity opens normally and nothing is guessed. The existing ID-to-readable entity redirect is kept.
+A failed check shows a clear message ("Edit window closed", "This update is no longer the latest", "Review not found") instead of the form. The page never guesses and never edits a different entry.
 
-**Sign-in and search:** every `/review` address needs sign-in and is noindex.
+## Save and Cancel
 
-## Backup switch
+| Mode | Save | Cancel |
+|---|---|---|
+| Create review | The entity page, showing your new review | Where you came from, or Home if unknown |
+| Edit review | The entity page | Where you came from, or the entity page |
+| Add timeline update | The entity page with the timeline reopened | The entity page with the timeline reopened |
+| Edit timeline update | The entity page with the timeline reopened | The entity page with the timeline reopened |
 
-- **One switch for all four flows.** It turns on only after all four flows pass their checks. Until then, the page is reachable only by its direct address, for testing.
+- "Where you came from" is used only if it is a safe address inside the app. Otherwise the page falls back to the entity page, built from the stored entity and parent slugs (existing rule).
+- "Timeline reopened" is a one-time marker passed during navigation. It is never put in the address, and the entity page consumes it once, so Back and Forward never reopen the timeline.
+- **Old `?compose=update` links** behave as today during the migration. After cutover, if you own a review for that entity, they redirect to `/review/:reviewId/timeline/new`. Otherwise the entity opens normally.
+
+## Backup switch: deterministic fallback
+
+- A fixed **release default** lives in the code:
+  - `legacy` until cutover.
+  - Changed to `page` in the cutover release.
+- A successfully loaded runtime setting can override it, so either way can be switched without a release.
+- While loading, or if the setting fails, the release default is used. Nothing has to be guessed.
 - **Switch on:** the timeline popup is read-only, and its Add and Edit buttons open the page.
-- **Switch off:** the old popup form and the old in-timeline form work exactly as today.
-- The in-timeline form is permanently deleted only when the switch itself is retired.
-- **Safe fallback:** if the setting can't load, the app uses whichever option is the current default.
-- The switch never changes permissions, validation or saving.
-- **Retirement:** the old forms and the switch are removed after you approve signed-in testing on desktop and mobile. The target is within two weeks of the page becoming the default, and the date is recorded in the roadmap.
+- **Switch off:** the old popup and the in-timeline form work exactly as today.
+- The switch never affects permissions, validation, saving, or whether the direct page addresses work. They always work, which is how testing happens before cutover.
+- **Retirement:** the old forms, the switch and the release default are removed after you approve signed-in testing. The target is within two weeks of cutover, and the roadmap records the date.
 
-## Delivery order (each part is checked before the next)
+## Section rules (part of the state model)
 
-1. **Design gate:** produce the deliverables below, with no behaviour change, then stop for your approval.
-2. Pull out the shared sections: rating, recommendation, written text, photos, locked subject, date, visibility and questionnaire.
-3. Build the composer (section list, settings table, step layout) and `ReviewComposerPage`.
-4. Move the flows one at a time, each matching today's behaviour first: create review, edit review, add timeline update, edit timeline update.
-5. Turn on the switch for all entry points. The timeline popup becomes read-only while the switch is on.
-6. Run the full parity checks, then you test signed in on desktop and mobile.
-7. After your approval, remove the old forms and the switch.
-8. Later and separately: the storage design for timeline-update answers, then the paused richer-review phases.
+Every section has the following:
+- a stable ID
+- validation
+- loading and saving mappings
+- a visibility rule
+- an accessible label linked to its error
+- its own unsaved-change tracking
+
+Values live in one central form state, not inside steps. Moving a section between steps, or going Back and Next, never resets a value, an upload, an error or the unsaved-change state.
+
+## Implementation sequence: split into parts, not all at once
+
+Doing it all at once would change four flows in one go. If something broke, we couldn't tell which part caused it, and you couldn't test in between. Each part below ships on its own and gets checked before the next. You see nothing different until part 3D, because the new page is reachable only by its direct address until cutover.
+
+| Part | What gets built or changed | What you'll notice |
+|---|---|---|
+| **3.0 Design gate** | A written design document with all the deliverables below. No code changes. | Nothing. You review and approve it. |
+| **3A Shared foundation** | The shared sections are pulled out of today's forms: rating, recommendation chips with the rating-based reset, written text, photos/video, locked subject, date, visibility, questionnaire. Also the central form state, the mode settings table and the step engine. Today's popup form switches to the shared sections with no visible change. | Nothing should look different. |
+| **3B Page + review modes** | The `/review` route family and the `ReviewComposerPage` are added, with create review and edit review working. Their checks, Save/Cancel and safe return are included. | Nothing in normal use. Reachable only by direct address for testing. |
+| **3C Timeline modes** | Add timeline update and edit timeline update move onto the page, matching today exactly (rating optional, what changed required, recommendation reset, photos). | Nothing in normal use. Reachable by direct address for testing. |
+| **3D Cutover** | The switch is added, with the release default set to `page`. Every Write review, Edit, Add timeline update and timeline Edit button opens the page. The timeline popup becomes read-only while the switch is on. The new `?compose=update` behaviour is added. The full parity checks run on desktop and mobile. | All review writing happens on the new page. You test signed in. |
+| **3E Retirement** | After your approval: delete the old popup form, the in-timeline form, the switch and the release default, and update the roadmap. | Nothing; the new page is already what you use. |
+
+Later and separately: the timeline-answer storage design, then the paused richer-review phases, each added once inside the shared composer.
 
 ## Not in Step 3
 
-- No new popup frame.
-- No drafts or autosave beyond a basic "discard changes?" prompt.
-- No extra questions on timeline updates.
-- No database changes, except possibly the switch (see Technical details).
-- No change to the one-hour rule, latest-only editing, Delete, one review per person, or the post composer.
+- A new popup frame.
+- Drafts or autosave. Only a basic "discard changes?" prompt is included.
+- Extra questions on timeline updates.
+- Changes to the post composer.
+- Changes to server behaviour.
+- Database changes, apart from possibly the switch (see Technical details).
 
-## Design gate deliverables
+## Design gate deliverables (part 3.0)
 
-- **Current field matrix:** review create and edit vs timeline create and edit. Covers fields, required rules, defaults, where each value is saved, and who may change it.
-- **Capability table:** all four modes, including the step layout per mode, the subject shown as a picker or locked, rating required or optional, the recommendation type, wording, media, date, visibility, and questionnaire (hidden in the timeline modes).
-- **State model:** shared and per-mode values, unsaved-change tracking, upload state, loading saved data, and the expired, no-longer-latest, deleted and subject-not-found states.
-- **Saving per mode:** the exact data each mode sends, the difference between "left alone" and "cleared", how saved metadata is preserved, and the timeline rating-based reset.
-- **Route and return contract:** as above, including the post-cutover `?compose=update` behaviour.
-- **Timeline answer storage write-up:**
-  - Updates record only the answers they change.
+- **Current field matrix:** review create and edit vs timeline create and edit. It covers fields, required rules, defaults, where each value is saved, and who may change it.
+- **Capability and step table:** all four modes.
+- **State model:** this includes the section rules above, plus the expired, not-latest, deleted, subject-not-found and bad-starting-subject states.
+- **Saving per mode:** the exact data sent, the difference between "left alone" and "cleared", how metadata is preserved, and the timeline rating-based reset.
+- **Route, checks and Save/Cancel tables:** as above.
+- **Timeline-answer storage write-up:**
+  - Updates record only what they change.
   - The review holds the current answers.
   - Untouched answers carry forward.
   - History shows how answers changed.
-  - It lists the open questions.
+  - Open questions are listed.
 - **Migration, rollback and retirement plan.**
-- **Parity checklist:** the four flows, the one-hour rule, latest-only editing, media, recommendation resolution, Back and Cancel, refresh, sign-in redirect, mobile keyboard, and accessibility.
+- **Parity checklist:** the four flows, the per-mode checks, media, recommendation resolution, Save and Cancel, refresh, sign-in redirect, mobile keyboard, and accessibility.
 
 ## Technical details
 
-- `resolveComposerMode({ entryType, operation })` maps into `REVIEW_COMPOSER_MODES: Record<ComposerMode, ComposerCapabilities>`. The table includes `steps: SectionId[][]`.
-  - Sections come from a registry and render from capabilities.
-  - Mode-specific wording comes from config.
-  - There are no scattered business-rule mode checks.
-- The route loader resolves `{ entryType, operation, initialEntityId?, reviewId?, updateId? }`, validating UUIDs before any query.
-  - Navigation state carries only display data for an instant first render, a validated internal `returnTo`, and the one-time `reopenTimeline` marker.
-- Saving keeps the same server operations and semantics: `createReview`, `updateReview`, `addReviewUpdate`, `editLatestReviewUpdate`. Small typed boundary refactors are allowed.
-- The existing typed own-review lookup and find-or-create entity persistence are reused unchanged.
-- **Switch:** a `reviews.composer_page_enabled` key in the existing `app_config` / `get_public_flags` / `useAppConfig` mechanism.
-  - The design gate checks whether `get_public_flags` already exposes new keys. If it doesn't, a small allow-list extension is the only database change, and it needs your approval.
-  - The client reads the switch the same way as the realtime switch: only a successful load counts, otherwise the defined fallback is used.
+- `resolveComposerMode({ entryType, operation })` maps to `REVIEW_COMPOSER_MODES: Record<ComposerMode, ComposerCapabilities>`. Sections come from a registry. Wording comes from the config. There are no scattered business-rule mode checks.
+- The route loader resolves `{ entryType, operation, initialEntityId?, reviewId?, updateId? }`, with every ID UUID-validated before any query. Navigation state carries only instant-render display data, a validated internal `returnTo` and the one-time `reopenTimeline` marker.
+- Saving keeps the same server operations and meaning: `createReview`, `updateReview`, `addReviewUpdate` and `editLatestReviewUpdate`. Small typed refactors at the boundary are allowed. The own-review lookup and the find-or-create entity persistence are reused unchanged.
+- **Switch:** `REVIEW_COMPOSER_RELEASE_DEFAULT` is the code constant. The runtime key `reviews.composer_page_enabled` goes through the existing `app_config` / `get_public_flags` / `useAppConfig` path and is added to the admin `ALLOWED_KEYS`. Only a successful load (`status === 'success'` and not placeholder) overrides the constant. The design gate confirms whether `get_public_flags` already exposes new keys. If it doesn't, a small allow-list extension is the only database change, and it needs your approval.
