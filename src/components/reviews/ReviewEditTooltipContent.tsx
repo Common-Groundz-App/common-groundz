@@ -13,7 +13,7 @@ export function ReviewEditTooltipContent({ children }: { children: ReactNode }) 
         side={isMobile ? 'top' : 'left'}
         align="center"
         collisionPadding={12}
-        className="z-[101] max-w-[calc(100vw-24px)] whitespace-normal break-words text-center"
+        className="pointer-events-none z-[101] max-w-[calc(100vw-24px)] whitespace-normal break-words text-center"
       >
         {children}
       </TooltipContent>

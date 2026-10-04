@@ -78,6 +78,7 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
     const content = document.querySelector('[class*="max-w-\\[calc(100vw-24px)\\]"]');
     expect(content).toBeInTheDocument();
     expect(content?.closest('[role="menu"]')).toBeNull();
+    expect(content).toHaveAttribute('data-side', 'left');
   });
 
   it('places the enabled explanation above Edit on a phone', async () => {
