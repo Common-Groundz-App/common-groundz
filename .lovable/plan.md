@@ -1,48 +1,62 @@
-# Step 3 — One shared review composer for reviews and timeline updates
+# Step 3 — One shared review composer (final, design gate first)
 
-## Which approach, and why
+## The decision and why
 
-Codex's model is the stronger one, with ChatGPT's presentation idea added. Concretely:
+Both reviewers agree on the same four refinements, and each fixes a real risk. This is the combined approach:
 
-- **Four explicit modes**: `create-review`, `edit-review`, `create-timeline-update`, `edit-timeline-update`. Each mode has its own short settings entry (Codex's "capability configuration") that declares which sections show and which are required.
-- **ChatGPT's `presentation: page | modal`**: kept as a separate setting, independent of mode. The form's logic never knows whether it sits on a page or in a popup.
-- **Default is page** (your decision, and both reviewers agree it fits a form this long). The current popup form is kept in the app as a selectable backup, so the new page can be tried and compared before anything is removed.
+1. **Three independent settings, plus one settings table** (ChatGPT's model with Codex's table).
+   - `entryType: review | timeline-update`, `operation: create | edit`, `presentation: page | modal`.
+   - The first two combine into one of four modes. Each mode reads its fields and rules from a single, complete settings table.
+   - Why: every difference between the four cases stays visible in one place, and presentation can never change fields, validation, permissions or saving. Adding a "sheet" later, or a "quick" variant, won't multiply modes.
 
-Why this beats one big component with `if (mode === ...)` checks scattered through it: every difference between the four situations lives in one small settings table. Adding a field later means building it once and listing it in the modes that want it — exactly the "change one thing, not two" outcome you asked for.
+2. **Page by default. The old popup is a temporary backup only.**
+   - The new composer body is built once and can be shown inside a page (default) or a popup wrapper.
+   - The current popup form stays untouched as an emergency fallback while you test. A switch you can flip without a code change chooses between them.
+   - Why: you get the safety net you asked for. Keeping the old form forever would bring back two forms to maintain, which is exactly what Step 3 removes. Once all four flows pass checks, the old form is retired. If you later want a popup, it shows the same new composer.
 
-Why not ChatGPT's `entryType + operation` alone: it describes the same four cases but hides the real differences (rating optional, "what changed" wording, no subject picker) inside the form. Codex's per-mode settings make those differences explicit and reviewable.
+3. **Clear page addresses.**
+   - Each address names exactly what it edits, so refreshing the page works.
+   - Editing a timeline update names that exact update. It fails safely if a newer update has been added since.
+   - Why: an old link can never edit the wrong entry.
 
-## What changes for the user
+4. **Timeline updates keep today's fields during the move.**
+   - Those fields are rating (optional), "Would you still recommend it?" with its rating-based reset, what changed, and photos.
+   - Extra questions (pros/cons, best for, food tags, detail ratings) stay hidden on updates until a separate storage design is approved.
+   - Why: we won't build screens before we know how a changed answer is kept in history.
 
-- "Write a review", "Edit" (within the hour), "Add timeline update" and timeline-update "Edit" all open the new composer **page**, with the subject locked at the top.
-- Timeline update stays lightweight by default: what changed (required), optional new rating, "Would you still recommend it?", photos. Extra review questions appear only in an "Update more details" fold, and only for things that actually changed.
-- The timeline popup becomes read-only history: AI summary, entries, menus. "Add timeline update" navigates to the page; saving or cancelling returns to the timeline/entity context.
-- The existing popup form keeps working until the page proves itself; a settings flag switches between page and popup.
+The timeline popup becomes read-only history. "Add timeline update" and "Edit" open the composer page; Save and Cancel return you where you came from.
 
-## Unchanged
+## Delivery order (each part is checked before the next)
 
-One review per person per subject, the one-hour Edit rule, latest-only timeline editing, Delete behavior, the post composer, the paused phases. "Base recommendation on rating" stays timeline-only: on a first review, leaving the question unanswered already falls back to the rating.
+1. **Design gate (this approval).** I produce the items under "Design gate deliverables" below. No behavior changes.
+2. Pull out the shared pieces: rating, recommendation, written text, photos, locked subject, date, visibility, and the questionnaire.
+3. Build the new composer and its page, with an optional popup wrapper.
+4. Move the flows over one at a time: create review, edit review, add timeline update, edit timeline update. Each must match today's behavior before the next one moves.
+5. Make the timeline popup read-only and point every entry point to the page. The old popup stays behind the backup switch.
+6. Run the full parity checks on desktop and mobile, then you test.
+7. Remove the old forms once the retirement conditions are met (all four flows pass, and you approve after testing).
+8. Separately: the storage design for timeline-update answers, then the paused richer-review phases, added once in the shared composer.
 
-## The one question to settle before building (temporal ownership)
+## Not in Step 3
 
-Timeline updates currently store only rating, comment, recommendation intent and media. Before review questions (pros/cons, best for, food tags) can appear on an update, we must decide where a changed answer lives:
+- No full drafts or autosave. Only refresh-safe pages and a basic "discard changes?" prompt.
+- No database changes.
+- No change to the one-hour rule, latest-only editing, Delete, one review per person, or the post composer.
 
-- **Chosen model**: an update records only the answers explicitly changed at that moment; the review row keeps the current effective answers for display and stats; untouched answers carry forward; the timeline can show how answers evolved. This needs a small storage addition on updates later — it is a gate for the advanced fields, not for Step 3's core (rating, recommendation, comment, media), which already have storage.
+## Design gate deliverables
 
-## Delivery sequence (each part ships and is checked separately)
-
-1. **Design gate (no code changes to behavior)**: produce the exact current Review vs Timeline field matrix, the capability settings for all four modes, the route/return-navigation contract, and the temporal-ownership write-up above. You approve before implementation.
-2. **Shared sections**: rating, recommendation intent, comment, media, visibility, questionnaire — extracted as controlled components with one shared form-state hook.
-3. **New composer page** (`/review/...` routes, noindex, auth-gated, `requireAuth()` first) mounting the shared sections per mode settings; centered max-width card on desktop.
-4. **Cutover with fallback**: a single flag routes entry points to the page (default) or the existing popup (backup). `?compose=update` deep links redirect to the page. Return navigation uses one-time location state per the existing pattern.
-5. **Parity verification**: create-review, edit-review, create-update, edit-update behave identically to today (persistence, one-hour enforcement, recommendation reset, media, navigation), verified by tests and preview checks.
-6. **Retire or keep**: only after parity passes, decide whether to delete the old popup form or keep it behind the flag.
-7. Advanced structured fields on timeline updates wait for the temporal-ownership storage contract (separate approval).
+- **Current field matrix**: review create/edit vs timeline create/edit, covering fields, required rules, defaults, where each value is saved, and who is allowed.
+- **Capability table**: all four modes. Shows the subject as select or locked, rating required or optional, recommendation mode, text wording, media, date, visibility, and questionnaire. The questionnaire is hidden for timeline modes. Confirms page and popup behave the same.
+- **State model**: shared and per-mode values, unsaved-change tracking, upload state, loading saved data, and the expired-window, no-longer-latest and deleted states.
+- **Saving per mode**: the exact data each mode sends, how "left alone" differs from "cleared", how saved metadata is preserved, and the recommendation rating-based reset.
+- **Page address contract**: `/reviews/new` (subject from entity context), `/reviews/:reviewId/edit`, `/reviews/:reviewId/updates/new`, `/reviews/:reviewId/updates/:updateId/edit`. These are noindex and sign-in gated. Each page loads by ID and works on refresh. Return context travels as one-time navigation state, never as the only copy of identity. Entity return paths use the stored slugs (existing rule), and `?compose=update` deep links redirect to the update page.
+- **Timeline answer storage (write-up only)**: each update records only the answers it changed, the review holds the current answers, untouched answers carry forward, and history shows how they changed. It lists the open questions: edit/undo, versioning, unknown fields, stats, recommendation precedence, older timelines.
+- **Migration, backup and retirement plan**, with the backup switch's location and the conditions for removing the old form.
+- **Parity checklist**: the four flows, the one-hour rule, latest-only editing, media, recommendation resolution, Back/Cancel, refresh, mobile keyboard, and accessibility.
 
 ## Technical details
 
-- `reviewComposerModes.ts`: `Record<Mode, ComposerCapabilities>` — typed config (`subject: select|locked|hidden`, `rating: required|optional`, `recommendation: initial|timeline|hidden`, `text: review|what-changed`, `media`, `experienceDate`, `visibility`, `questionnaire: full|updateable|hidden`). No mode checks in JSX; sections render from capabilities.
-- Presentation dimension: `page | modal` wrapper only; the composer body is identical in both. Flag lives in one config file.
-- Persistence adapters: `createReview`/`updateReview` and `addReviewUpdate`/`editLatestReviewUpdate` unchanged; each mode maps form state to its call. DB triggers/RPCs untouched.
-- Routes: `/review/new?entity=<slug>`, `/review/:id/edit`, `/review/:id/update`, `/review/:id/update/edit` (exact URLs reconciled with canonical slug routing in the design gate).
-- Tests: mode/capability matrix, recommendation-intent parity with existing ReviewTimelineViewer tests, save mapping per mode, navigation return behavior.
+- `resolveComposerMode({ entryType, operation })` maps to `REVIEW_COMPOSER_MODES: Record<ComposerMode, ComposerCapabilities>`. The table must cover every mode, and the JSX never checks the mode.
+- `ReviewComposer` takes no presentation input for its logic. `ReviewComposerPage` (default) and `ReviewComposerModal` are thin shells around it.
+- Saving uses the existing `createReview`, `updateReview`, `addReviewUpdate` and `editLatestReviewUpdate` unchanged. Database triggers and RPCs are untouched.
+- The backup switch is a read-at-runtime config value, not a hardcoded constant. Each switch use is recorded in the roadmap together with its retirement date.
