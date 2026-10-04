@@ -3,6 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ReviewOwnerMenu } from './ReviewOwnerMenu';
+import { useIsMobile } from '@/hooks/use-mobile';
+
+vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: vi.fn(() => false) }));
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'owner-1' } }),
@@ -43,6 +46,7 @@ async function openMenu(user: ReturnType<typeof userEvent.setup>) {
 describe('ReviewOwnerMenu edit-window presentation', () => {
   beforeEach(() => {
     vi.spyOn(Date, 'now').mockReturnValue(NOW.getTime());
+    vi.mocked(useIsMobile).mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -74,6 +78,31 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
     const content = document.querySelector('[class*="max-w-\\[calc(100vw-24px)\\]"]');
     expect(content).toBeInTheDocument();
     expect(content?.closest('[role="menu"]')).toBeNull();
+  });
+
+  it('places the enabled explanation above Edit on a phone', async () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    const user = userEvent.setup();
+    renderMenu('2026-10-03T11:00:01Z');
+    await openMenu(user);
+    await user.hover(screen.getByRole('menuitem', { name: 'Edit' }));
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('You can edit for 1 hour after publishing.');
+    expect(document.querySelector('[class*="max-w-\\[calc(100vw-24px)\\]"]')).toHaveAttribute('data-side', 'top');
+  });
+
+  it('keeps the expired explanation above Edit and the menu open on a phone', async () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    const user = userEvent.setup();
+    renderMenu('2026-10-03T11:00:00Z');
+    await openMenu(user);
+    const edit = screen.getByRole('menuitem', { name: 'Edit' });
+    await user.hover(edit);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Edit window closed (1 hour limit)');
+    expect(document.querySelector('[class*="max-w-\\[calc(100vw-24px)\\]"]')).toHaveAttribute('data-side', 'top');
+    await user.click(edit);
+    expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
   });
 
   it('keeps owner Edit visible but inert at the exact one-hour boundary', async () => {
