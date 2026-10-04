@@ -16,7 +16,7 @@ Both reviewers approve the direction. Their remaining points are refinements, an
    - A new popup frame is built later only if there is a real need. It would hold the same new composer, never the old form.
    - Why: this avoids building and testing two frames before the page has proven itself.
 
-3. **Every page address carries what it works on, so refreshing never loses it** (details in "Clarifications" below).
+3. **One `/review` page address, like `/create` for posts.** Selecting an entity never changes the address (details in "Clarifications" below).
 
 4. **Timeline updates keep today's fields during the move.**
    - The fields are: what changed, an optional rating, "Would you still recommend it?" with its rating-based reset, and photos.
