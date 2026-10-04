@@ -1,50 +1,48 @@
-# Step 3 — One review form for first reviews and timeline updates
+# Step 3 — One shared review composer for reviews and timeline updates
 
-## Short answers
+## Which approach, and why
 
-**Modes, or something better?** Use modes, but keep them in one central list, not spread through the form. Make one shared form. Each of the four situations (new review, edit review, new timeline update, edit timeline update) gets one short settings entry. That entry says which sections show, which are required, and what the button says. The sections themselves (rating, "Would you still recommend it?", what stood out, best for, photos, comment, date, visibility) are built once. When a section is added to the shared list, it appears everywhere that entry allows it. You change the form in one place.
+Codex's model is the stronger one, with ChatGPT's presentation idea added. Concretely:
 
-What to avoid: one big form full of "if timeline, hide this" checks. It is easy to build and gets harder to change every month. Sections chosen by the mode's settings give the same result without that mess.
+- **Four explicit modes**: `create-review`, `edit-review`, `create-timeline-update`, `edit-timeline-update`. Each mode has its own short settings entry (Codex's "capability configuration") that declares which sections show and which are required.
+- **ChatGPT's `presentation: page | modal`**: kept as a separate setting, independent of mode. The form's logic never knows whether it sits on a page or in a popup.
+- **Default is page** (your decision, and both reviewers agree it fits a form this long). The current popup form is kept in the app as a selectable backup, so the new page can be tried and compared before anything is removed.
 
-**Page or popup?** Use a page, the same as the post form. Reasons:
-- The form is getting longer (questions, photos, video). Long popups jump on phones when the keyboard opens. You already fixed that for posts by moving to a page.
-- A page has its own address. Leaving and returning, refreshing, and the back button all work. The "update your review" links you already have can go straight to it.
-- One page handles all four modes, so there is only one place to change.
+Why this beats one big component with `if (mode === ...)` checks scattered through it: every difference between the four situations lives in one small settings table. Adding a field later means building it once and listing it in the modes that want it — exactly the "change one thing, not two" outcome you asked for.
 
-**What other review sites do:**
-- Yelp, Amazon, Tripadvisor and Booking.com use a full page for writing a review, because their forms are long and include photos.
-- Google Maps uses a full-screen sheet on phones (which works like a page) and a dialog on desktop, because its form is short.
-- Letterboxd and app-store ratings use small popups, because they are a star rating plus one text box.
-
-Our form is closer to Yelp/Tripadvisor, so a page fits. The timeline viewer stays a popup for reading. Its "Add timeline update" button opens the page instead of growing the popup.
+Why not ChatGPT's `entryType + operation` alone: it describes the same four cases but hides the real differences (rating optional, "what changed" wording, no subject picker) inside the form. Codex's per-mode settings make those differences explicit and reviewable.
 
 ## What changes for the user
 
-- "Write a review", "Edit" (within the hour), "Add timeline update" and timeline-update "Edit" all open the same review page, with the subject shown locked at the top.
-- New review: the same steps as today.
-- Timeline update: no subject picking, and rating is optional. "What changed?" is required. It has the same recommendation, photos and (later) questions as a review.
-- When saving or cancelling, you go back where you came from (the entity page, your profile, or the reopened timeline).
-- The popup review form and the form inside the timeline popup are removed once the page works.
-
-## Moving timeline-only features into the review form first
-
-The timeline form has things the review form lacks. These move into the shared sections before anything is removed:
-- "Would you still recommend it?" Yes / Maybe / No, with "tap again to clear"
-- "Base recommendation on rating" reset
-- The current photo/video uploader layout and limits text
-
-Order: (1) build the shared sections, (2) use them in the current review form and check it, (3) switch the timeline update over, (4) move both to the page, (5) delete the old copies.
+- "Write a review", "Edit" (within the hour), "Add timeline update" and timeline-update "Edit" all open the new composer **page**, with the subject locked at the top.
+- Timeline update stays lightweight by default: what changed (required), optional new rating, "Would you still recommend it?", photos. Extra review questions appear only in an "Update more details" fold, and only for things that actually changed.
+- The timeline popup becomes read-only history: AI summary, entries, menus. "Add timeline update" navigates to the page; saving or cancelling returns to the timeline/entity context.
+- The existing popup form keeps working until the page proves itself; a settings flag switches between page and popup.
 
 ## Unchanged
 
-One review per person per subject, the one-hour Edit rule, latest-only timeline editing, Delete behavior, what is saved, the post form, and the paused phases.
+One review per person per subject, the one-hour Edit rule, latest-only timeline editing, Delete behavior, the post composer, the paused phases. "Base recommendation on rating" stays timeline-only: on a first review, leaving the question unanswered already falls back to the rating.
+
+## The one question to settle before building (temporal ownership)
+
+Timeline updates currently store only rating, comment, recommendation intent and media. Before review questions (pros/cons, best for, food tags) can appear on an update, we must decide where a changed answer lives:
+
+- **Chosen model**: an update records only the answers explicitly changed at that moment; the review row keeps the current effective answers for display and stats; untouched answers carry forward; the timeline can show how answers evolved. This needs a small storage addition on updates later — it is a gate for the advanced fields, not for Step 3's core (rating, recommendation, comment, media), which already have storage.
+
+## Delivery sequence (each part ships and is checked separately)
+
+1. **Design gate (no code changes to behavior)**: produce the exact current Review vs Timeline field matrix, the capability settings for all four modes, the route/return-navigation contract, and the temporal-ownership write-up above. You approve before implementation.
+2. **Shared sections**: rating, recommendation intent, comment, media, visibility, questionnaire — extracted as controlled components with one shared form-state hook.
+3. **New composer page** (`/review/...` routes, noindex, auth-gated, `requireAuth()` first) mounting the shared sections per mode settings; centered max-width card on desktop.
+4. **Cutover with fallback**: a single flag routes entry points to the page (default) or the existing popup (backup). `?compose=update` deep links redirect to the page. Return navigation uses one-time location state per the existing pattern.
+5. **Parity verification**: create-review, edit-review, create-update, edit-update behave identically to today (persistence, one-hour enforcement, recommendation reset, media, navigation), verified by tests and preview checks.
+6. **Retire or keep**: only after parity passes, decide whether to delete the old popup form or keep it behind the flag.
+7. Advanced structured fields on timeline updates wait for the temporal-ownership storage contract (separate approval).
 
 ## Technical details
 
-- `reviewFormModes.ts`: `{ initial, editInitial, timeline, editTimeline }` → `{ sections[], required[], subjectLocked, ratingOptional, submitLabel, onSubmit target }`. This is a typed config, not booleans spread through components.
-- `ReviewSections/*`: rating, recommendationIntent (from ReviewTimelineViewer), questionnaire (existing registry/QuestionnaireSections), media, comment, date, visibility. Each is controlled and uses one state hook (`useReviewFormState`).
-- Save adapters: `createReview`/`updateReview` and `addReviewUpdate`/`editLatestReviewUpdate` stay as they are. Each mode maps the form state to its call. Existing DB triggers/RPCs are untouched.
-- Routes: `/review/new?entity=<slug>`, `/review/:id/edit`, `/review/:id/update`, `/review/:id/update/edit`. These are noindex and auth-gated (`requireAuth()` first). `?compose=update` on the entity page redirects to the update route. Return navigation uses one-time location state, following the existing pattern.
-- Timeline update entries get questionnaire answers only when the update storage supports them. Until then those sections stay hidden in the timeline modes (config only, no schema change in this step).
-- Tests: a mode matrix (sections and required fields per mode), recommendation-intent parity with the current timeline tests, and save mapping per mode. Existing ReviewTimelineViewer/ReviewForm tests move to the new sections.
-- Delivered as 3A (shared sections in the current popup), 3B (timeline uses them), 3C (page and routes, remove old forms). Each part ships and is checked separately.
+- `reviewComposerModes.ts`: `Record<Mode, ComposerCapabilities>` — typed config (`subject: select|locked|hidden`, `rating: required|optional`, `recommendation: initial|timeline|hidden`, `text: review|what-changed`, `media`, `experienceDate`, `visibility`, `questionnaire: full|updateable|hidden`). No mode checks in JSX; sections render from capabilities.
+- Presentation dimension: `page | modal` wrapper only; the composer body is identical in both. Flag lives in one config file.
+- Persistence adapters: `createReview`/`updateReview` and `addReviewUpdate`/`editLatestReviewUpdate` unchanged; each mode maps form state to its call. DB triggers/RPCs untouched.
+- Routes: `/review/new?entity=<slug>`, `/review/:id/edit`, `/review/:id/update`, `/review/:id/update/edit` (exact URLs reconciled with canonical slug routing in the design gate).
+- Tests: mode/capability matrix, recommendation-intent parity with existing ReviewTimelineViewer tests, save mapping per mode, navigation return behavior.
