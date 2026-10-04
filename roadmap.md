@@ -368,7 +368,9 @@ cross-read between them.
 ## Review Lifecycle Consistency (Review Experience Phases 1–5 paused, not discarded)
 - [x] Step 1 — one review per person per subject (unique index, shared own-review lookup, form guard, entity-page any-visibility check, race recovery) — awaiting user approval; docs/verification/review-lifecycle-step-1.md
 - [ ] Step 2 — shared owner menu on every own review + 1-hour edit window (client + review-specific DB trigger) — waits for Step 1 approval
-- [ ] Step 3 — review form vs timeline update comparison (discussion, then separate plan)
+- [ ] Step 3 — one shared review composer (plan approved; parts 3.0 → 3E)
+  - [ ] 3.0 design gate document (docs/review-composer-design.md) — awaiting approval
+  - [ ] 3A–3E blocked until 3.0 approved
 - [x] Step 1 follow-ups: readable update links, outside results in review form, live entity stats (awaiting signed-in checks)
 - [x] Step 1 navigation polish implemented: pre-resolved readable destination, one-time state consumed after ownership check, same-URL history replacement, missing-address retry, legacy query links retained. Focused tests (43), full suite (891), type check and preview build pass.
 - [ ] Step 1 signed-in acceptance: confirm immediate readable URL and update opening, Back/Forward does not reopen, missing-address retry and legacy UUID query links; blocked by external-unmanaged authentication in automated preview.
