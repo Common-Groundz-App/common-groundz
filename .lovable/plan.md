@@ -97,18 +97,39 @@ Doing it all at once would change four flows in one go. If something broke, we c
 
 Later and separately: the timeline-answer storage design, then the paused richer-review phases, each added once inside the shared composer.
 
-## Two extra safeguards (added)
+## Safeguards: worded to match what they can actually guarantee
 
-1. **No double-saves.**
-   - The Save button locks from the first tap until the server answers, in all four modes.
-   - If a save times out or loses connection, the page re-reads the review before allowing a retry.
-   - That way a slow network can't post the same timeline update twice. This matters most for timeline updates, which have no uniqueness rule like reviews do.
-2. **No orphaned photos on Cancel.**
-   - Photos uploaded during a session that you then cancel or discard are cleaned up using the existing owned-media cleanup.
-   - Photos that were already saved on the review are never touched.
-   - Today the old forms can leave such uploads behind. The new page shouldn't.
+1. **Saving twice (Option A, kept within Step 3's scope).**
+   - In all four modes, the Save button locks from the first tap until the server answers. This stops double taps.
+   - If a save **times out or the connection drops**, the result is unknown. In that case the page keeps the form, loads the latest timeline entry and shows it. It then asks: "We couldn't confirm your update was saved. Check above — Save again only if it isn't there." It never retries automatically.
+   - This does **not** guarantee that duplicates are impossible. True protection means sending a one-time submission key that the server enforces, which is a server change. It is recorded as separate reliability work for later.
+2. **Photo cleanup on Cancel (best effort).**
+   - The page remembers only the files uploaded in this session.
+   - On an explicit Cancel or Discard, it tries to delete those files through the existing owned-media cleanup.
+   - Once Save succeeds, those files are kept and never cleaned up.
+   - It never deletes:
+     - photos that were already on the review before editing
+     - files you kept during an edit
+     - files used by another review, update, post or entity
+     - outside links
+     - entity images
+   - Closing the tab, a crash or going offline can still leave files behind. Catching those needs a later scheduled cleanup, which is recorded as separate work.
 
 Both are added to the parity checklist.
+
+## Server rules check (part of 3.0)
+
+The design gate confirms, by reading the actual database functions and triggers, that these rules already exist:
+- the one-hour limit on review edits
+- the admin bypass
+- the locked subject
+- timeline-update ownership
+- latest-only timeline editing
+- the separate one-hour limit on each timeline update
+- recommendation recalculation
+- whole-thread delete
+
+Step 3 relies on these rules and does not change them. If any rule turns out to be missing, I report it to you rather than quietly adding a server change inside this refactor.
 
 ## Not in Step 3
 
