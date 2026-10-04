@@ -75,13 +75,13 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('You can edit for 1 hour after publishing.');
-    const content = document.querySelector('[class*="max-w-\\[calc(100vw-24px)\\]"]');
+    const content = document.querySelector('[class*="radix-tooltip-content-available-width"]');
     expect(content).toBeInTheDocument();
     expect(content?.closest('[role="menu"]')).toBeNull();
     expect(content).toHaveAttribute('data-side', 'left');
   });
 
-  it('places the enabled explanation above Edit on a phone', async () => {
+  it('wraps the enabled explanation beside Edit on a phone', async () => {
     vi.mocked(useIsMobile).mockReturnValue(true);
     const user = userEvent.setup();
     renderMenu('2026-10-03T11:00:01Z');
@@ -90,10 +90,12 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('You can edit for 1 hour after publishing.');
-    expect(document.querySelector('[class*="max-w-\\[calc(100vw-24px)\\]"]')).toHaveAttribute('data-side', 'top');
+    const content = document.querySelector('[class*="radix-tooltip-content-available-width"]');
+    expect(content).toHaveClass('w-40', 'whitespace-normal');
+    expect(content).toHaveAttribute('data-side', 'left');
   });
 
-  it('keeps the expired explanation above Edit and the menu open on a phone', async () => {
+  it('keeps the expired explanation beside Edit and the menu open on a phone', async () => {
     vi.mocked(useIsMobile).mockReturnValue(true);
     const user = userEvent.setup();
     renderMenu('2026-10-03T11:00:00Z');
@@ -101,7 +103,7 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
     const edit = screen.getByRole('menuitem', { name: 'Edit' });
     await user.hover(edit);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Edit window closed (1 hour limit)');
-    expect(document.querySelector('[class*="max-w-\\[calc(100vw-24px)\\]"]')).toHaveAttribute('data-side', 'top');
+    expect(document.querySelector('[class*="radix-tooltip-content-available-width"]')).toHaveAttribute('data-side', 'left');
     await user.click(edit);
     expect(screen.getByRole('menuitem', { name: 'Delete' })).toBeInTheDocument();
   });

@@ -10,10 +10,10 @@ export function ReviewEditTooltipContent({ children }: { children: ReactNode }) 
   return (
     <TooltipPrimitive.Portal>
       <TooltipContent
-        side={isMobile ? 'top' : 'left'}
+        side="left"
         align="center"
         collisionPadding={12}
-        className="pointer-events-none z-[101] max-w-[calc(100vw-24px)] whitespace-normal break-words text-center"
+        className={`pointer-events-none z-[101] max-w-[var(--radix-tooltip-content-available-width)] whitespace-normal break-words text-center ${isMobile ? 'w-40' : ''}`}
       >
         {children}
       </TooltipContent>
