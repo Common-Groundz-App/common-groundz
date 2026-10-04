@@ -63,6 +63,18 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
     expect(onEdit).toHaveBeenCalledTimes(1);
   });
 
+  it('portals the enabled explanation outside the clipped menu', async () => {
+    const user = userEvent.setup();
+    renderMenu('2026-10-03T11:00:01Z');
+    await openMenu(user);
+    await user.hover(screen.getByRole('menuitem', { name: 'Edit' }));
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('You can edit for 1 hour after publishing.');
+    expect(tooltip).toHaveClass('max-w-[calc(100vw-24px)]');
+    expect(tooltip.closest('[role="menu"]')).toBeNull();
+  });
+
   it('keeps owner Edit visible but inert at the exact one-hour boundary', async () => {
     const user = userEvent.setup();
     const onEdit = vi.fn();

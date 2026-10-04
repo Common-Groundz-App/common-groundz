@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ReviewEditTooltipContent } from '@/components/reviews/ReviewEditTooltipContent';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import {
