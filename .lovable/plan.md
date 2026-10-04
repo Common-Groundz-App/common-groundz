@@ -9,7 +9,11 @@ The architecture is now locked. This round added five precise corrections. None 
    - A settings table holds each mode's sections, required rules, wording and step layout (`steps: SectionId[][]`).
    - Presentation (page or popup) never affects fields, validation, permissions or saving.
    - Today's four-step form is not copied in.
-2. **Only the page is built now.** The old popup form and the in-timeline form stay frozen as a temporary rollback.
+2. **Only the page is built now.**
+   - The old popup form and the in-timeline form stay **genuinely frozen** as the rollback, and their code is not touched.
+   - The new shared sections are built alongside them and used only by the new page. That way a bug in the new code can't break the backup.
+   - The copying is temporary and ends at retirement.
+   - Small pieces both already use today, such as the rating rings and the photo uploader, stay shared as they are.
 3. **One route family, one page.** The addresses are listed below.
 4. **Timeline updates keep exactly today's fields.** Extra questions wait for the separate storage design.
 5. **One switch for all four flows**, using the existing settings system.
@@ -35,7 +39,7 @@ The architecture is now locked. This round added five precise corrections. None 
 | Mode | Checks |
 |---|---|
 | Create review | Signed in. The subject is saved before submit. No existing review by you for that subject: the shared lookup runs, plus the database uniqueness rule. |
-| Edit review | The review exists. You own it, or you are an admin checked on the server. It is inside its one-hour window. The subject is locked. |
+| Edit review | The review exists and the subject is locked. As the **owner**, you can edit only within one hour. As a server-verified **admin**, the existing bypass is unchanged: Edit stays available without one-hour messaging, matching the Step 2 menu. |
 | Add timeline update | The review exists, you own it, and it can still take updates. There is **no** one-hour limit; adding updates after the hour is the whole point. |
 | Edit timeline update | The review and update both exist, you own them, the update belongs to that review, it is still the latest, and it is inside its own one-hour window. |
 
@@ -85,13 +89,26 @@ Doing it all at once would change four flows in one go. If something broke, we c
 | Part | What gets built or changed | What you'll notice |
 |---|---|---|
 | **3.0 Design gate** | A written design document with all the deliverables below. No code changes. | Nothing. You review and approve it. |
-| **3A Shared foundation** | The shared sections are pulled out of today's forms: rating, recommendation chips with the rating-based reset, written text, photos/video, locked subject, date, visibility, questionnaire. Also the central form state, the mode settings table and the step engine. Today's popup form switches to the shared sections with no visible change. | Nothing should look different. |
-| **3B Page + review modes** | The `/review` route family and the `ReviewComposerPage` are added, with create review and edit review working. Their checks, Save/Cancel and safe return are included. | Nothing in normal use. Reachable only by direct address for testing. |
-| **3C Timeline modes** | Add timeline update and edit timeline update move onto the page, matching today exactly (rating optional, what changed required, recommendation reset, photos). | Nothing in normal use. Reachable by direct address for testing. |
-| **3D Cutover** | The switch is added, with the release default set to `page`. Every Write review, Edit, Add timeline update and timeline Edit button opens the page. The timeline popup becomes read-only while the switch is on. The new `?compose=update` behaviour is added. The full parity checks run on desktop and mobile. | All review writing happens on the new page. You test signed in. |
+| **3A New shared foundation** | New shared sections for the composer: rating, recommendation chips with the rating-based reset, written text, photos/video, locked subject, date, visibility and questionnaire. Also the central form state, the mode settings table and the step engine. The legacy forms are not touched. | Nothing. |
+| **3B Page + review modes + switch** | The `/review` route family and `ReviewComposerPage`, with create review and edit review working, including their checks, Save/Cancel and safe return. The **switch is installed now** with the release default `legacy`, along with the helper every entry button will use. Its behaviour is tested when the setting loads on, loads off, is still loading or fails, and for direct addresses. Entry buttons still open the old forms. | Nothing in normal use. Reachable only by direct address for testing. |
+| **3C Timeline modes** | Add timeline update and edit timeline update on the page, matching today exactly: rating optional, what changed required, recommendation reset, photos. The in-timeline form keeps working normally. | Nothing in normal use. Reachable only by direct address for testing. |
+| **3D Cutover** | Only after all four modes pass: the release default becomes `page` and the already-tested switch is turned on. Every Write review, Edit, Add timeline update and timeline Edit button then opens the page. The timeline popup is read-only while the switch is on, and the new `?compose=update` behaviour starts. Full parity checks run on desktop and mobile, and an immediate rollback stays available. | All review writing happens on the new page. You test signed in. |
 | **3E Retirement** | After your approval: delete the old popup form, the in-timeline form, the switch and the release default, and update the roadmap. | Nothing; the new page is already what you use. |
 
 Later and separately: the timeline-answer storage design, then the paused richer-review phases, each added once inside the shared composer.
+
+## Two extra safeguards (added)
+
+1. **No double-saves.**
+   - The Save button locks from the first tap until the server answers, in all four modes.
+   - If a save times out or loses connection, the page re-reads the review before allowing a retry.
+   - That way a slow network can't post the same timeline update twice. This matters most for timeline updates, which have no uniqueness rule like reviews do.
+2. **No orphaned photos on Cancel.**
+   - Photos uploaded during a session that you then cancel or discard are cleaned up using the existing owned-media cleanup.
+   - Photos that were already saved on the review are never touched.
+   - Today the old forms can leave such uploads behind. The new page shouldn't.
+
+Both are added to the parity checklist.
 
 ## Not in Step 3
 
