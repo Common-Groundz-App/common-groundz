@@ -71,8 +71,9 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('You can edit for 1 hour after publishing.');
-    expect(tooltip.querySelector('[class*="max-w-"]')).toHaveClass('max-w-[calc(100vw-24px)]');
-    expect(tooltip.closest('[role="menu"]')).toBeNull();
+    const content = document.querySelector('[class*="max-w-\\[calc(100vw-24px)\\]"]');
+    expect(content).toBeInTheDocument();
+    expect(content?.closest('[role="menu"]')).toBeNull();
   });
 
   it('keeps owner Edit visible but inert at the exact one-hour boundary', async () => {
