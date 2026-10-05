@@ -34,6 +34,7 @@ import ResetPassword from '@/pages/ResetPassword';
 import CompleteProfile from '@/pages/CompleteProfile';
 import AccountDeleted from '@/pages/AccountDeleted';
 import CreatePost from '@/pages/CreatePost';
+import ReviewComposerPage from '@/pages/ReviewComposerPage';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import TermsOfService from '@/pages/TermsOfService';
 import CookiePolicy from '@/pages/CookiePolicy';
@@ -211,6 +212,17 @@ function App() {
                   <Route path="/create" element={
                     <AppProtectedRoute>
                       <CreatePost />
+                    </AppProtectedRoute>
+                  } />
+                  {/* Step 3B — review composer page (temporary admin/switch gate inside the page). */}
+                  <Route path="/review" element={
+                    <AppProtectedRoute>
+                      <ReviewComposerPage />
+                    </AppProtectedRoute>
+                  } />
+                  <Route path="/review/:reviewId/edit" element={
+                    <AppProtectedRoute>
+                      <ReviewComposerPage />
                     </AppProtectedRoute>
                   } />
                   <Route path="*" element={<NotFound />} />
