@@ -86,7 +86,7 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
     setIsDeleting(false);
     if (result === 'deleted') {
       setConfirmOpen(false);
-      toast({ title: 'Review deleted', description: 'Your review and its timeline were removed.' });
+      toast(isModerator ? { title: 'Review removed' } : { title: 'Review deleted', description: 'Your review and its timeline were removed.' });
       onDeleted?.();
     } else if (result === 'not_found') {
       // Already gone (e.g. deleted in another tab): reconcile, not an error.
