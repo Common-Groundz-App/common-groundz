@@ -20,6 +20,8 @@ import {
   REVIEW_DELETE_AFTER_HOUR_HINT,
   REVIEW_DELETE_DESCRIPTION,
   REVIEW_DELETE_TITLE,
+  REVIEW_MODERATION_DELETE_DESCRIPTION,
+  REVIEW_MODERATION_DELETE_TITLE,
 } from '@/utils/reviewEditPolicy';
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import type { Review } from '@/services/reviewService';
@@ -61,9 +63,13 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
   const isOwner = !!user && user.id === review.user_id;
   if (!isOwner && !isAdmin) return null;
 
+  // Step 3.0A (F1): author actions are owner-only. An admin viewing someone
+  // else's review gets moderation actions only. Admins keep the one-hour
+  // bypass on their own reviews.
+  const isModerator = !isOwner && isAdmin;
   const canEdit = canEditReview(review, user?.id, isAdmin);
   const afterHour = !isWithinEditWindow(review.created_at);
-  const hasEditAction = !!(onEdit || editableReview);
+  const hasEditAction = isOwner && !!(onEdit || editableReview);
 
   const editItem = hasEditAction ? (
     <DropdownMenuItem
@@ -145,7 +151,7 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
             onClick={() => setConfirmOpen(true)}
             className="text-destructive focus:text-destructive flex items-center gap-2"
           >
-            <Trash2 className="h-4 w-4" /> Delete
+            <Trash2 className="h-4 w-4" /> {isModerator ? 'Remove review (moderation)' : 'Delete'}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -154,11 +160,13 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
         isOpen={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleDelete}
-        title={REVIEW_DELETE_TITLE}
+        title={isModerator ? REVIEW_MODERATION_DELETE_TITLE : REVIEW_DELETE_TITLE}
         description={
-          afterHour && isOwner
-            ? `${REVIEW_DELETE_DESCRIPTION} ${REVIEW_DELETE_AFTER_HOUR_HINT}`
-            : REVIEW_DELETE_DESCRIPTION
+          isModerator
+            ? REVIEW_MODERATION_DELETE_DESCRIPTION
+            : afterHour
+              ? `${REVIEW_DELETE_DESCRIPTION} ${REVIEW_DELETE_AFTER_HOUR_HINT}`
+              : REVIEW_DELETE_DESCRIPTION
         }
         isLoading={isDeleting}
       />
