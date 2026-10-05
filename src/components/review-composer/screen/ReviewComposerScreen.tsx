@@ -13,7 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import StepOne from '@/components/profile/reviews/steps/StepOne';
-import { SubjectSelectStep } from '@/components/profile/reviews/steps/SubjectSelectStep';
+import SubjectSelectStep from '@/components/profile/reviews/steps/SubjectSelectStep';
 import StepFour from '@/components/profile/reviews/steps/StepFour';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
@@ -142,7 +142,7 @@ export function ReviewComposerScreen(props: Props) {
   }, [dirty]);
 
   /* ---------------- section handlers ---------------- */
-  const setValue = (id: Parameters<typeof dispatch>[0] extends infer A ? any : never, value: unknown) =>
+  const setValue = (id: Exclude<SectionId, 'subject' | 'questionnaire'>, value: unknown) =>
     dispatch({ type: 'SET_VALUE', sessionKey, id, value });
 
   const handleSubjectChange = (adapter: EntityAdapter | null) => {
