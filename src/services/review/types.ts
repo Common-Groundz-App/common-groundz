@@ -35,7 +35,7 @@ export interface ReviewCreateData {
   title: string;
   subtitle?: string;
   description?: string;
-  image_url?: string;
+  image_url?: string | null;
   category: string;
   rating: number;
   venue?: string;
@@ -50,7 +50,7 @@ export interface ReviewUpdateData {
   title?: string;
   subtitle?: string;
   description?: string;
-  image_url?: string;
+  image_url?: string | null;
   category?: string;
   rating?: number;
   venue?: string;

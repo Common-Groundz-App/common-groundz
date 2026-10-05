@@ -1037,27 +1037,11 @@ const ReviewForm = ({
       // Convert Date to ISO string for API submission
       const formattedExperienceDate = experienceDate ? experienceDate.toISOString() : undefined;
       
-      // For backward compatibility, use the first image as the main image_url,
-      // but if no user-uploaded images and we're from entity page, use entity image as fallback
-      let image_url: string | undefined = undefined;
-      
-      if (selectedMedia.length > 0) {
-        // Use the first uploaded image as the main image
-        image_url = selectedMedia[0].url;
-      } else if (isFromEntityPage && entity?.image_url) {
-        // If no user-uploaded images and we're from entity page, use entity image as fallback
-        image_url = entity.image_url;
-        
-        // Also add it to the media array so it shows in the review
-        const entityMedia: MediaItem = {
-          url: ensureHttps(entity.image_url),
-          type: 'image',
-          order: 0,
-          id: `entity-${entity.id}`
-        };
-        setSelectedMedia([entityMedia]);
-      }
-      
+      // Step 3.0A (F5): review media and image_url come only from the reviewer's
+      // own uploads. The entity image is display-only and is never persisted
+      // as review media.
+      const image_url: string | null = selectedMedia.length > 0 ? selectedMedia[0].url : null;
+
       /**
        * Phase 3A — identity is derived from the subject, never re-typed, and
        * `subjectOrigin` protects historical rows from a silent rewrite.
@@ -1092,10 +1076,10 @@ const ReviewForm = ({
        */
       
       if (isEditMode && review) {
+        // Step 3.0A (F4): subject identity (title, venue, entity_id, category)
+        // is immutable and never sent on Edit, including legacy-unlinked reviews.
         await updateReview(review.id, {
-          title: finalTitle, // Subject identity
           subtitle: reviewTitle, // Store the review headline in the subtitle field
-          venue: finalVenue,
           description,
           rating,
           image_url,
