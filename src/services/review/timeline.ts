@@ -199,6 +199,16 @@ export const deleteLatestReviewUpdate = async (
 export type EditUpdateResult = 'ok' | 'expired' | 'not_latest' | 'unauthorized' | 'conflict' | 'error';
 
 /**
+ * Step 3.0A (F2) — the five distinct recommendation states for a timeline
+ * entry: yes/maybe/no = explicit opinion, 'auto' = explicit reset to the
+ * rating, null = this entry makes no recommendation statement.
+ */
+export const toTimelineRecommendationValue = (
+  baseOnRating: boolean,
+  wouldRecommend: 'yes' | 'maybe' | 'no' | null,
+): 'yes' | 'maybe' | 'no' | 'auto' | null => (baseOnRating ? 'auto' : wouldRecommend ?? null);
+
+/**
  * Step 2 — owner edits the latest timeline update within its hour.
  * Server enforces owner, latest-only, window, and recomputes the review.
  */
@@ -208,7 +218,7 @@ export const editLatestReviewUpdate = async (
   rating: number | null,
   comment: string,
   media: MediaItem[],
-  wouldRecommend: 'yes' | 'maybe' | 'no' | null,
+  wouldRecommend: 'yes' | 'maybe' | 'no' | 'auto' | null,
 ): Promise<EditUpdateResult> => {
   try {
     const { data, error } = await supabase.rpc('edit_latest_review_update', {
