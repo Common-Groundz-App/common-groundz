@@ -21,16 +21,22 @@ The building blocks of the new composer. No screen uses them yet, so nobody sees
 3. **Sections own only their field**: each section loads its own value, checks it, and handles its label and error. **Sections never build save data.**
 4. **Four save builders, and only these build what gets saved**: they own the cross-field rules. The first photo becomes the cover image. The subject decides title, place and category. Metadata is merged with what's stored. Each mode has its own rule for leaving a value out versus saving it as empty, and for auto versus no statement. They also enforce the fields an edit must never send.
    - new review: title and place come from the saved subject; the photo comes only from uploads; metadata is merged.
-   - edit review: can never contain the author, subject, category, title or place (enforced by the types).
+   - edit review: can never contain the author, subject, category, title, place or status.
    - new timeline update: the comment is trimmed; leaving the recommendation out is different from auto.
    - edit timeline update: all five recommendation states are kept.
-5. **Hidden sections are inert**: a section hidden in a mode doesn't check itself, doesn't block Next or Save, doesn't show errors or count as dirty, and never adds or clears anything in what gets saved. Stored values a hidden section holds are carried through only where a save builder deliberately keeps them.
-6. **Upload session (F7), lifetime defined**: the ID is created once and kept through re-renders, step changes, failed checks, upload progress, screen-size changes and retries after a temporary error. It changes only when the session itself changes: a different review, a different timeline update, a new review session, or a deliberate reset after a successful save. Cleanup on Cancel covers only this session's uploads, never photos that were already there or entity photos. Photos from a successful save count as kept. After an ambiguous save, nothing is cleaned up.
-7. **Step engine**: walks the mode's steps, blocks Next and Save on errors, and focuses the first invalid field.
-8. **Save lock**: Save is disabled from the first tap. A timeout moves to "ambiguous" with no automatic retry. Neither the blocked nor the ambiguous state can submit.
-9. **My additions**:
-   - **Unsaved-changes check**: the store reports one "has unsaved changes" signal based on dirty values plus this session's uploads, so 3B can warn on Cancel or leaving the page using the same rule in every mode.
-   - **Same errors for the server's refusals**: a single function turns server responses (window closed, not the latest update, not allowed, existing review, conflict) into the store's blocked reasons, so every mode shows the same message for the same refusal.
+   - **Allowlist at run time, not only in the types**: each builder lists exactly the fields it sends. None of them starts from the whole form or the loaded record and removes keys afterwards. Timeline payloads follow the same rule, so review fields can never slip in.
+5. **Three kinds of "not showing"**, each with its own rule:
+   - **Not used in this mode** (for example, the questionnaire in a timeline update): fully inert. It isn't checked, doesn't block, shows no errors, doesn't count as dirty, and is left out of what gets saved.
+   - **On another step** (for example, photos while you're on step 1): still active. It stays dirty, is still checked and saved, and still counts as an unsaved change.
+   - **No longer fits after the subject changes** (Food to Book, or Book to Food): an explicit reset clears the answers given this session that no longer fit, never saves stale ones, and marks the change as dirty. Stored answers that this build doesn't understand are kept when editing.
+6. **Old results can't overwrite the current session**: each session has its own key (new review, edit review X, new update on X, edit update Y on X). Every slow result is checked against the active key before it can change anything: loaded data, a subject lookup, an upload finishing, a check result, or a save result (success, error or ambiguous). If the user has moved on, it's ignored.
+7. **Upload session (F7), lifetime tied to the session, not to a screen piece**: the ID belongs to the session controller, not to any child part of the screen. It survives re-renders, step changes, failed checks, upload progress, layout or screen-size remounts, page-shell changes, and retries after a temporary error. A new ID is made only when a real new session starts: a different review, a different update, a new review session, or a deliberate reset after a successful save. Changing the session never cleans up the old session's uploads until it's settled whether they were saved. Cancel cleans up only this session's uploads, never photos that were already there or entity photos. Saved photos count as kept. Nothing is cleaned up while a save is ambiguous.
+8. **Step engine**: walks the mode's steps, blocks Next and Save on errors, and focuses the first invalid field.
+9. **Save lock**: Save is disabled from the first tap. "Blocked" can't submit. "Ambiguous" (after a timeout) disables Save only until it's resolved. Once 3B confirms whether the save went through, an explicit manual retry is allowed when appropriate. It never retries automatically.
+10. **My additions**:
+   - **Unsaved-changes check**: one signal for every mode, based on dirty values plus this session's uploads. 3B will use it to warn on Cancel or when leaving the page.
+   - **Same errors for the server's refusals, using codes**: one function maps stable result codes (expired, not_latest, unauthorized, existing_review, conflict, not_found) to blocked reasons. It never matches on error text. Unknown errors stay real errors and are never forced into a known reason.
+   - **Ambiguous saves can be checked**: a function that, given the session, looks up the server to see whether the save landed. For a new review it uses the existing own-review lookup; for a timeline update, the latest update. 3B wires it to the screen, so "ambiguous" always has a defined way out.
 
 ## Not in 3A
 
@@ -44,27 +50,42 @@ The building blocks of the new composer. No screen uses them yet, so nobody sees
 
 Automated tests only:
 - **Modes**: all four resolve; unsupported combinations fail; every referenced section exists; every step list is valid.
-- **State**: loading doesn't mark dirty; change-and-restore clears dirty; step moves keep values, errors and uploads; switching to another review resets everything; blocked and ambiguous states can't submit.
-- **Hidden sections**: they don't validate, block, show errors, count as dirty or change what gets saved.
+- **State**: loading doesn't mark dirty; change-and-restore clears dirty; step moves keep values, errors and uploads; switching to another review resets everything; "blocked" can't submit; "ambiguous" can't submit until resolved, then allows one manual retry.
+- **Three kinds of "not showing"**:
+  - moving between steps;
+  - collapsing an optional section;
+  - Food → Book and Book → Food;
+  - editing a review with unknown questionnaire fields;
+  - questionnaire data while in a timeline mode.
+- **Old results**:
+  - review A finishes loading after review B is open;
+  - closing during loading;
+  - changing the subject while its lookup is running;
+  - an old upload finishing after the session changed;
+  - an old save result arriving after moving to another review. None of these may change the current session.
 - **Edit paths, not just round trips**:
   - load, change one field, save: the other fields stay unchanged;
   - unknown stored metadata and questionnaire keys survive;
-  - review edit never contains identity fields;
   - a timeline update saved as auto, with only its comment edited, still saves as auto;
   - cleared and untouched values stay distinct.
+- **Allowlist**: each builder's output equals the exact expected object. Edit review has no `user_id`, `entity_id`, `category`, `title`, `venue` or `status`, even when the input is spread from a loaded record that contains them. Timeline payloads contain no review fields.
 - **Save builders**: identity comes from the saved subject; no upload means no cover image; a new timeline update keeps "left out" and auto apart; timeline edit keeps all five states.
-- **Upload session**: stable across re-renders and steps; a new ID for a new session; cleanup lists only this session's uploads; saved photos count as kept; nothing is cleaned up after an ambiguous save.
+- **Server refusals**: each code maps correctly; unknown errors stay errors; nothing depends on error text.
+- **Upload session**: the ID survives re-renders, step changes and remounts of child parts; a new ID only for a new session; an old session's uploads aren't cleaned up when the session changes before the save is settled; cleanup lists only this session's uploads; saved photos count as kept; nothing is cleaned up while a save is ambiguous.
 - **Boundary**: no existing screen imports the new module; the old forms are untouched; the existing tests pass unchanged.
 
 The docs and roadmap are updated, and 3A is marked done, only after the implementation and its tests pass. Then I stop for your approval before 3B.
 
 ## Technical details
 
-- Module `src/components/review-composer/`: `modes.ts`, `values.ts`, `store.ts` (useReducer + context), `sections/*.ts`, `saveBuilders.ts`, `serverErrors.ts`, `useUploadSession.ts`, `stepEngine.ts`, `__tests__/`. A header comment in each file says the module is unused until cutover.
+- Module `src/components/review-composer/`: `README.md` (one module note: introduced in 3A, unused until the page integration, old forms stay independent during rollout), `modes.ts`, `values.ts`, `store.ts` (useReducer + controller), `sections/*.ts`, `saveBuilders.ts`, `serverErrors.ts`, `reconcile.ts`, `useUploadSession.ts`, `stepEngine.ts`, `__tests__/`. File comments describe each file's lasting job, not the rollout status.
 - `ReviewComposerValues` interface; `SectionValueMap` keys map to exact types; no `Record<SectionId, unknown>` and no casts. `MODES satisfies Record<ComposerMode, ComposerCapabilities>`.
-- Section contract: `{ id, visible(caps), hydrate(record) → SectionValueMap[id], validate(value, mode) }`. There is no serialize on sections.
-- The edit-review payload type uses `Omit`/`never` for `user_id | entity_id | category | title | venue`.
-- Builders reuse `resolveReviewIdentity`/`identityPersistence`, `buildReviewMetadataForSave` (merge), `toTimelineRecommendationValue` and the questionnaire `registry`/`resolve`.
-- `useUploadSession(sessionKey)`: the key is `mode + reviewId/updateId`, or a per-mount nonce for new reviews. The ID is set lazily (`ref.current ??= generateUUID()`) and regenerated when the key changes. The hook tracks `sessionUploads` and `committed`.
+- `SectionAvailability = 'enabled' | 'mode-disabled' | 'not-rendered'`. Subject change dispatches `SUBJECT_CHANGED`, which resets incompatible session answers and keeps unknown stored keys, matching the legacy `questionnaireReset` contract.
+- Section contract: `{ id, availability(caps, values), hydrate(record) → SectionValueMap[id], validate(value, mode) }`. There is no serialize on sections.
+- Session key: `create-review:<nonce>` | `edit-review:<reviewId>` | `create-timeline-update:<reviewId>` | `edit-timeline-update:<reviewId>:<updateId>`. The nonce is created once by the controller that owns the logical session, never by a child mount. Every async action carries its key; the reducer drops actions whose key isn't current.
+- Builders return object literals built from named fields, plus a type-level `Omit` as a second guard.
+- `useUploadSession(sessionKey)`: `ref.current` holds `{ key, id }` and is regenerated only when the key changes. It tracks `sessionUploads`, `committed` and `settled`; cleanup is never triggered by a key change alone.
+- `serverErrors.ts` maps service result codes and Postgres/RPC codes (23505 on `reviews_one_per_user_entity`, `review_edit_window_closed` as an exception code). It falls back to `error` for anything else.
+- `reconcile.ts` uses the existing `findOwnReviewForEntity` and the latest-update fetch; it's pure and tested with mocks.
 - A grep check in the tests confirms no file outside the module imports from it.
 - Close-out: `docs/verification/review-composer-3a.md`, the design-doc boundary note, and roadmap updates. AGENTS.md is unchanged.
