@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
-import { MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Eye, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -12,7 +17,7 @@ import { ReviewEditTooltipContent } from './ReviewEditTooltipContent';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { deleteReviewThread } from '@/services/review/core';
+import { deleteReviewThread, updateReview } from '@/services/review/core';
 import { notifyReviewsChanged } from '@/services/review/reviewChangeEvents';
 import {
   canEditReview,
@@ -20,12 +25,14 @@ import {
   REVIEW_DELETE_AFTER_HOUR_HINT,
   REVIEW_DELETE_DESCRIPTION,
   REVIEW_DELETE_TITLE,
+  REVIEW_MODERATION_DELETE_DESCRIPTION,
+  REVIEW_MODERATION_DELETE_TITLE,
 } from '@/utils/reviewEditPolicy';
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import type { Review } from '@/services/reviewService';
 
 interface ReviewOwnerMenuProps {
-  review: { id: string; user_id: string; created_at: string };
+  review: { id: string; user_id: string; created_at: string; visibility?: string | null };
   isAdmin?: boolean;
   /** Opens the timeline (where Add timeline update lives). */
   onAddTimelineUpdate?: () => void;
@@ -61,9 +68,13 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
   const isOwner = !!user && user.id === review.user_id;
   if (!isOwner && !isAdmin) return null;
 
+  // Step 3.0A (F1): author actions are owner-only. An admin viewing someone
+  // else's review gets moderation actions only. Admins keep the one-hour
+  // bypass on their own reviews.
+  const isModerator = !isOwner && isAdmin;
   const canEdit = canEditReview(review, user?.id, isAdmin);
   const afterHour = !isWithinEditWindow(review.created_at);
-  const hasEditAction = !!(onEdit || editableReview);
+  const hasEditAction = isOwner && !!(onEdit || editableReview);
 
   const editItem = hasEditAction ? (
     <DropdownMenuItem
@@ -80,7 +91,7 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
     setIsDeleting(false);
     if (result === 'deleted') {
       setConfirmOpen(false);
-      toast({ title: 'Review deleted', description: 'Your review and its timeline were removed.' });
+      toast(isModerator ? { title: 'Review removed' } : { title: 'Review deleted', description: 'Your review and its timeline were removed.' });
       onDeleted?.();
     } else if (result === 'not_found') {
       // Already gone (e.g. deleted in another tab): reconcile, not an error.
@@ -90,6 +101,20 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
       onDeleted?.();
     } else {
       toast({ title: 'Could not delete', description: 'Please try again.', variant: 'destructive' });
+    }
+  };
+
+  type Visibility = 'public' | 'circle_only' | 'private';
+  const currentVisibility = (review.visibility as Visibility | undefined) ?? undefined;
+  /** Step 3.0A — visibility is a privacy control the owner can change at any time. */
+  const handleVisibility = async (value: string) => {
+    if (value === currentVisibility) return;
+    try {
+      await updateReview(review.id, { visibility: value as Visibility });
+      toast({ title: 'Visibility updated' });
+      await onEdited?.();
+    } catch {
+      toast({ title: 'Could not change visibility', description: 'Please try again.', variant: 'destructive' });
     }
   };
 
@@ -140,12 +165,26 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
               </TooltipProvider>
             )
           )}
+          {isOwner && currentVisibility && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="flex items-center gap-2">
+                <Eye className="h-4 w-4" /> Change visibility
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent onClick={stop}>
+                <DropdownMenuRadioGroup value={currentVisibility} onValueChange={handleVisibility}>
+                  <DropdownMenuRadioItem value="public">Public</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="circle_only">Circle only</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="private">Private</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          )}
           {children}
           <DropdownMenuItem
             onClick={() => setConfirmOpen(true)}
             className="text-destructive focus:text-destructive flex items-center gap-2"
           >
-            <Trash2 className="h-4 w-4" /> Delete
+            <Trash2 className="h-4 w-4" /> {isModerator ? 'Remove review (moderation)' : 'Delete'}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -154,11 +193,13 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
         isOpen={confirmOpen}
         onClose={() => setConfirmOpen(false)}
         onConfirm={handleDelete}
-        title={REVIEW_DELETE_TITLE}
+        title={isModerator ? REVIEW_MODERATION_DELETE_TITLE : REVIEW_DELETE_TITLE}
         description={
-          afterHour && isOwner
-            ? `${REVIEW_DELETE_DESCRIPTION} ${REVIEW_DELETE_AFTER_HOUR_HINT}`
-            : REVIEW_DELETE_DESCRIPTION
+          isModerator
+            ? REVIEW_MODERATION_DELETE_DESCRIPTION
+            : afterHour
+              ? `${REVIEW_DELETE_DESCRIPTION} ${REVIEW_DELETE_AFTER_HOUR_HINT}`
+              : REVIEW_DELETE_DESCRIPTION
         }
         isLoading={isDeleting}
       />

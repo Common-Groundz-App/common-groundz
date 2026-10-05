@@ -136,4 +136,20 @@ describe('ReviewOwnerMenu edit-window presentation', () => {
     await user.click(edit);
     expect(onEdit).toHaveBeenCalledTimes(1);
   });
+
+  it("gives an admin only moderation removal on someone else's review", async () => {
+    const user = userEvent.setup();
+    render(
+      <ReviewOwnerMenu
+        review={{ id: 'review-2', user_id: 'someone-else', created_at: '2026-10-03T11:50:00Z' }}
+        isAdmin
+        onEdit={vi.fn()}
+        onAddTimelineUpdate={vi.fn()}
+      />,
+    );
+    await openMenu(user);
+    expect(screen.queryByRole('menuitem', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /Add timeline update/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Remove review \(moderation\)/ })).toBeInTheDocument();
+  });
 });

@@ -381,3 +381,13 @@ cross-read between them.
 - [x] Step 2 polish: keep eligible Edit actions visible, explain the one-hour window, and preserve accurate admin/latest-only behavior
 - [x] Step 2 mobile tooltip polish: portalled, viewport-safe wrapped Edit explanations beside review and latest timeline-update rows on phones; menus and post tooltips unchanged
 - [ ] Step 2 signed-in acceptance — needs your manual check (automated sign-in not available)
+
+## Step 3.0A — audit fixes before 3A
+- [x] 3.0A-1 F3 timeline privacy (RLS + reader audit); private/Circle behavior manually unverified
+- [x] 3.0A-2 F2 auto recommendation round-trip
+- [x] 3.0A-3 F1 author actions owner-only, separate moderation removal
+- [x] 3.0A-4 F4 legacy identity read-only, omitted from Edit
+- [x] 3.0A-5 F5 no entity image as review media (10 legacy rows counted, untouched)
+- [x] Owner Change visibility after the edit window
+- [ ] Signed-in manual checklist (docs/review-composer-design.md) — waiting on user
+- [ ] 3A — blocked until 3.0A approved

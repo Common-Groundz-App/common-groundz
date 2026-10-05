@@ -29,6 +29,7 @@ import {
   addReviewUpdate,
   deleteLatestReviewUpdate,
   editLatestReviewUpdate,
+  toTimelineRecommendationValue,
   fetchLatestRecommendationIntent,
   fetchReviewUpdates,
   type WouldRecommendValue,
@@ -268,7 +269,7 @@ export const ReviewTimelineViewer = ({
         newRating,
         newComment.trim(),
         selectedMedia,
-        baseOnRating ? null : wouldRecommend,
+        toTimelineRecommendationValue(baseOnRating, wouldRecommend),
       );
       if (result === 'ok') {
         toast({ title: 'Timeline update saved' });

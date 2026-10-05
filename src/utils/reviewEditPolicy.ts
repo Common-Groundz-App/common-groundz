@@ -49,6 +49,9 @@ export const REVIEW_DELETE_DESCRIPTION =
   'This permanently removes the original review and all timeline updates.';
 export const REVIEW_DELETE_AFTER_HOUR_HINT =
   'If your experience changed, consider adding a timeline update instead.';
+export const REVIEW_MODERATION_DELETE_TITLE = "Remove this person's review?";
+export const REVIEW_MODERATION_DELETE_DESCRIPTION =
+  "This is a moderation action. It permanently removes another person's review and all of its timeline updates.";
 export const UPDATE_DELETE_TITLE = 'Delete this timeline update?';
 export const UPDATE_DELETE_DESCRIPTION = 'Your original review and earlier updates will remain.';
 
