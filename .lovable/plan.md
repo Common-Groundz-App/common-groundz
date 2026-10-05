@@ -29,7 +29,7 @@ Build the full-page composer for **new review** and **edit review** on the 3A pa
 
 ## Step 4 — New review
 - `/review`: pick a subject on the page, including external results found-or-created in the background; the URL never changes.
-- `/review?entityId=<id>`: subject preselected and locked. If it's not found, "Pick another" replaces the URL with `/review` **and starts a fresh session** — no leftover category, questionnaire or food-tag answers.
+- `/review?entityId=<id>`: a valid subject stays locked for the whole session — no way to unlock it. "Pick another" appears **only** when the starting subject is malformed, missing or deleted; it replaces the URL with `/review` **and starts a fresh session** — no leftover category, questionnaire or food-tag answers.
 - Already reviewed this subject (before the form, or on save via 23505): "You've already reviewed this" with **Add timeline update** and Cancel.
 - Save payload identical to the legacy popup's.
 
@@ -44,7 +44,7 @@ Build the full-page composer for **new review** and **edit review** on the 3A pa
 - Ambiguous timeout: form kept, Save locked. New review: if a review for this subject now exists, say "A review for this already exists" and offer to view it — never "your exact answers were saved". Edit: reload and compare the sent fields; only a full match says "Your changes were saved"; otherwise stays unsure and the user chooses to retry.
 - Cancel removes only photos uploaded in this session, never while unsure.
 - Success: invalidation fires; destination built from the stored entity and parent slugs (resolved during the lookup), never from names or `/entity/<uuid>`.
-- **Add timeline update** (from both notices) reuses the existing Step 1 helper (`openReviewUpdate`: stored slugs + one-time state consumed on the entity page) — no second implementation, no ID or `?compose=update` URL. Tested explicitly.
+- **Add timeline update** (from both notices): a small new typed helper `openExistingReviewTimelineUpdate({ entityId, expectedReviewId })` built on the existing pieces — the signed-in `findOwnReviewForEntity` lookup, its stored-slug destination, and the entity page's one-time `openReviewUpdate` state. It checks the review ID matches, requires the stored-slug destination, and returns opened / not found / mismatch / no destination / lookup failed (last two retryable). Never falls back to an ID URL, a name-made slug, `?compose=update` or another review. The frozen legacy popup keeps its own handler until 3E. Tested explicitly.
 - The page reuses only low-level inputs (rating, subject picker, photo uploader, questionnaire, food tags, visibility); it never imports the legacy popup's orchestration — the 3A parts stay the only state/save authority.
 - Pick another also clears the old subject's existing-review check and errors; earlier-session uploads follow the 3A rules (not cleaned until settled).
 
