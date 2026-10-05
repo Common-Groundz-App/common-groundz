@@ -210,4 +210,4 @@ Corrected mappings: `edit-review` sends subtitle, description, rating, image_url
 
 ## Step 3A — composer foundation boundary
 
-The shared composer foundation lives in `src/components/review-composer/` (modes, typed store, sections, four save builders, upload session, step engine, server results, ambiguous-save evidence). It is not mounted by any screen until 3B; the legacy popup and inline timeline form stay independent during rollout. Verification: `docs/verification/review-composer-3a.md`.
+The shared composer foundation lives in `src/components/review-composer/` (modes, typed store, sections, four save builders, upload session, step engine, server results, ambiguous-save evidence). In 3B it is used only by the gated review page (`src/pages/ReviewComposerPage.tsx`); the legacy popup and inline timeline form stay independent during rollout. Verification: `docs/verification/review-composer-3a.md`.
