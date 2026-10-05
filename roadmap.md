@@ -392,4 +392,7 @@ cross-read between them.
 - [ ] Signed-in manual checklist (docs/review-composer-design.md) — waiting on user
 - [x] 3.0A approved (signed-in step 1 checked by user)
 - [x] 3A — composer foundation (unused): design doc reconciled, modes, typed store, sections, allowlisted save builders, upload session, step engine, typed server results, ambiguity evidence; 61 new tests; see docs/verification/review-composer-3a.md
-- [ ] 3B — blocked until 3A approved
+- [x] 3A approved
+- [x] 3B — review page (new + edit review) behind the rollout switch (off); see docs/verification/review-composer-3b.md
+- [ ] 3B signed-in manual checklist — waiting on user (preview sign-in not available to the agent)
+- [ ] 3C — timeline modes on the page (blocked until 3B approved)
