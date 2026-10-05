@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
-import { MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Eye, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -12,7 +17,7 @@ import { ReviewEditTooltipContent } from './ReviewEditTooltipContent';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { deleteReviewThread } from '@/services/review/core';
+import { deleteReviewThread, updateReview } from '@/services/review/core';
 import { notifyReviewsChanged } from '@/services/review/reviewChangeEvents';
 import {
   canEditReview,
@@ -27,7 +32,7 @@ import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import type { Review } from '@/services/reviewService';
 
 interface ReviewOwnerMenuProps {
-  review: { id: string; user_id: string; created_at: string };
+  review: { id: string; user_id: string; created_at: string; visibility?: string | null };
   isAdmin?: boolean;
   /** Opens the timeline (where Add timeline update lives). */
   onAddTimelineUpdate?: () => void;
@@ -99,6 +104,20 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
     }
   };
 
+  type Visibility = 'public' | 'circle_only' | 'private';
+  const currentVisibility = (review.visibility as Visibility | undefined) ?? undefined;
+  /** Step 3.0A — visibility is a privacy control the owner can change at any time. */
+  const handleVisibility = async (value: string) => {
+    if (value === currentVisibility) return;
+    try {
+      await updateReview(review.id, { visibility: value as Visibility });
+      toast({ title: 'Visibility updated' });
+      await onEdited?.();
+    } catch {
+      toast({ title: 'Could not change visibility', description: 'Please try again.', variant: 'destructive' });
+    }
+  };
+
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   const btn = size === 'xs' ? 'h-6 w-6' : 'h-8 w-8';
   const icon = size === 'xs' ? 'h-3 w-3' : 'h-4 w-4';
@@ -145,6 +164,20 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
                 </Tooltip>
               </TooltipProvider>
             )
+          )}
+          {isOwner && currentVisibility && (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="flex items-center gap-2">
+                <Eye className="h-4 w-4" /> Change visibility
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent onClick={stop}>
+                <DropdownMenuRadioGroup value={currentVisibility} onValueChange={handleVisibility}>
+                  <DropdownMenuRadioItem value="public">Public</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="circle_only">Circle only</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="private">Private</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
           )}
           {children}
           <DropdownMenuItem
