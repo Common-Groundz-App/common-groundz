@@ -10,18 +10,22 @@ export interface PublicFlags {
   notifications: {
     realtime_enabled: boolean;
   };
+  reviews: {
+    composer_page_enabled: boolean;
+  };
 }
 
 const DEFAULTS: PublicFlags = {
   mux: { uploads_enabled: true, prewarm_enabled: true, mode: 'live' },
   notifications: { realtime_enabled: true },
+  reviews: { composer_page_enabled: false },
 };
 
-async function fetchPublicFlags(): Promise<PublicFlags> {
-  const { data, error } = await supabase.rpc('get_public_flags');
-  if (error) throw error;
-  const muxRaw = (data as any)?.mux ?? {};
-  const notificationsRaw = (data as any)?.notifications ?? {};
+export function parsePublicFlags(data: unknown): PublicFlags {
+  const raw = (data ?? {}) as Record<string, any>;
+  const muxRaw = raw.mux ?? {};
+  const notificationsRaw = raw.notifications ?? {};
+  const reviewsRaw = raw.reviews ?? {};
   return {
     mux: {
       uploads_enabled: muxRaw.uploads_enabled ?? true,
@@ -31,7 +35,17 @@ async function fetchPublicFlags(): Promise<PublicFlags> {
     notifications: {
       realtime_enabled: notificationsRaw.realtime_enabled ?? true,
     },
+    reviews: {
+      // Fail closed: only an explicit `true` turns it on.
+      composer_page_enabled: reviewsRaw.composer_page_enabled === true,
+    },
   };
+}
+
+async function fetchPublicFlags(): Promise<PublicFlags> {
+  const { data, error } = await supabase.rpc('get_public_flags');
+  if (error) throw error;
+  return parsePublicFlags(data);
 }
 
 /**

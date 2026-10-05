@@ -479,11 +479,13 @@ function walk(dir: string): string[] {
 }
 
 describe('module boundary', () => {
-  it('no file outside the module imports it', () => {
+  it('only the gated review page uses the module', () => {
     const offenders = walk(ROOT)
       .filter((f) => !f.startsWith(MODULE))
       .filter((f) => /review-composer/.test(readFileSync(f, 'utf8')))
-      .map((f) => relative(ROOT, f));
+      .map((f) => relative(ROOT, f))
+      // 3B: only the gated review page and its own tests may use the module.
+      .filter((f) => !/pages[\\/](ReviewComposerPage|__tests__[\\/]reviewComposerPage)/.test(f));
     expect(offenders).toEqual([]);
   });
   it('the composer module never parses error text', () => {
