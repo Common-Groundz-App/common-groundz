@@ -297,9 +297,13 @@ export { SECTIONS };
  * Owns the logical session. The create-review nonce is created once here,
  * never by a child mount. `resetSession` starts a genuinely new session.
  */
-export function useComposerController(target: Omit<ComposerSessionTarget, 'nonce'> & { nonce?: string }, preselectedSubject?: ComposerSubject | null) {
-  const [nonce, setNonce] = useState<string>(() => target.nonce ?? generateUUID());
-  const resolved = (target.mode === 'create-review' ? { mode: 'create-review', nonce } : target) as ComposerSessionTarget;
+export type ComposerControllerTarget =
+  | { mode: 'create-review'; nonce?: string }
+  | Exclude<ComposerSessionTarget, { mode: 'create-review' }>;
+
+export function useComposerController(target: ComposerControllerTarget, preselectedSubject?: ComposerSubject | null) {
+  const [nonce, setNonce] = useState<string>(() => (target.mode === 'create-review' && target.nonce) || generateUUID());
+  const resolved: ComposerSessionTarget = target.mode === 'create-review' ? { mode: 'create-review', nonce } : target;
   const sessionKey = composerSessionKey(resolved);
   const [state, dispatch] = useReducer(composerReducer, undefined, () =>
     initialComposerState({ sessionKey, mode: resolved.mode, preselectedSubject }),
