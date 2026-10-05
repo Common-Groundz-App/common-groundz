@@ -41,6 +41,7 @@ type PendingChange =
   | { key: 'entity_extraction.search_image_cse_fallback_enabled'; nextEnabled: boolean }
   | { key: 'entity_extraction.search_brand_logo_lookup_enabled'; nextEnabled: boolean }
   | { key: 'notifications.realtime_enabled'; nextEnabled: boolean }
+  | { key: 'reviews.composer_page_enabled'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
@@ -127,6 +128,10 @@ export function AdminFeatureFlagsPanel() {
   const notificationsRealtimeEnabled: boolean =
     notificationsRealtimeRow?.value?.enabled !== false;
 
+  // Step 3B — review composer page rollout. Default OFF.
+  const composerPageRow = rows.data?.find((r) => r.key === 'reviews.composer_page_enabled');
+  const composerPageEnabled: boolean = composerPageRow?.value?.enabled === true;
+
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
       ? pending.nextEnabled
@@ -168,6 +173,10 @@ export function AdminFeatureFlagsPanel() {
                         ? pending.nextEnabled
                           ? 'Enable brand logo lookup for Search?'
                           : 'Disable brand logo lookup for Search?'
+                        : pending?.key === 'reviews.composer_page_enabled'
+                          ? pending.nextEnabled
+                            ? 'Turn on the new review page?'
+                            : 'Turn off the new review page?'
                         : pending?.key === 'notifications.realtime_enabled'
                           ? pending.nextEnabled
                             ? 'Enable realtime notifications?'
@@ -215,6 +224,10 @@ export function AdminFeatureFlagsPanel() {
                           ? pending.nextEnabled
                             ? 'When ON, Search-to-Draft results fetch brand logos in the background using the same Google CSE lookup URL Analysis uses. Admins can test even when OFF. Uses the existing Google CSE daily quota.'
                             : 'Disables background brand logo lookup for Search-to-Draft. Brand chips will show initials instead of logos.'
+                          : pending?.key === 'reviews.composer_page_enabled'
+                            ? pending.nextEnabled
+                              ? 'Signed-in users can open the new review page directly. Review buttons still open the old popup.'
+                              : 'Only admins can open the new review page. Everyone else keeps the old popup.'
                           : pending?.key === 'notifications.realtime_enabled'
                             ? pending.nextEnabled
                               ? 'The notification bell and drawer will open a user-scoped realtime channel and update within a second of a new notification. The unread count RPC stays authoritative.'
@@ -275,6 +288,12 @@ export function AdminFeatureFlagsPanel() {
       } else if (pending.key === 'entity_extraction.search_image_cse_fallback_enabled') {
         await setFlag.mutateAsync({
           key: 'entity_extraction.search_image_cse_fallback_enabled',
+          value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else if (pending.key === 'reviews.composer_page_enabled') {
+        await setFlag.mutateAsync({
+          key: 'reviews.composer_page_enabled',
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
@@ -853,6 +872,44 @@ export function AdminFeatureFlagsPanel() {
               disabled={rows.isLoading || setFlag.isPending}
               onCheckedChange={(checked) =>
                 setPending({ key: 'notifications.realtime_enabled', nextEnabled: checked })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Reviews
+          </CardTitle>
+          <CardDescription>
+            Rollout switch for the new full-page review composer. Default OFF.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="reviews-composer-page" className="text-base">
+                New review page
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When ON, everyone signed in can open the new review page directly. Review buttons keep opening the old popup until the cutover step.
+              </p>
+              {composerPageRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(composerPageRow.updated_at), { addSuffix: true })}
+                  {composerPageRow.updated_reason ? ` — “${composerPageRow.updated_reason}”` : ''}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="reviews-composer-page"
+              checked={composerPageEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({ key: 'reviews.composer_page_enabled', nextEnabled: checked })
               }
             />
           </div>
