@@ -390,4 +390,6 @@ cross-read between them.
 - [x] 3.0A-5 F5 no entity image as review media (10 legacy rows counted, untouched)
 - [x] Owner Change visibility after the edit window
 - [ ] Signed-in manual checklist (docs/review-composer-design.md) — waiting on user
-- [ ] 3A — blocked until 3.0A approved
+- [x] 3.0A approved (signed-in step 1 checked by user)
+- [x] 3A — composer foundation (unused): design doc reconciled, modes, typed store, sections, allowlisted save builders, upload session, step engine, typed server results, ambiguity evidence; 61 new tests; see docs/verification/review-composer-3a.md
+- [ ] 3B — blocked until 3A approved

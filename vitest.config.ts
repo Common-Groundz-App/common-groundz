@@ -64,6 +64,7 @@ const nodeIncludes = [
   'src/components/profile/reviews/__tests__/questionnaireMatrix.test.ts',
   'src/components/profile/reviews/__tests__/curatedTagInput.test.ts',
   'src/components/profile/reviews/__tests__/questionnaireEnvelope.test.ts',
+  'src/components/review-composer/__tests__/composerFoundation.test.ts',
 ];
 
 
@@ -93,6 +94,7 @@ export default defineConfig({
           // (e.g. LightboxPreview.handoff.test.tsx) with no executable tests.
           include: [
             'src/contexts/ComposerFocusContext.test.tsx',
+            'src/components/review-composer/__tests__/composerHooks.test.tsx',
             'src/hooks/__tests__/useTimelineReviews.test.ts',
             'src/components/profile/reviews/__tests__/SubjectSelectStepLocked.test.tsx',
             'src/hooks/useSoftwareKeyboardOpen.test.tsx',

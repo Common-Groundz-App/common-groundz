@@ -1,6 +1,6 @@
 # Step 3.0 — Review composer design gate
 
-Status: **awaiting approval**. No product behaviour, route, form or database change was made producing this document. Everything below was read from the current code (`ReviewForm.tsx`, `steps/*`, `ReviewTimelineViewer.tsx`, `services/review/*`) and the live database (functions, triggers, RLS policies) on 2026-10-04.
+Status: **approved; Step 3.0A complete (2026-10-05)**. This is the single current contract; sections below already reflect the 3.0A fixes. Everything below was read from the current code (`ReviewForm.tsx`, `steps/*`, `ReviewTimelineViewer.tsx`, `services/review/*`) and the live database (functions, triggers, RLS policies) on 2026-10-04.
 
 ---
 
@@ -12,16 +12,16 @@ Legend: **R** = review create, **RE** = review edit, **T** = timeline create, **
 |---|---|---|---|---|---|---|---|---|
 | Rating (1–5 rings) | Step 1 | Step 1 | yes | yes | `reviews.rating` / `review_updates.rating` | R/RE yes (blocks Next); T/TE optional | 0 / null | T omits column when unset. TE RPC accepts null. |
 | Subject | Step 2 picker (locked from entity page) | locked display | hidden (implicit) | hidden | `reviews.entity_id`, `category` | R yes | from entity page or none | Identity immutable in DB for every writer. |
-| Identity title / venue | derived | derived (legacy-unlinked: editable) | — | — | `reviews.title`, `venue` | derived | from subject | DB rejects any change (`review_identity_locked`). Legacy-unlinked editability is therefore UI-only today — see finding F4. |
+| Identity title / venue | derived | derived (legacy-unlinked: read-only) | — | — | `reviews.title`, `venue` | derived | from subject | DB rejects any change (`review_identity_locked`). Shown read-only for legacy-unlinked reviews; never sent on Edit. |
 | Subject preview + location prompt | Step 3 | Step 3 | — | — | — | — | — | Read-only. |
-| Photos / video | Step 3, max 4 | Step 3 | yes, max 4 | yes | `reviews.media` (+ `image_url` = first item) / `review_updates.media` | no | [] | R from entity page with no photo copies the **entity image** into review media — finding F5. |
+| Photos / video | Step 3, max 4 | Step 3 | yes, max 4 | yes | `reviews.media` (+ `image_url` = first item) / `review_updates.media` | no | [] | No reviewer upload → `media = []`, `image_url = null`. The entity image is display-only, never stored. |
 | Headline | Step 4 | Step 4 | — | — | `reviews.subtitle` | no | '' | |
 | Written text | Step 4 "description" | Step 4 | "Update comment" | same | `reviews.description` / `review_updates.comment` | R/RE no; T/TE **yes** (trimmed, DB-checked on TE) | '' | |
 | Experience date | Step 4 | Step 4 | — | — | `reviews.experience_date` | no | none | |
 | Questionnaire (choices + curated tags) | Step 4 | Step 4 | — | — | `reviews.metadata.questionnaire` envelope | no | per registry | Dirty-field patching via `buildReviewMetadataForSave`. |
 | Food tags | Step 4 (food) | Step 4 | — | — | `reviews.metadata.food_tags` | no | [] | |
 | Visibility | Step 4 | Step 4 | — | — | `reviews.visibility` | yes (always set) | public | Editable any time (not window-limited). |
-| Recommendation | — (derived from rating) | — | Yes/Maybe/No chips + "Base on rating" | same | `review_updates.would_recommend` | no | omitted | T: unset → column omitted; reset → `'auto'`. TE: see finding F2. |
+| Recommendation | — (derived from rating) | — | Yes/Maybe/No chips + "Base on rating" | same | `review_updates.would_recommend` | no | omitted | T: unset → column omitted; reset → `'auto'`. TE: yes/maybe/no/auto/null round-trip distinctly. |
 
 Current validation entry points: Step 1 rating ≠ 0; Step 2 subject required unless legacy-optional; invalid type blocks; legacy-unlinked title required; submit re-checks auth, existing review, category. Timeline: non-empty trimmed comment.
 
@@ -65,12 +65,11 @@ Parity rule: step contents and order equal today's. Reordering is a later config
 **create-review → `createReview`** (insert `reviews`)
 `{ title, subtitle, venue, description, rating, image_url, media, category, visibility, entity_id, experience_date, metadata, user_id }`
 - `title`/`venue` from `resolveReviewIdentity`; `category` from persisted-category rules; `metadata` from `buildReviewMetadataForSave` (merge, never replace).
-- `image_url` = first media URL; if none and opened from an entity page, currently the entity image (F5 — parity keeps it unless you decide otherwise).
+- `image_url` = first reviewer-uploaded media URL, otherwise null.
 - 23505 on `reviews_one_per_user_entity` → existing-review recovery, never a plain error.
 
 **edit-review → `updateReview(id, …)`**
-`{ title, subtitle, venue, description, rating, image_url, media, visibility, experience_date, metadata }` — `entity_id`/`category` never sent.
-- `title`/`venue` are sent unchanged (DB rejects any change).
+`{ subtitle, description, rating, image_url, media, visibility, experience_date, metadata }` — `user_id`, `entity_id`, `category`, `title`, `venue`, `status` are never sent.
 - `review_edit_window_closed` → blocked `expired` state with "add as timeline update" offer (as today).
 
 **create-timeline-update → `addReviewUpdate`** (insert `review_updates`)
@@ -78,9 +77,9 @@ Parity rule: step contents and order equal today's. Reordering is a later config
 - `would_recommend`: untouched/cleared → **omitted**; Yes/Maybe/No → value; reset → `'auto'`.
 
 **edit-timeline-update → `editLatestReviewUpdate` RPC**
-`(review_id, update_id, rating|null, comment (trimmed), media, would_recommend yes|maybe|no|null)`
+`(review_id, update_id, rating|null, comment (trimmed), media, would_recommend yes|maybe|no|auto|null)`
 - Full replace of the row's author fields; result `ok | expired | not_latest | unauthorized | conflict | error`.
-- Reset/'auto' cannot be expressed today (F2).
+- `'auto'` (explicit reset to rating) and null (no statement) are distinct.
 
 "Left alone vs cleared": review edits send every field (full replace, as today); questionnaire is the only field-level patch (touched set). Timeline create distinguishes omitted (no statement) from explicit values only for `rating` and `would_recommend`.
 
@@ -92,7 +91,7 @@ Parity rule: step contents and order equal today's. Reordering is a later config
 |---|---|---|
 | `/review` | create-review | signed in; RLS `auth.uid() = user_id`; subject trigger; unique index |
 | `/review?entityId=<uuid>` | create-review, subject locked | same; bad/unknown id → `subject_not_found`, "Pick another" replaces URL with `/review` |
-| `/review/:reviewId/edit` | edit-review | owner via RLS; one-hour trigger; identity locked; admin see F1 |
+| `/review/:reviewId/edit` | edit-review | owner only (RLS); one-hour trigger (admins bypass the hour on their own reviews); identity locked |
 | `/review/:reviewId/timeline/new` | create-timeline-update | RLS: inserter is review owner; no one-hour limit |
 | `/review/:reviewId/timeline/:updateId/edit` | edit-timeline-update | RPC: owner, latest-only (under lock), own one-hour window |
 
@@ -142,7 +141,7 @@ Entity page URL is always built from persisted entity + parent slugs. `?compose=
 | Identity locked (user, entity, category, title, venue) | ✅ all writers | same trigger |
 | System fields locked; metadata only `questionnaire`/`food_tags` writable | ✅ | same trigger |
 | Status change only admin/moderator | ✅ | same trigger |
-| Admin window bypass | ⚠️ partial — F1 | trigger allows; RLS UPDATE blocks non-owners |
+| Admin window bypass (own reviews only); no admin edit of others | ✅ | trigger allows; RLS UPDATE owner-only; moderation removal separate |
 | One review per user + subject | ✅ | `reviews_one_per_user_entity` |
 | Timeline create = owner only | ✅ | RLS insert policy on `review_updates` |
 | Timeline chronology server-owned, serialized | ✅ | `review_updates_before_insert` (advisory lock, `now()`) |
@@ -152,7 +151,7 @@ Entity page URL is always built from persisted entity + parent slugs. `?compose=
 | Whole-thread delete, atomic, safe media list | ✅ | `delete_review_thread` (owner or admin) |
 | No direct client UPDATE/DELETE on `review_updates` | ✅ | no such policies |
 
-### Findings (reported, not fixed — your call)
+### Findings (historical — all resolved in Step 3.0A, see below)
 
 - **F1 Admin edit bypass is incomplete.** The trigger exempts admins from the hour, but RLS UPDATE on `reviews` is `auth.uid() = user_id`, so an admin cannot edit another person's review from the app. The Step 2 menu shows admins an enabled Edit that would fail on others' reviews. Options: add an admin UPDATE policy (server change), or show admin Edit only on their own reviews.
 - **F2 Timeline edit drops "Base recommendation on rating".** Today's edit sends `null` when reset is chosen, and the RPC rejects `'auto'`, so editing an update saved with the reset turns it into "no statement" — the previous explicit Yes/Maybe/No becomes authoritative again. Parity would preserve this bug; fixing needs the RPC to accept `'auto'` (server change).
@@ -170,10 +169,10 @@ Entity page URL is always built from persisted entity + parent slugs. `?compose=
 - [ ] create from entity page: locked subject; refresh keeps it; bad id → recover to `/review`
 - [ ] existing-review notice + 23505 race recovery
 - [ ] edit: hydration of every field incl. questionnaire/food tags; metadata keys preserved; identity unchanged
-- [ ] edit at/after one hour → expired state with timeline offer; admin behaviour per F1 decision
+- [ ] edit at/after one hour → expired state with timeline offer; admins: no Edit on others' reviews
 - [ ] timeline add: comment required, rating optional, Yes/Maybe/No, tap-to-clear, reset → `'auto'`, omitted when untouched
-- [ ] timeline edit: latest-only, own hour, not_latest/expired/conflict messages; F2 decision applied
-- [ ] media: max 4, video limits, first image → `image_url`, F5 decision
+- [ ] timeline edit: latest-only, own hour, not_latest/expired/conflict messages; auto survives a comment-only edit
+- [ ] media: max 4, video limits, first upload → `image_url`, none → null
 - [ ] recommendation and live entity stats update after every save/undo
 - [ ] Save/Cancel destinations and one-time timeline reopen (Back/Forward don't reopen)
 - [ ] refresh and sign-in redirect on every route
@@ -205,3 +204,10 @@ Corrected mappings: `edit-review` sends subtitle, description, rating, image_url
 5. Legacy unlinked review Edit: title and venue are greyed out and saving works.
 6. New review from an entity page with no photo: the saved review has no media or image.
 7. Review older than one hour: Change visibility works while Edit stays disabled.
+
+
+---
+
+## Step 3A — composer foundation boundary
+
+The shared composer foundation lives in `src/components/review-composer/` (modes, typed store, sections, four save builders, upload session, step engine, server results, ambiguous-save evidence). It is not mounted by any screen until 3B; the legacy popup and inline timeline form stay independent during rollout. Verification: `docs/verification/review-composer-3a.md`.
