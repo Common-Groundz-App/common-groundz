@@ -180,3 +180,28 @@ Entity page URL is always built from persisted entity + parent slugs. `?compose=
 - [ ] Save lock, ambiguous-timeout prompt, Cancel cleanup of session uploads only
 - [ ] switch: loaded on/off, loading, failure, rollback restores legacy exactly
 - [ ] mobile keyboard, desktop, keyboard-only navigation, labels/errors announced
+
+---
+
+## Step 3.0A — findings resolved (2026-10-05)
+
+| Finding | Status | Evidence |
+|---|---|---|
+| F3 timeline privacy | Fixed | Policy `Timeline updates follow parent review visibility` (`EXISTS (select 1 from public.reviews r where r.id = review_updates.review_id)`) replaces `Users can view all review updates (true)`. Definition check: policy read back from `pg_policies`. No recursion: `reviews` policies don't reference `review_updates`. Indexes: `idx_review_updates_review_id`, `reviews_pkey`. Signed-out REST read still returns the 14 updates on public reviews. Behavior check for private/Circle-only/missing parent: **manually unverified**, because there's no rolled-back fixture access and no non-public review currently has updates. Today's `reviews` read rule is public OR author, so Circle-only updates are author-only (same as their reviews). |
+| F3 reader inventory | Audited | Returns timeline content: `lookup_latest_recommendation_intent`, `recompute_review_timeline_state` (EXECUTE postgres only, internal). Mutations with internal authorization: `edit_latest_review_update`, `delete_latest_review_update`, `delete_review_thread`, `admin_delete_review_update` (service_role). Aggregates only (scores, no content): `calculate_trust_score` (PUBLIC execute; it reveals only an update-count-derived score for a review id, noted as a low-risk follow-up), `calculate_user_similarity_v2`, `calculate_entity_trending_score_v2`, `select_trending_candidates_v2`. No views read `review_updates`. Client: `fetchReviewUpdates` returns `[]` when access is denied, so timeline content is cleared and never shown as Anonymous. |
+| F2 auto recommendation | Fixed | `edit_latest_review_update` replaced in place (single overload confirmed), and `'auto'` is accepted. Grants: postgres, authenticated, service_role; PUBLIC/anon revoked. search_path, auth.uid, latest-only, one-hour and advisory-lock checks are kept. Client: `toTimelineRecommendationValue` maps the five states. Tests in `timelineRecommendationValue.test.ts`. |
+| F1 author actions | Fixed | `ReviewOwnerMenu`: Edit, Add timeline update and Change visibility are owner-only. Admin non-owners see only moderation items plus "Remove review (moderation)", which has its own confirmation copy. The timeline latest-update menu was already owner-only. |
+| F4 legacy identity | Fixed | Legacy title and venue are read-only in StepThree. Edit payload omits title, venue, entity_id and category. |
+| F5 entity image | Fixed | Create and Edit `image_url` come only from `selectedMedia[0]`, otherwise null. The entity image is never copied into media. Existing rows: 10 of 78 reviews have `image_url` equal to their entity image (not modified). 0 have an entity-marker media item. |
+| Visibility after the hour | Added | Owner "Change visibility" submenu updates only `visibility`. The edit-window trigger allows this at any time. |
+
+Corrected mappings: `edit-review` sends subtitle, description, rating, image_url, media, visibility, experience_date and metadata only. `create-review.image_url` is the first reviewer upload or null. `edit-timeline.would_recommend` is one of yes, maybe, no, auto or null. Author Edit is owner-only in the app UI.
+
+### Manual signed-in checklist
+1. Private review with a timeline update: the owner sees it, while another account and a signed-out visitor see no updates.
+2. Edit a timeline update saved with "Base recommendation on rating" and change only the text. It should still be auto after reload.
+3. Yes → auto, auto → yes, and yes → no statement each show the expected current recommendation. Undo restores the previous one.
+4. Admin on another person's review: no Edit or Add timeline update, only "Remove review (moderation)".
+5. Legacy unlinked review Edit: title and venue are greyed out and saving works.
+6. New review from an entity page with no photo: the saved review has no media or image.
+7. Review older than one hour: Change visibility works while Edit stays disabled.
