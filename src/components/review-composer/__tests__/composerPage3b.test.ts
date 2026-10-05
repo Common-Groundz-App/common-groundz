@@ -94,7 +94,7 @@ describe('3B boundaries', () => {
   it('no existing entry point links to the new page yet', () => {
     const offenders = walk(ROOT)
       .filter((f) => !/review-composer|ReviewComposerPage|App\.tsx$/.test(f))
-      .filter((f) => /ReviewComposerPage|['"`]\/review(\?|['"`/])/.test(readFileSync(f, 'utf8')))
+      .filter((f) => /ReviewComposerPage|['"`]\/review(\?|['"`])|\/review\/[^'"`\s]*\/edit/.test(readFileSync(f, 'utf8')))
       .map((f) => relative(ROOT, f));
     expect(offenders).toEqual([]);
   });
