@@ -32,11 +32,20 @@ The building blocks of the new composer. No screen uses them yet, so nobody sees
 6. **Old results can't overwrite the current session**: each session has its own key (new review, edit review X, new update on X, edit update Y on X). Every slow result is checked against the active key before it can change anything: loaded data, a subject lookup, an upload finishing, a check result, or a save result (success, error or ambiguous). If the user has moved on, it's ignored.
 7. **Upload session (F7), lifetime tied to the session, not to a screen piece**: the ID belongs to the session controller, not to any child part of the screen. It survives re-renders, step changes, failed checks, upload progress, layout or screen-size remounts, page-shell changes, and retries after a temporary error. A new ID is made only when a real new session starts: a different review, a different update, a new review session, or a deliberate reset after a successful save. Changing the session never cleans up the old session's uploads until it's settled whether they were saved. Cancel cleans up only this session's uploads, never photos that were already there or entity photos. Saved photos count as kept. Nothing is cleaned up while a save is ambiguous.
 8. **Step engine**: walks the mode's steps, blocks Next and Save on errors, and focuses the first invalid field.
-9. **Save lock**: Save is disabled from the first tap. "Blocked" can't submit. "Ambiguous" (after a timeout) disables Save only until it's resolved. Once 3B confirms whether the save went through, an explicit manual retry is allowed when appropriate. It never retries automatically.
+9. **Save lock**: Save is disabled from the first tap. "Blocked" can't submit. "Ambiguous" (after a timeout) keeps the form and disables Save. In 3B the page fetches the latest state from the server and shows it to the user. The user decides: go back, or retry by hand. Save never unlocks or retries on its own.
 10. **My additions**:
    - **Unsaved-changes check**: one signal for every mode, based on dirty values plus this session's uploads. 3B will use it to warn on Cancel or when leaving the page.
-   - **Same errors for the server's refusals, using codes**: one function maps stable result codes (expired, not_latest, unauthorized, existing_review, conflict, not_found) to blocked reasons. It never matches on error text. Unknown errors stay real errors and are never forced into a known reason.
-   - **Ambiguous saves can be checked**: a function that, given the session, looks up the server to see whether the save landed. For a new review it uses the existing own-review lookup; for a timeline update, the latest update. 3B wires it to the screen, so "ambiguous" always has a defined way out.
+   - **Server refusals arrive already sorted**: the composer only receives typed results (ok, expired, not_latest, unauthorized, existing_review, conflict, not_found, error). It never reads error text itself. The services do the sorting:
+     - timeline services already return these statuses;
+     - a duplicate review is recognised by its database code plus the constraint name;
+     - review Edit still recognises "window closed" through the one existing helper, `isEditWindowClosedError`, until the server returns a typed result. That would be a separate, approved database change, and the composer gets no second copy of this check.
+     - Unknown errors stay real errors.
+   - **Ambiguous saves give evidence, not a verdict**: a lookup returns "possible saved item found" (and shows it), "not seen", or "lookup failed". How strong the evidence is depends on the mode:
+     - new review: strong, because there's only one review per person and subject. It shows the saved review, without assuming every field matches;
+     - edit review / edit update: reload that exact record and compare it with what was sent. A change from another tab can still leave it unclear;
+     - new timeline update: weak. The latest update is shown for the user to judge, because without a submission key from the server, nothing can prove it was this attempt. It never counts as confirmed.
+     A guaranteed answer needs a server submission key, which stays separate work.
+   - **Closing during an ambiguous save**: this session's uploads count as "unsettled". They're never cleaned up, so a review that may already be saved never loses its photos.
 
 ## Not in 3A
 
@@ -50,7 +59,13 @@ The building blocks of the new composer. No screen uses them yet, so nobody sees
 
 Automated tests only:
 - **Modes**: all four resolve; unsupported combinations fail; every referenced section exists; every step list is valid.
-- **State**: loading doesn't mark dirty; change-and-restore clears dirty; step moves keep values, errors and uploads; switching to another review resets everything; "blocked" can't submit; "ambiguous" can't submit until resolved, then allows one manual retry.
+- **State**: loading doesn't mark dirty; change-and-restore clears dirty; step moves keep values, errors and uploads; switching to another review resets everything; "blocked" can't submit; "ambiguous" can't submit until the user explicitly chooses to retry, and evidence alone never unlocks it.
+- **Evidence lookup**:
+  - new review found → "candidate found";
+  - new timeline update → never "confirmed", only a candidate or "not seen";
+  - lookup failure → "lookup failed", and the form stays as it is;
+  - an old session's lookup result is ignored.
+- **Server results**: the composer module contains no message matching (checked by a grep for `.message` / `includes(` on error text).
 - **Three kinds of "not showing"**:
   - moving between steps;
   - collapsing an optional section;
