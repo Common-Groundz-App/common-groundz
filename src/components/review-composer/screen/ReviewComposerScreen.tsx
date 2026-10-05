@@ -61,6 +61,8 @@ type Props =
 
 type ExistingCheck = { entityId: string; state: 'checking' | 'found' | 'none' | 'error'; reviewId: string | null };
 
+const SID = { rating: 'rating', subject: 'subject', media: 'media', text: 'text' } as const satisfies Record<string, SectionId>;
+
 const STEP_TITLES = ['Rating', 'Subject', 'Photos', 'Details'];
 
 export function ReviewComposerScreen(props: Props) {
@@ -195,6 +197,8 @@ export function ReviewComposerScreen(props: Props) {
     requestAnimationFrame(() => document.getElementById(`composer-section-${id}`)?.focus());
   };
 
+  const onStep = (id: SectionId) => (caps.steps[step] as readonly SectionId[]).indexOf(id) >= 0;
+
   const subjectBlocked =
     !isEdit && (isAddingSubject || isResolvingContext || (!!subjectId && existing?.entityId === subjectId && existing.state !== 'none'));
 
@@ -202,7 +206,7 @@ export function ReviewComposerScreen(props: Props) {
     const r = nextStep(state, step);
     dispatch({ type: 'VALIDATED', sessionKey, errors: r.validation.errors });
     if (!r.validation.ok) return focusSection(r.validation.firstInvalid);
-    if (caps.steps[step].includes('subject') && subjectBlocked) return;
+    if (onStep(SID.subject) && subjectBlocked) return;
     setStep(r.stepIndex);
   };
 
@@ -374,13 +378,13 @@ export function ReviewComposerScreen(props: Props) {
       )}
 
       <div className="min-h-[360px] space-y-6">
-        {stepIds.includes('rating') && (
+        {onStep(SID.rating) && (
           <div id="composer-section-rating" tabIndex={-1} className="outline-none">
             <StepOne rating={state.values.rating ?? 0} onChange={(r) => setValue('rating', r)} showError={!!err('rating')} />
           </div>
         )}
 
-        {stepIds.includes('subject') && (
+        {onStep(SID.subject) && (
           <div id="composer-section-subject" tabIndex={-1} className="outline-none space-y-2">
             <SubjectSelectStep
               subject={display}
@@ -405,7 +409,7 @@ export function ReviewComposerScreen(props: Props) {
           </div>
         )}
 
-        {stepIds.includes('media') && (
+        {onStep(SID.media) && (
           <div id="composer-section-media" tabIndex={-1} className="outline-none space-y-4">
             <h2 className="text-center text-xl font-medium">
               Tell us about your {renderedConfig?.subjectLabel ?? 'experience'}
@@ -423,7 +427,7 @@ export function ReviewComposerScreen(props: Props) {
           </div>
         )}
 
-        {stepIds.includes('text') && renderedConfig && (
+        {onStep(SID.text) && renderedConfig && (
           <div id="composer-section-headline" tabIndex={-1} className="outline-none">
             <StepFour
               config={renderedConfig}
@@ -471,7 +475,7 @@ export function ReviewComposerScreen(props: Props) {
             {state.status === 'saving' ? 'Saving…' : caps.submitLabel}
           </Button>
         ) : (
-          <Button type="button" onClick={goNext} disabled={isUploading || (caps.steps[step].includes('subject') && subjectBlocked)}>
+          <Button type="button" onClick={goNext} disabled={isUploading || (onStep(SID.subject) && subjectBlocked)}>
             Next
           </Button>
         )}
