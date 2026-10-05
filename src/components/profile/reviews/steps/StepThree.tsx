@@ -149,32 +149,22 @@ const StepThree = ({
       )}
 
       {/*
-        Legacy UNLINKED reviews keep their editable historical identity fields.
-        Canonical linked reviews do not ask for a name or a venue at all.
+        Step 3.0A (F4): legacy UNLINKED reviews show their stored identity
+        read-only. Subject identity is immutable and never sent on Edit.
       */}
       {legacyMode && (
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <Label htmlFor="legacy-title">What is this review about?</Label>
-            <Input
-              id="legacy-title"
-              value={legacyTitle}
-              onChange={(e) => onLegacyTitleChange(e.target.value)}
-              placeholder="Name of what you reviewed"
-              className="border-brand-orange/30 focus-visible:ring-brand-orange/30"
-            />
-            {!legacyTitle && <p className="text-red-500 text-xs">This field is required</p>}
+            <Label htmlFor="legacy-title">What this review is about</Label>
+            <Input id="legacy-title" value={legacyTitle} readOnly disabled aria-readonly="true" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="legacy-venue">Where was this? (optional)</Label>
-            <Input
-              id="legacy-venue"
-              value={legacyVenue}
-              onChange={(e) => onLegacyVenueChange(e.target.value)}
-              placeholder="Place or context"
-              className="border-brand-orange/30 focus-visible:ring-brand-orange/30"
-            />
+            <Label htmlFor="legacy-venue">Where</Label>
+            <Input id="legacy-venue" value={legacyVenue} readOnly disabled aria-readonly="true" />
           </div>
+          <p className="md:col-span-2 text-xs text-muted-foreground">
+            The subject of a review can't be changed.
+          </p>
         </div>
       )}
 
