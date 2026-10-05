@@ -100,7 +100,8 @@ The docs and roadmap are updated, and 3A is marked done, only after the implemen
 - Session key: `create-review:<nonce>` | `edit-review:<reviewId>` | `create-timeline-update:<reviewId>` | `edit-timeline-update:<reviewId>:<updateId>`. The nonce is created once by the controller that owns the logical session, never by a child mount. Every async action carries its key; the reducer drops actions whose key isn't current.
 - Builders return object literals built from named fields, plus a type-level `Omit` as a second guard.
 - `useUploadSession(sessionKey)`: `ref.current` holds `{ key, id }` and is regenerated only when the key changes. It tracks `sessionUploads`, `committed` and `settled`; cleanup is never triggered by a key change alone.
-- `serverErrors.ts` maps service result codes and Postgres/RPC codes (23505 on `reviews_one_per_user_entity`, `review_edit_window_closed` as an exception code). It falls back to `error` for anything else.
-- `reconcile.ts` uses the existing `findOwnReviewForEntity` and the latest-update fetch; it's pure and tested with mocks.
+- `serverErrors.ts` defines `ComposerServerResult` (`ok | expired | not_latest | unauthorized | existing_review{reviewId} | conflict | not_found | error{cause}`) and service-boundary adapters. Timeline uses the existing RPC statuses; create maps 23505 + `reviews_one_per_user_entity`; review edit calls the existing `isEditWindowClosedError`. There is no new message parsing.
+- `reconcile.ts` returns `AmbiguousSaveEvidence = candidate-found{candidate, strength: 'strong'|'compare'|'weak'} | not-observed | lookup-failed{error}` and never `confirmed`. It uses `findOwnReviewForEntity`, an exact-ID reload, and the latest-update fetch; it's session-keyed and tested with mocks.
+- The step engine returns the first invalid section ID; the screen moves focus to it in 3B.
 - A grep check in the tests confirms no file outside the module imports from it.
 - Close-out: `docs/verification/review-composer-3a.md`, the design-doc boundary note, and roadmap updates. AGENTS.md is unchanged.
