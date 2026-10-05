@@ -939,14 +939,7 @@ const ReviewForm = ({
       return;
     }
     
-    if (currentStep === 3 && resolution.mode === 'legacy-unlinked' && !legacyTitle.trim()) {
-      toast({
-        title: 'Name required',
-        description: 'Tell us what this review is about.',
-        variant: 'destructive'
-      });
-      return;
-    }
+    // Legacy-unlinked identity is read-only (F4), so no name check here.
 
     
     // Mark current step as completed
