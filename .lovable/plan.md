@@ -18,8 +18,8 @@ Build the full-page composer for **new review** and **edit review** on the 3A pa
 
 ## Step 2 — Routes and access
 - `/review`, `/review?entityId=<id>`, `/review/:reviewId/edit`, all inside `AppProtectedRoute` (same as `/create`), all noindex.
-- Signed-out: current app behavior (sent to the home page). Returning to the exact composer address after sign-in is a separate app-wide auth fix, not part of 3B.
-- Pre-cutover gate: page allowed when implementation = `page` **or** the user is a server-verified admin (`has_role`). Everyone else sees a short "not available yet" state with a link back. While the admin check loads: skeleton, never the form.
+- Signed-out: current `AppProtectedRoute` behavior — redirected to the landing page `/`. Returning to the exact composer address after sign-in is a separate app-wide auth fix, not part of 3B.
+- Pre-cutover gate (temporary, testing only): page allowed when implementation = `page` **or** the user is a server-verified admin (`has_role`). Everyone else sees a short "not available yet" state with a link back. While the admin check loads: skeleton, never the form. Lives in one clearly marked place; 3D removes it so the switch and normal route permissions are the only rules.
 - States: malformed id, missing/deleted entity or review → "not found"; someone else's review → "You can only edit your own review"; network/permission failure → Retry (never silently falls back to picking a subject).
 
 ## Step 3 — Page shell
@@ -35,7 +35,8 @@ Build the full-page composer for **new review** and **edit review** on the 3A pa
 
 ## Step 5 — Edit review
 - Loads the exact review; owner only; subject locked (legacy unlinked title/place shown read-only); unknown metadata kept.
-- One hour from the original publish time. Expired → explanation + **Add timeline update**. Admins follow the same author rules on their own reviews.
+- One hour from the original publish time. Ordinary owner after the hour → explanation + **Add timeline update**.
+- A server-verified admin keeps the existing time-window bypass **only on their own review** (no one-hour warning, same locked subject and payload limits). An admin opening someone else's review gets "You can only edit your own review"; moderation stays in its separate tools.
 - Visibility after the hour stays in the three-dot menu, not this form.
 
 ## Step 6 — Saving and reliability
@@ -43,7 +44,9 @@ Build the full-page composer for **new review** and **edit review** on the 3A pa
 - Ambiguous timeout: form kept, Save locked. New review: if a review for this subject now exists, say "A review for this already exists" and offer to view it — never "your exact answers were saved". Edit: reload and compare the sent fields; only a full match says "Your changes were saved"; otherwise stays unsure and the user chooses to retry.
 - Cancel removes only photos uploaded in this session, never while unsure.
 - Success: invalidation fires; destination built from the stored entity and parent slugs (resolved during the lookup), never from names or `/entity/<uuid>`.
-- **Add timeline update** (from both notices) deliberately uses today's legacy path: entity page from stored slugs + one-time "open timeline update" state. Tested explicitly.
+- **Add timeline update** (from both notices) reuses the existing Step 1 helper (`openReviewUpdate`: stored slugs + one-time state consumed on the entity page) — no second implementation, no ID or `?compose=update` URL. Tested explicitly.
+- The page reuses only low-level inputs (rating, subject picker, photo uploader, questionnaire, food tags, visibility); it never imports the legacy popup's orchestration — the 3A parts stay the only state/save authority.
+- Pick another also clears the old subject's existing-review check and errors; earlier-session uploads follow the 3A rules (not cleaned until settled).
 
 ## Not in 3B
 Timeline modes, any entry-point change, switching the default, legacy forms, auth return-to fix, database changes beyond the flag, AGENTS.md.
