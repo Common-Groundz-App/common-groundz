@@ -29,23 +29,20 @@ In that profile, Chrome already has location set to **Allow** for commongroundz.
 
 ## Corrected manual test (after the build)
 
-1. On commongroundz.co, open DevTools → Console and run:
-   `navigator.permissions.query({name:'geolocation'}).then(p => console.log(p.state))`
-   - `granted` → the prompt is skipped by design. Click the site-info icon left of the address → Location → "Ask (default)". Close and reopen the tab, then run the command again until it says `prompt`.
-2. In Application → Local Storage, delete `locationPromptLastShown` and `locationPromptLastSkipped`. Make sure `locationEnabled` is `false`.
-3. Start a review of a place or dish → step 3. The "Location Access" card should appear at the top. The admin reason line should say "showing".
-4. Tap Skip, go back a step and forward again → no card (snoozed for 2 hours).
+1. Open an incognito window, sign in, and start a review of a place or dish. On step 3 the "Location Access" card appears. (Already passed for you.)
+2. Tap Skip, go back a step and forward again → no card (snoozed for 2 hours).
+3. Pick 6 photos at once → "Too many files selected — Only the first 4 files will be processed." Only 4 upload.
+4. In a normal window where location is already allowed → no card. This is expected.
 
 ## Open question (not part of this fix)
 
 When the browser already allows location but the app's own location switch is off, neither the popup nor the new page asks. So app location stays off, quietly. This rule is older than 3B. I'll leave it as is unless you want it changed.
 
-3B stays open until you confirm both checks. 3C stays on hold.
+After the photo-warning check, 3B is done. Then 3C can start.
 
 ## Technical details
 
 - `MediaUploader.handleFileSelect`: on the `reserveSlots` path, reserve `min(files.length, remainingSlots)` and show the toast when `granted < files.length`. The non-reserve branch stays the same.
-- `locationPromptPolicy.ts`: add `explainLocationPrompt(args)`, which returns `{ show, reason }` and is built on the existing rules. `shouldShowLocationPrompt` stays as a wrapper. Render the admin-only line in `ReviewComposerScreen` with `isAdmin` passed from the page.
-- New vitest that renders the screen's photos step with a mocked `LocationContext` and a Place subject. Assert the `LocationAccessPrompt` text and the localStorage write.
+- New vitest that renders the screen's photos step with a mocked `LocationContext` and a Place subject. Assert the `LocationAccessPrompt` text and the localStorage write. Add policy cases for granted, enabled, ineligible type and the Skip windows.
 - `scripts/e2e/review-history-guard.py`: add the intercepted Place entity case and assert "Location Access" on step 3.
-- Update `docs/verification/review-composer-3b.md` with the steps above. Update the roadmap's 3B entry with "location prompt acceptance open".
+- Update `docs/verification/review-composer-3b.md`: replace the stale "Known limits" line about the missing location prompt and subject card, and add the steps above and the "browser already allows" rule.
