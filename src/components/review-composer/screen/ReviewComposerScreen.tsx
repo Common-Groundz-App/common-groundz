@@ -17,9 +17,25 @@ import SubjectSelectStep from '@/components/profile/reviews/steps/SubjectSelectS
 import StepFour from '@/components/profile/reviews/steps/StepFour';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
+import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
+import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
+import { useLocation as useLocationAccess } from '@/contexts/LocationContext';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  decideFinishedUpload,
+  endSession,
+  releaseSlot as registryReleaseSlot,
+  reserveSlots as registryReserveSlots,
+  setSettlement,
+  syncCommitted,
+} from '../uploadRegistry';
+import { DIALOG_COPY, type GuardMode } from './historyGuard';
+import { useHistoryGuard } from './useHistoryGuard';
+import { markLocationPromptShown, markLocationPromptSkipped, shouldShowLocationPrompt } from './locationPromptPolicy';
 import type { EntityAdapter } from '@/components/profile/circles/types';
 import type { QuestionnaireConfig } from '@/components/profile/reviews/questionnaire/registry';
-import type { MediaItem } from '@/types/media';
+import type { MediaItem, MediaUploadState } from '@/types/media';
 import { parseEntityTypeAtBoundary } from '@/services/entityType';
 import { createReview, updateReview } from '@/services/review/core';
 import { findOwnReviewForEntity } from '@/services/review/ownReview';
@@ -50,6 +66,7 @@ type Props =
       userId: string;
       preselected: LoadedSubject | null;
       cancelTo: string;
+      fromKnown?: boolean;
       onPickAnother?: never;
     }
   | {
@@ -57,6 +74,7 @@ type Props =
       userId: string;
       loaded: LoadedReview;
       cancelTo: string;
+      fromKnown?: boolean;
     };
 
 type ExistingCheck = { entityId: string; state: 'checking' | 'found' | 'none' | 'error'; reviewId: string | null };
@@ -91,7 +109,14 @@ export function ReviewComposerScreen(props: Props) {
   const [existing, setExisting] = useState<ExistingCheck | null>(null);
   const [openResult, setOpenResult] = useState<OpenTimelineResult | null>(null);
   const [isOpening, setIsOpening] = useState(false);
-  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [leaveDialog, setLeaveDialog] = useState<{ mode: Exclude<GuardMode, 'clean'>; action: () => void | Promise<void> } | null>(null);
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
   const subjectReq = useRef(0);
   const existingReq = useRef(0);
 
@@ -133,15 +158,31 @@ export function ReviewComposerScreen(props: Props) {
 
   /* ---------------- leave warnings ---------------- */
   const dirty = hasUnsavedChanges(state, uploads.uploads.length);
+  const guardMode: GuardMode =
+    state.status === 'saving' ? 'saving' : state.status === 'ambiguous' ? 'ambiguous' : dirty && state.status !== 'saved' ? 'dirty' : 'clean';
+  const guard = useHistoryGuard({
+    mode: guardMode,
+    sessionId: uploads.sessionId,
+    fromKnown: !!props.fromKnown,
+    fallback: props.cancelTo,
+    onBlocked: (mode) => setLeaveDialog({ mode, action: () => navigate(props.cancelTo, { replace: true }) }),
+  });
+
+  /* ---------------- upload registry (outlives this screen) ---------------- */
+  const uploadSid = uploads.sessionId;
+  useEffect(() => setSettlement(uploadSid, uploads.settlement), [uploadSid, uploads.settlement]);
+  useEffect(() => syncCommitted(uploadSid, state.values.media.length), [uploadSid, state.values.media.length]);
+  useEffect(() => () => endSession(uploadSid), [uploadSid]);
+
   useEffect(() => {
-    if (!dirty) return;
+    if (guardMode === 'clean') return;
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [dirty]);
+  }, [guardMode]);
 
   /* ---------------- section handlers ---------------- */
   const setValue = (id: Exclude<SectionId, 'subject' | 'questionnaire'>, value: unknown) =>
@@ -184,12 +225,46 @@ export function ReviewComposerScreen(props: Props) {
     return { ...config, sections };
   }, [q.resolution, qEnabled, foodEnabled]);
 
+  // Captures this render's session: a late finish is decided against the
+  // session the upload started in, even after the screen has closed.
   const handleMediaAdded = (media: MediaItem) => {
+    const decision = decideFinishedUpload(uploadSid, media.url, aliveRef.current);
     uploads.recordUpload(sessionKey, media.url);
-    setValue('media', [...state.values.media, { ...media, order: state.values.media.length }]);
+    if (decision === 'add') dispatch({ type: 'MEDIA_ADDED', sessionKey, media });
+    else if (decision === 'delete') void deleteMedia(media.url).catch(() => undefined);
   };
-  const handleMediaRemove = (media: MediaItem) =>
-    setValue('media', state.values.media.filter((m) => m.url !== media.url));
+  const handleMediaRemove = (media: MediaItem) => dispatch({ type: 'MEDIA_REMOVED', sessionKey, url: media.url });
+  const reserveSlots = useCallback((n: number) => registryReserveSlots(uploadSid, n), [uploadSid]);
+  const releaseSlot = useCallback(() => registryReleaseSlot(uploadSid), [uploadSid]);
+  const onUploadsChange = useCallback(
+    (list: MediaUploadState[]) => setIsUploading(list.some((u) => u.status === 'uploading')),
+    [],
+  );
+
+  /* ---------------- location prompt (questionnaire-driven) ---------------- */
+  const { permissionStatus, locationEnabled } = useLocationAccess();
+  const onMediaStep = (caps.steps[step] as readonly SectionId[] | undefined)?.indexOf('media') !== undefined &&
+    (caps.steps[step] as readonly SectionId[]).indexOf('media') >= 0;
+  const locationEligible = !!renderedConfig?.showLocationPrompt;
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  useEffect(() => {
+    if (!onMediaStep) return;
+    if (showLocationPrompt) {
+      if (locationEnabled || permissionStatus === 'granted') setShowLocationPrompt(false);
+      return;
+    }
+    const now = Date.now();
+    const show = shouldShowLocationPrompt({ eligible: locationEligible, locationEnabled, permissionStatus, now, storage: localStorage });
+    if (show) {
+      markLocationPromptShown(localStorage, now);
+      setShowLocationPrompt(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onMediaStep, locationEligible, locationEnabled, permissionStatus]);
+  const skipLocationPrompt = () => {
+    setShowLocationPrompt(false);
+    markLocationPromptSkipped(localStorage, Date.now());
+  };
 
   /* ---------------- step navigation ---------------- */
   const focusSection = (id: SectionId | null) => {
@@ -232,6 +307,9 @@ export function ReviewComposerScreen(props: Props) {
   }, [state.mode, state.stored?.id, subjectId, sessionKey, dispatch]);
 
   const goToEntity = async (entityId: string | null, fallbackToast: string) => {
+    if (!aliveRef.current) return;
+    await guard.release();
+    if (!aliveRef.current) return;
     if (entityId) {
       const found = await findOwnReviewForEntity(entityId);
       if (found.status === 'found' && found.canonicalPath) return navigate(found.canonicalPath, { replace: true });
@@ -277,6 +355,7 @@ export function ReviewComposerScreen(props: Props) {
         new Promise((resolve) => setTimeout(() => resolve(TIMEOUT), SAVE_TIMEOUT_MS)),
       ]);
     } catch (error) {
+      if (!aliveRef.current) return; // left while saving: background only
       const result = isEdit ? fromUpdateReviewError(error) : fromCreateReviewError(error);
       uploads.send({ type: 'SAVE_FAILED' });
       dispatch({ type: 'SAVE_RESULT', sessionKey, result });
@@ -286,6 +365,9 @@ export function ReviewComposerScreen(props: Props) {
       }
       return;
     }
+    // Left while saving: the service already emitted the background
+    // "reviews changed" signal; no navigation, toast or form change.
+    if (!aliveRef.current) return;
     if (outcome === TIMEOUT) {
       uploads.send({ type: 'AMBIGUOUS' });
       dispatch({ type: 'SAVE_TIMEOUT', sessionKey });
@@ -298,21 +380,34 @@ export function ReviewComposerScreen(props: Props) {
   };
 
   /* ---------------- leaving ---------------- */
-  const leave = async () => {
+  /** Every exit goes through here. Cleanup only ever runs for an open session. */
+  const performLeave = async (action: () => void | Promise<void>) => {
+    const ok = await guard.release();
+    if (!ok) {
+      if (aliveRef.current) toast({ title: "Couldn't leave this page — try again." });
+      return;
+    }
     const preexisting = (state.stored?.media ?? []).map((m) => m.url);
-    const candidates = uploads.cleanupCandidates(preexisting);
-    // Best-effort; never blocks leaving.
+    const candidates = uploads.cleanupCandidates(preexisting); // [] unless open
     void Promise.allSettled(candidates.map((url) => deleteMedia(url)));
-    navigate(props.cancelTo);
+    await action();
   };
-  const requestCancel = () => (dirty && state.status !== 'saved' ? setConfirmLeave(true) : void leave());
+  const requestLeave = (action: () => void | Promise<void>) => {
+    if (guardMode === 'clean') return void performLeave(action);
+    setLeaveDialog({ mode: guardMode, action });
+  };
+  const requestCancel = () => requestLeave(() => navigate(props.cancelTo, { replace: true }));
 
-  const openTimeline = async (reviewId: string | null) => {
+  const openTimeline = (reviewId: string | null) => {
     if (!subjectId) return;
-    setIsOpening(true);
-    const r = await openExistingReviewTimelineUpdate({ entityId: subjectId, expectedReviewId: reviewId, navigate });
-    setIsOpening(false);
-    setOpenResult(r);
+    const entityId = subjectId;
+    requestLeave(async () => {
+      setIsOpening(true);
+      const r = await openExistingReviewTimelineUpdate({ entityId, expectedReviewId: reviewId, navigate });
+      if (!aliveRef.current) return;
+      setIsOpening(false);
+      setOpenResult(r);
+    });
   };
 
   /* ---------------- render ---------------- */
@@ -373,7 +468,7 @@ export function ReviewComposerScreen(props: Props) {
           retryAllowed={state.manualRetryAllowed}
           onCheckAgain={() => void gatherEvidence()}
           onAllowRetry={() => dispatch({ type: 'ALLOW_MANUAL_RETRY', sessionKey })}
-          onContinue={() => void goToEntity(subjectId, isEdit ? 'Your changes were saved' : 'Your review exists')}
+          onContinue={() => requestLeave(() => goToEntity(subjectId, isEdit ? 'Your changes were saved' : 'Your review exists'))}
         />
       )}
 
@@ -410,19 +505,72 @@ export function ReviewComposerScreen(props: Props) {
         )}
 
         {onStep(SID.media) && (
-          <div id="composer-section-media" tabIndex={-1} className="outline-none space-y-4">
+          <div id="composer-section-media" tabIndex={-1} className="w-full space-y-8 py-2 outline-none">
             <h2 className="text-center text-xl font-medium">
               Tell us about your {renderedConfig?.subjectLabel ?? 'experience'}
             </h2>
-            {contextLine && <p className="text-center text-sm text-muted-foreground">{contextLine}</p>}
-            <MediaUploader
-              sessionId={uploads.sessionId}
-              onMediaUploaded={handleMediaAdded}
-              initialMedia={state.values.media}
-              maxMediaCount={4}
-              onUploadsChange={(list: unknown[]) => setIsUploading(Array.isArray(list) && list.length > 0)}
-            />
-            <CompactMediaGrid media={state.values.media} onRemove={handleMediaRemove} />
+
+            {showLocationPrompt && locationEligible && <LocationAccessPrompt onCancel={skipLocationPrompt} className="mb-8" />}
+
+            {subjectId && display && (
+              <div className="space-y-2" data-testid="composer-subject-preview">
+                <EntityPreviewCard
+                  entity={{ ...display, image_url: display.image_url?.replace(/^http:\/\//i, 'https://') }}
+                  type={display.type ?? ''}
+                  onChange={() => {
+                    /* subject changes happen on the subject step only */
+                  }}
+                  disableChange
+                />
+                {contextLine && <p className="text-sm text-muted-foreground">{contextLine}</p>}
+              </div>
+            )}
+
+            {isEdit && !state.stored?.entity_id && (
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="composer-legacy-title">What this review is about</Label>
+                  <Input id="composer-legacy-title" value={state.stored?.title ?? ''} readOnly disabled aria-readonly="true" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="composer-legacy-venue">Where</Label>
+                  <Input id="composer-legacy-venue" value={state.stored?.venue ?? ''} readOnly disabled aria-readonly="true" />
+                </div>
+                <p className="text-xs text-muted-foreground md:col-span-2">The subject of a review can't be changed.</p>
+              </div>
+            )}
+
+            {state.values.media.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2 font-medium">
+                  <span className="text-lg">🖼️</span>
+                  <span>Your media ({state.values.media.length}/4)</span>
+                </Label>
+                <CompactMediaGrid media={state.values.media} onRemove={handleMediaRemove} maxVisible={4} className="group" />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label className="mb-1 flex items-center gap-2 font-medium">
+                <span className="text-lg">📸</span>
+                <span>Add photos & videos</span>
+              </Label>
+              <MediaUploader
+                sessionId={uploads.sessionId}
+                onMediaUploaded={handleMediaAdded}
+                initialMedia={state.values.media}
+                className="w-full"
+                maxMediaCount={4}
+                onUploadsChange={onUploadsChange}
+                reserveSlots={reserveSlots}
+                releaseSlot={releaseSlot}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                {state.values.media.length > 0
+                  ? `${state.values.media.length}/4 media items added - Add photos or videos to make your review stand out`
+                  : 'Add photos or videos to make your review stand out'}
+              </p>
+            </div>
             {err('media') && <FieldError message={err('media')!} />}
           </div>
         )}
@@ -482,17 +630,18 @@ export function ReviewComposerScreen(props: Props) {
       </footer>
 
       <ConfirmationDialog
-        isOpen={confirmLeave}
-        onClose={() => setConfirmLeave(false)}
+        isOpen={!!leaveDialog}
+        onClose={() => setLeaveDialog(null)}
         onConfirm={() => {
-          setConfirmLeave(false);
-          void leave();
+          const d = leaveDialog;
+          setLeaveDialog(null);
+          if (d) void performLeave(d.action);
         }}
-        title={isEdit ? 'Discard your changes?' : 'Discard this review?'}
-        description="Your changes will not be saved."
+        title={leaveDialog ? DIALOG_COPY[leaveDialog.mode].title : ''}
+        description={leaveDialog ? DIALOG_COPY[leaveDialog.mode].description : ''}
         variant="destructive"
-        confirmLabel="Discard"
-        cancelLabel="Keep editing"
+        confirmLabel={leaveDialog ? DIALOG_COPY[leaveDialog.mode].confirm : 'Discard'}
+        cancelLabel={leaveDialog ? DIALOG_COPY[leaveDialog.mode].cancel : 'Keep editing'}
       />
     </div>
   );

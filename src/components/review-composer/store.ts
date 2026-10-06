@@ -31,6 +31,7 @@ import {
 import type { SubjectOrigin } from '@/components/profile/reviews/categoryPersistence';
 import type { CuratedTagAnswer } from '@/components/profile/reviews/questionnaire/curatedTagInput';
 import { generateUUID } from '@/lib/uuid';
+import type { MediaItem } from '@/types/media';
 
 /* ------------------------------ session keys ------------------------------ */
 
@@ -132,7 +133,11 @@ export type ComposerAction =
   | Keyed<{ type: 'SAVE_RESULT'; result: ComposerServerResult }>
   | Keyed<{ type: 'SAVE_TIMEOUT' }>
   | Keyed<{ type: 'EVIDENCE'; evidence: AmbiguousSaveEvidence }>
-  | Keyed<{ type: 'ALLOW_MANUAL_RETRY' }>;
+  | Keyed<{ type: 'ALLOW_MANUAL_RETRY' }>
+  | Keyed<{ type: 'MEDIA_ADDED'; media: MediaItem }>
+  | Keyed<{ type: 'MEDIA_REMOVED'; url: string }>;
+
+const MEDIA_LIMIT = 4;
 
 function setTyped<K extends SectionId>(values: ReviewComposerValues, id: K, value: SectionValueMap[K]) {
   return { ...values, [id]: value } as ReviewComposerValues;
@@ -165,6 +170,19 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
     case 'HYDRATE_FAILED': {
       const reason = toBlockedReason(action.result);
       return { ...state, status: 'blocked', blockedReason: reason ?? 'not_found', lastResult: action.result };
+    }
+    case 'MEDIA_ADDED': {
+      if (state.status !== 'ready') return state;
+      const media = state.values.media;
+      if (media.some((m) => m.url === action.media.url) || media.length >= MEDIA_LIMIT) return state;
+      const next = [...media, action.media].map((m, i) => ({ ...m, order: i }));
+      return { ...state, values: { ...state.values, media: next }, meta: touch(state, 'media') };
+    }
+    case 'MEDIA_REMOVED': {
+      if (state.status !== 'ready') return state;
+      const next = state.values.media.filter((m) => m.url !== action.url).map((m, i) => ({ ...m, order: i }));
+      if (next.length === state.values.media.length) return state;
+      return { ...state, values: { ...state.values, media: next }, meta: touch(state, 'media') };
     }
     case 'SET_VALUE': {
       if (state.status !== 'ready') return state;

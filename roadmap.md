@@ -393,6 +393,8 @@ cross-read between them.
 - [x] 3.0A approved (signed-in step 1 checked by user)
 - [x] 3A — composer foundation (unused): design doc reconciled, modes, typed store, sections, allowlisted save builders, upload session, step engine, typed server results, ambiguity evidence; 61 new tests; see docs/verification/review-composer-3a.md
 - [x] 3A approved
-- [x] 3B — review page (new + edit review) behind the rollout switch (off); see docs/verification/review-composer-3b.md
-- [ ] 3B signed-in manual checklist — waiting on user (preview sign-in not available to the agent)
+- [ ] 3B — review page (new + edit review) behind the rollout switch (off) — IN PROGRESS; see docs/verification/review-composer-3b.md
+  - [x] First signed-in checklist passed (user)
+  - [x] 3B close-out: upload race/slots/late uploads, photos-step parity, navigation protection (clean/dirty/saving/ambiguous)
+  - [ ] Signed-in re-test of real uploads + navigation protection — waiting on user
 - [ ] 3C — timeline modes on the page (blocked until 3B approved)
