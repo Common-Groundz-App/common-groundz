@@ -23,7 +23,7 @@ Date: 2026-10-05. Scope: page for create-review / edit-review only. No entry poi
 ## Known limits
 - Signed-in screenshots not taken: this project's sign-in can't be injected into the test browser. Covered by the manual checklist below.
 - Browser Back with unsaved changes is not intercepted (the app's router doesn't support blocking); Cancel and tab close are guarded.
-- Photos step shows the heading, context line and uploader, not the legacy location prompt / subject preview card.
+- ~~Photos step lacked the location prompt / subject card~~ — fixed in the 3B close-out (see below).
 - A pre-existing link in search results points to `/review/:id`, which never existed as a page; untouched.
 
 ## Manual signed-in checklist (admin account, switch off)
@@ -99,3 +99,14 @@ In the popup's order:
 6. Save → you land on the entity page; pressing Back doesn't show the old form with your answers.
 7. Edit within the hour (`/review/<id>/edit`): the same photos-step checks.
 8. Mobile and desktop.
+
+## 3B audit (2026-10-06)
+- **Fixed:** "Too many files selected — Only the first N files will be processed." was missing on the new page. The uploader compared against the already-trimmed list on the reserved-slot path. It now compares against the number of files picked. The popup path is unchanged. Tests: `composer3bAudit.test.tsx` (3 uploader cases + 5 location-policy cases).
+- **Location prompt: no bug.** It is skipped on purpose when the browser already allows location for the site (same as the popup). The profile used for testing had Allow set; incognito showed the card on both the popup and the page. Browser test case 7 checks it (Place, permission Ask, no snooze keys → card shown and "last shown" written). 20/20 required checks pass, 0 writes.
+- Snooze rule (same as the popup): a saved Skip → only the 2h rule applies; otherwise 24h since last shown.
+
+### Manual re-test
+1. Incognito → sign in → review a place or dish → step 3 shows "Location Access". (Passed.)
+2. Skip → back a step → forward → no card (2h snooze).
+3. Pick 6 photos at once → "Too many files selected — Only the first 4 files will be processed."; only 4 upload.
+4. A normal window where location is already allowed → no card (expected).
