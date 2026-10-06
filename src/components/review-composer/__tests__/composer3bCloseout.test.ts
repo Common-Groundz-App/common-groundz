@@ -133,7 +133,7 @@ describe('location prompt policy', () => {
 });
 
 describe('MEDIA_ADDED / MEDIA_REMOVED', () => {
-  const start = () => initialComposerState({ mode: 'create-review' } as never);
+  const start = () => initialComposerState({ sessionKey: 'k1', mode: 'create-review' });
   it('applies several finishes against the latest state', () => {
     let s = start();
     const k = s.sessionKey;

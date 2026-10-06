@@ -66,6 +66,7 @@ const nodeIncludes = [
   'src/components/profile/reviews/__tests__/questionnaireEnvelope.test.ts',
   'src/components/review-composer/__tests__/composerFoundation.test.ts',
   'src/components/review-composer/__tests__/composerPage3b.test.ts',
+  'src/components/review-composer/__tests__/composer3bCloseout.test.ts',
 ];
 
 
@@ -96,6 +97,7 @@ export default defineConfig({
           include: [
             'src/contexts/ComposerFocusContext.test.tsx',
             'src/components/review-composer/__tests__/composerHooks.test.tsx',
+            'src/components/review-composer/__tests__/historyGuardRouter.test.tsx',
             'src/hooks/__tests__/useTimelineReviews.test.ts',
             'src/components/profile/reviews/__tests__/SubjectSelectStepLocked.test.tsx',
             'src/hooks/useSoftwareKeyboardOpen.test.tsx',
