@@ -44,6 +44,13 @@ interface MediaUploaderProps {
     uploads: MediaUploadState[],
     cancel: (upload: MediaUploadState) => void
   ) => void;
+  /**
+   * Optional (review composer): reserve slots atomically before any upload
+   * starts; returns how many were granted. When omitted, behaviour is unchanged.
+   */
+  reserveSlots?: (requested: number) => number;
+  /** Optional: called exactly once per reserved file (success, failure or skip). */
+  releaseSlot?: () => void;
 }
 
 /**
@@ -238,6 +245,8 @@ export function MediaUploader({
   disabled = false,
   renderUploadsInline = true,
   onUploadsChange,
+  reserveSlots,
+  releaseSlot,
 }: MediaUploaderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -299,9 +308,33 @@ export function MediaUploader({
       return;
     }
 
-    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+    let filesToProcess = Array.from(files).slice(0, remainingSlots);
+    if (reserveSlots) {
+      const granted = reserveSlots(filesToProcess.length);
+      if (granted <= 0) {
+        toast({
+          title: 'Media limit reached',
+          description: `You can only add up to ${maxMediaCount} media items to one experience`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (granted < filesToProcess.length) {
+        toast({
+          title: 'Too many files selected',
+          description: `Only the first ${granted} files will be processed.`,
+        });
+      }
+      filesToProcess = filesToProcess.slice(0, granted);
+    }
+    const released = new Set<File>();
+    const release = (f: File) => {
+      if (!releaseSlot || released.has(f)) return;
+      released.add(f);
+      releaseSlot();
+    };
 
-    if (files.length > remainingSlots) {
+    if (!reserveSlots && files.length > remainingSlots) {
       toast({
         title: 'Too many files selected',
         description: `Only the first ${remainingSlots} files will be processed.`,
@@ -322,12 +355,14 @@ export function MediaUploader({
             'You can include one video in this version. Remove the existing video to add a different one.',
           variant: 'destructive',
         });
+        release(file);
         continue;
       }
 
       const { valid, error } = await validateMediaFile(file);
       if (!valid) {
         toast({ title: 'Invalid file', description: error, variant: 'destructive' });
+        release(file);
         continue;
       }
 
@@ -395,6 +430,7 @@ export function MediaUploader({
       }).then((mediaItem) => {
         if (mediaItem) {
           onMediaUploaded(mediaItem, file);
+          release(file);
           setCurrentMediaCount((prev) => prev + 1);
           if (mediaItem.type === 'video') setCurrentVideoCount((prev) => prev + 1);
 
@@ -407,12 +443,20 @@ export function MediaUploader({
             return prev.filter((u) => u.file !== file);
           });
         } else {
+          release(file);
           setUploads((prev) =>
             prev.map((u) =>
               u.file === file ? { ...u, status: 'error', error: 'Upload failed' } : u
             )
           );
         }
+      }, () => {
+        release(file);
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.file === file ? { ...u, status: 'error', error: 'Upload failed' } : u
+          )
+        );
       });
     }
   };
