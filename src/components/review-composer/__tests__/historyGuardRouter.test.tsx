@@ -88,10 +88,11 @@ describe('useHistoryGuard with a real router', () => {
   it('Discard / Save / Cancel: release waits for the base entry, then replace', async () => {
     const { probe, queryByTestId, setMode } = setup('clean', { entries: ['/a', '/review'] });
     setMode('dirty');
-    let ok = false;
-    await act(async () => {
-      ok = await probe.release();
+    let pending!: Promise<boolean>;
+    act(() => {
+      pending = probe.release();
     });
+    const ok = await pending;
     expect(ok).toBe(true);
     expect(guardSessionOf(probe.loc.state)).toBeNull();
     act(() => probe.nav('/home', { replace: true }));
@@ -148,10 +149,11 @@ describe('useHistoryGuard with a real router', () => {
     setMode('dirty');
     // user is on the guard; simulate an unexpected forward-history push
     act(() => probe.nav('/review?x=1', { state: probe.loc.state }));
-    let ok = true;
-    await act(async () => {
-      ok = await probe.release();
+    let pending!: Promise<boolean>;
+    act(() => {
+      pending = probe.release();
     });
+    const ok = await pending;
     expect(ok).toBe(false);
   });
 });
