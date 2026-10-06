@@ -59,7 +59,7 @@ def check(name, ok, detail="", required=True):
     print(("PASS " if ok else ("FAIL " if required else "NOTE ")) + name + (f" — {detail}" if detail else ""))
 
 async def composer_visible(page):
-    return await page.get_by_role("heading", name="Write a review").count() > 0
+    return await page.locator("h1", has_text="Write a review").count() > 0
 
 async def make_dirty(page):
     # rating step: pick a rating so the form has something to lose
