@@ -9,7 +9,7 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u1' } 
 vi.mock('@/services/mediaService', async (orig) => ({
   ...(await orig<typeof import('@/services/mediaService')>()),
   uploadMedia: vi.fn(() => new Promise(() => undefined)),
-  validateMediaFile: vi.fn(() => null),
+  validateMediaFile: vi.fn(async () => ({ valid: true })),
 }));
 vi.mock('@/utils/codecSupport', () => ({ detectHEVCRisk: vi.fn(async () => false) }));
 
