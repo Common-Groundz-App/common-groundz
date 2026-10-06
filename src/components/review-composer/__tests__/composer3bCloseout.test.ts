@@ -109,8 +109,8 @@ describe('upload registry', () => {
       expect(hasSession(id)).toBe(false);
     }
   });
-  it('ended sessions grant no new slots', () => {
-    reserveSlots('e', 0);
+  it('an ended session with pending uploads grants no new slots', () => {
+    reserveSlots('e', 1);
     endSession('e');
     expect(reserveSlots('e', 1)).toBe(0);
   });

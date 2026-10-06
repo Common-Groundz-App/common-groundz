@@ -99,6 +99,7 @@ export function useHistoryGuard({ mode, sessionId, fromKnown, fallback, onBlocke
     const done = waiter.wait(a.baseKey);
     navigate(-1);
     const r = await done;
+    if (typeof process !== 'undefined' && process.env.DEBUG_GUARD) console.log('release', r, a, loc.current.key);
     leaving.current = false;
     if (r !== 'arrived') return false;
     armed.current = null;
