@@ -110,3 +110,19 @@ In the popup's order:
 2. Skip → back a step → forward → no card (2h snooze).
 3. Pick 6 photos at once → "Too many files selected — Only the first 4 files will be processed."; only 4 upload.
 4. A normal window where location is already allowed → no card (expected).
+
+## Final parity audit (popup vs page)
+| Item | Popup | Page | Status |
+|---|---|---|---|
+| Subject search / quick-create messages | SubjectSelectStep | same component | Same |
+| Blocked subject type | toast | same toast | Same |
+| Missing rating / subject / skip steps | toasts | inline error + focus, step jump only via Next/Back | Different on purpose |
+| Unclassifiable subject on publish | toast | "We can't save this review yet" toast | Same intent |
+| Already reviewed | notice | notice + Add timeline update | Same |
+| Edit window closed | panel | blocked "expired" panel | Same |
+| 4-photo limit + too-many warning, upload error | MediaUploader | same, with slot reservation | Same |
+| Location prompt, subject card, legacy read-only fields | yes | yes | Same |
+| Success / failure messages | "Review has been added/updated" | "Your review was published" / "Your changes were saved", lands on the review | Different wording on purpose |
+| Leave warnings | unsaved-changes dialog | dirty/saving/ambiguous dialogs | Same+ |
+| Usage tracking (subject step shown, subject selected, submitted) | yes | **was missing — added** | Fixed |
+| Subject type mismatch / legacy unlinked tracking | yes | not added (page never changes type; subject is locked on edit) | Different on purpose |

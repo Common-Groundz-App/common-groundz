@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
+import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 import StepOne from '@/components/profile/reviews/steps/StepOne';
 import SubjectSelectStep from '@/components/profile/reviews/steps/SubjectSelectStep';
 import StepFour from '@/components/profile/reviews/steps/StepFour';
@@ -86,6 +87,7 @@ const STEP_TITLES = ['Rating', 'Subject', 'Photos', 'Details'];
 export function ReviewComposerScreen(props: Props) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { log: logFunnel } = useSearchFunnel();
   const isEdit = props.mode === 'edit-review';
   const target = useMemo(
     () => (isEdit ? { mode: 'edit-review' as const, reviewId: (props as any).loaded.record.id } : { mode: 'create-review' as const }),
@@ -201,6 +203,7 @@ export function ReviewComposerScreen(props: Props) {
       toast({ title: "We can't use this one yet", description: 'Pick something else to review for now.', variant: 'destructive' });
       return;
     }
+    logFunnel({ event: isEdit ? 'review_subject_attached_late' : 'review_subject_selected', source: 'review_form', entityType: adapter.type as never });
     setDisplay(adapter);
     setContextLine(null);
     setIsResolvingContext(true);
@@ -273,6 +276,13 @@ export function ReviewComposerScreen(props: Props) {
   };
 
   const onStep = (id: SectionId) => (caps.steps[step] as readonly SectionId[]).indexOf(id) >= 0;
+
+  // Parity with the popup: fires each time the subject step becomes visible.
+  const subjectStepVisible = onStep(SID.subject);
+  useEffect(() => {
+    if (subjectStepVisible) logFunnel({ event: 'review_subject_step_shown', source: 'review_form' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjectStepVisible]);
 
   const subjectBlocked =
     !isEdit && (isAddingSubject || isResolvingContext || (!!subjectId && existing?.entityId === subjectId && existing.state !== 'none'));
@@ -375,6 +385,7 @@ export function ReviewComposerScreen(props: Props) {
       return;
     }
     uploads.send({ type: 'COMMITTED' });
+    logFunnel({ event: 'review_submitted', source: 'review_form', entityType: (display?.type ?? undefined) as never });
     dispatch({ type: 'SAVE_RESULT', sessionKey, result: { status: 'ok' } });
     await goToEntity(subjectId, isEdit ? 'Your changes were saved' : 'Your review was published');
   };
