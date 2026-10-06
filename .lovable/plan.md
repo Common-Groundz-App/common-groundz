@@ -1,37 +1,37 @@
-# Finish 3B — photos step parity, upload fix, navigation protection (revision 3)
+# Finish 3B — photos step parity, upload fix, navigation protection (revision 4)
 
 Only the new review page changes. The legacy popup, entry points, switch, database and 3C stay untouched.
 
 ## 1. Uploader fixes
-- **Lost photos:** each finished upload adds to the photo list as it stood when that upload started. When several finish together, they overwrite each other. Fix: new store actions `MEDIA_ADDED` and `MEDIA_REMOVED`, tied to the session, that work on the latest state. They skip duplicates, renumber `order` and cap the list at 4.
-- **Stuck Next:** only rows still preparing, uploading or finalizing count as uploading. A failed row stays visible but doesn't block Next.
-- **Limit checked before uploading:** the uploader gets "4 minus photos already added minus uploads still running". Picking more than that while uploads are running doesn't start the extra uploads; they're refused with the existing "maximum 4" message.
-- **Uploads that finish after leaving, or that end up over the limit:**
-  - Any upload that finishes is recorded in the session's upload list first, even when the form then drops it (stale session, or over the limit).
-  - So the existing rule applies: delete only while the session is open and unsaved, and never while saving or ambiguous.
-  - A photo dropped for going over the limit while the session is open is deleted straight away.
-  - An upload that finishes after the user has left an open session is deleted when it arrives.
-  - An upload that finishes after leaving during saving or ambiguous is kept and counted as an orphan. Those files are listed in the verification doc. Cleaning up such files on the server is separate future work, the same as today.
+- **Lost photos:** new store actions `MEDIA_ADDED` and `MEDIA_REMOVED`, tied to the session, work on the latest state. They skip duplicates, renumber `order` and cap the list at 4.
+- **Stuck Next:** only rows that are still preparing, uploading or finalizing count. A failed row stays visible but doesn't block Next.
+- **Slots reserved the moment files are picked:** one counter, held by the page, reserves a slot for each file as it is accepted. Space left = 4 − photos already added − slots reserved.
+  - Two quick selections in a row can't both use the last slot.
+  - A slot is given back when its upload fails or is removed.
+  - The existing video limit and its message stay the same.
+- **Late uploads stay with their own session:**
+  - Each upload holds on to the session it started in. It finishes against that session, even after the page has closed (a small in-memory list on the page that outlives a single screen).
+  - The rules for what happens next:
+    - Session still open → added normally.
+    - Session open but over the limit → deleted right away.
+    - Session left while open → deleted when the upload finishes.
+    - Session left while saving or ambiguous → kept and listed as orphaned.
+  - The orphan list lives only in memory, for the visit. It is not durable cleanup tracking, and the docs say so. Durable cleanup on the server is separate future work.
 - Tests:
-  - Three uploads finishing at once
+  - Uploads finishing at the same time
   - Mixed success and failure
   - Remove, then add
-  - Adding at 4 refused before the upload starts
-  - Picking files while uploads are running
-  - Late upload after leaving an open session (deleted)
-  - Late upload after leaving an ambiguous session (kept)
-  - Over-limit upload (deleted)
+  - Two selections racing for the last slot
+  - Video limit
+  - Late finish in each of the four session situations, including after the page has closed
   - A step change keeps the photos
 
 ## 2. Photos step matches the popup
-Unchanged from the previous revision:
-- **Order:** location prompt → subject preview and context line → legacy read-only title/place → "Your media (n/4)" → "Add photos & videos" uploader → helper text.
-- **Built from:** the same low-level pieces, plus the stable upload session.
-- **Location prompt:** shown when the subject's questionnaire settings say so. "Last shown" is recorded when the prompt actually appears.
+Unchanged. Order: location prompt → subject preview and context line → legacy read-only title/place → "Your media (n/4)" → "Add photos & videos" uploader → helper text. It's built from the same low-level pieces, uses the stable upload session, and shows the location prompt when the questionnaire settings say so. "Last shown" is recorded when the prompt actually appears.
 
 ## 3. Navigation protection
 
-### States and copy
+### States and copy (unchanged)
 | State | Dialog | Buttons |
 |---|---|---|
 | Clean | none | — |
@@ -39,77 +39,88 @@ Unchanged from the previous revision:
 | Saving | "Your review is still saving. Leaving now may leave its status uncertain." | Stay here / Leave anyway |
 | Ambiguous | "We couldn't confirm whether your review was saved. Leaving now will close this form before the save status is resolved." | Stay here / Leave anyway |
 
-Two rules for these states:
 - Leave anyway never cleans up uploads.
-- A save that finishes after the user has left does nothing on screen: no navigation and no toast. It still sends the normal "reviews changed" signal so lists refresh.
+- **Save finishing after the user left:** it only sends the background "reviews changed" signal. No navigation, no toast, no change to the form. The save handler checks a "still here" flag before doing anything on screen. Tests check that whichever screen is open next gets no toast and no route change.
 
-### History guard: the exact design
-The router (`BrowserRouter`) can't block navigation itself, so the page uses one extra history step at the same address. "Guard entry" below means that extra step; "base entry" is the real one under it.
+### History guard: corrected design
+- **Marker in the router's state:** the guard entry is `navigate(sameUrl, { state: { ...location.state, __reviewGuard: { sessionId } } })`. The router keeps managing its own key/index fields, and the page never reads or writes raw `history.state`.
+- **Entries are identified by the router's location key.** When the guard is added, the page records the key of the entry underneath it (the base entry) and the guard's own key. Moves are checked against these keys, not the address, because both entries share the same address.
+- **Adding the guard:** happens when the form becomes dirty, saving or ambiguous, and only if the current entry isn't this session's guard. Going clean again doesn't change history.
+- **Waiting for a move (`traverse`):**
+  - The page asks the browser to step back and waits for the router to arrive at the expected key, for up to 1 second.
+  - **If it doesn't arrive:** the page stops. No replace and no further moves; it stays put and shows "Couldn't leave this page — try again."
+  - **If the page closes while waiting:** the wait is cancelled and does nothing.
+  - **If it arrives at an unexpected key:** treated the same as a timeout.
 
-- **Router state kept:** the guard entry copies the router's own current `history.state`, including its own fields, and only adds `__reviewGuard: { sessionId }`. The page never rewrites the router's state.
-  - The extra entry is created with `navigate(sameUrl, { state: {...current, guard} })`, not the raw browser call, so the router's location tracking stays in sync.
-- **Arming:** the guard is added when the form becomes dirty, saving or ambiguous, and only if the current step isn't already this session's guard. So it is added at most once, never stacked.
-- **Disarming:** going clean again doesn't touch history (history steps can't be deleted). The guard entry stays, and the next Back over it is handled below.
-- **Waiting instead of guessing:** every planned history move goes through one helper, `traverse(n)`. It calls `history.go(-n)` and waits for the router to report the matching location, with a 1-second timeout. Only then does the next action run. Nothing is replaced or navigated while a move is still in progress.
+**Return destination (direct entry vs in-app):** the page doesn't rely on `location.key === "default"` or the history length.
+- **In-app entry:** every in-app link to the composer passes `state.from`. Leaving the page is a history step back only when `state.from` is a valid in-app path (the existing safe-origin rule) and the page saw it on its own base entry.
+- **Anything else** (typed address, reload without that state, restored tab, unknown history): use a fixed, safe destination — the entity page for a fixed subject (from saved slugs), otherwise `/home`.
+- The browser test checks a typed address, an in-app link, a reload, and arriving through Back/Forward.
 
-Back sequences (the page is on the guard entry, with the base entry beneath it):
+**How each exit tidies up the guard and base entries, without ever stepping out of the app:**
 
-| Situation | What happens |
-|---|---|
-| Back while dirty, saving or ambiguous | The router lands on the base entry. The address is the same, so the page stays open. The page shows the dialog and puts the guard back (`navigate` forward to the same address with the guard state). |
-| Keep editing / Stay here | Nothing more; the user is back on the guard. |
-| Discard / Leave anyway | The user is on the guard again after the dialog, so the page steps back 2 entries (guard + base) and waits until it has left the page. |
-| Back while clean (guard still there) | The router lands on the base entry. The page sees the guard is no longer needed and quietly steps back 1 more entry, so the user only presses Back once. |
-| Rapid double Back | Dialogs and moves are handled one at a time: while the page is moving or a dialog is open, further Back presses just put the guard back. The page never opens two dialogs or skips past the form. |
+| Exit | In-app entry | Direct / unknown entry |
+|---|---|---|
+| Save success, Cancel confirmed, Discard, Leave anyway | Step back off the guard (wait for the base key), then replace the base entry with the destination | Same first step: step back off the guard (the page created it, so this stays in the app), then replace the base entry with the fixed destination |
+| No guard yet (clean) | Replace with the destination | Replace with the fixed destination |
 
-- **Save success / Cancel confirmed:**
-  - If the page is on its guard entry, it steps back 1 and waits.
-  - Then it replaces the base entry with the destination, so history ends: previous page → destination. No leftover review address.
-- **Direct entry (opened in a new tab):** the browser can't reliably say whether the page before is part of this app.
-  - The page notes on its first load whether it was opened with a link from inside the app (the router's own location key is "default" for a fresh visit).
-  - If opened directly, Discard / Leave / Cancel never step back out of the app. They replace the address with a fixed destination: the entity page for a fixed subject (from saved slugs), otherwise `/home`.
-- **Leftover guard entries:** a session marker doesn't make an old entry disappear. So:
-  - An entry whose session doesn't match is treated as a normal page. No dialog, no stale state; a fresh session starts as usual.
-  - Pressing Back from there behaves normally. One extra press past an old duplicate entry is possible, and that is documented as the known cost. There's no automatic skipping, which could loop.
-- **Forward:** after Keep editing, the forward history is cut off (normal browser behavior). Forward into an old guard entry from another page opens a fresh, clean form with no dialog.
-- **React Strict Mode** (the app doesn't use it today; tested anyway): setting up the guard is safe to run twice. Arming checks the current state first, and the listener is cleaned up when the page closes. Running mount, unmount and mount again leaves exactly one guard.
-- **Tab close / reload:** the browser's own warning shows when the form is dirty, saving or ambiguous.
+Either way, history ends up as: previous entries → destination. No review entry is left behind.
 
-### All exits guarded
-Every exit goes through the same `requestLeave(destination)`:
+**Back behavior:**
+- **Back while dirty, saving or ambiguous:** the page lands on the base key and puts the guard back. Then it shows the dialog.
+- **Back while clean with a guard still there:** one quiet step back, waited for, so a single press is enough.
+- **Leftover guard entries from an earlier session:** shown as a normal fresh page with no dialog. The known cost is one possible extra Back press. There's no automatic skipping.
+- **Forward:** after Keep, forward history is cut (normal browser behavior). Forward into an old guard entry opens a fresh, clean form.
+- **Rapid double Back:** the browser can step past the base entry before the page puts the guard back, so this is **not** promised. The browser test checks it.
+  - If the page can stay open, it's documented as protected.
+  - If the second Back escapes, that limitation is reported to you, and browser Back protection is **not** marked complete. Tab close and the in-app exits stay protected either way. A router migration would be the only full fix and needs your decision.
+- **Strict Mode:** setting up the guard is safe to run twice, and mount → unmount → mount leaves exactly one guard. Unit-tested.
+- **Tab close / reload:** the browser's own warning shows in the dirty, saving and ambiguous states.
+
+### All exits go through `requestLeave(destination)`
 - Cancel
-- Browser Back
-- "View it" in the existing-review notice
+- Back
+- "View it"
 - Add timeline update
 - Evidence-panel links
-- Any app header or logo shown
+- Any header or logo
 
-While building, I'll list every clickable item on the screen in the verification doc. The state panels with no form stay unguarded.
+The full list of clickable items goes in the verification doc.
 
 ## 4. Verification
 - **Committed unit tests (vitest):**
-  - The history guard logic is a pure state machine run against an in-memory history, with no browser timing.
-  - All the sequences above: clean → dirty → clean, Back; Back → Keep three times; Discard; Leave anyway; rapid double Back; Save and Cancel with the guard active; direct entry; leftover marker; Forward; Strict Mode double setup; late save completion after leaving.
+  - The guard state machine runs against an in-memory history keyed by location key.
+  - The waiting step: timeout, unexpected key, and the page closing while waiting.
+  - Every exit and Back sequence in both entry kinds.
+  - The leftover marker, Forward, and Strict Mode.
   - The dialog copy for each state.
+  - The late-save side effects.
   - All the upload cases.
-- **Committed browser test:**
-  - `scripts/e2e/review-history-guard.py` (Playwright), runnable again on demand.
-  - It blocks all save requests and fakes the save results, so nothing reaches the database. It signs in with a minted session.
-  - It checks the address and page state after each step of the same sequences.
-  - It isn't part of `bun test`, because the project has no browser test runner. The verification doc explains how to run it.
-- Screenshots of the photos step and each dialog at 390 and 1280.
-- Full suite, typecheck, build.
-- `docs/verification/review-composer-3b.md`: the navigation design, its known limits (one extra Back press past an old entry; forward history cut after Keep), the list of exits, the orphan-upload rule, and your re-test list (media uploads plus navigation protection).
-- Roadmap: 3B stays "in progress" until you pass that list.
+- **Committed browser test:** `scripts/e2e/review-history-guard.py` (Playwright).
+  - **Sign-in is faked** with a stored fake session and blocked sign-in calls. Every write request (database calls other than reads, storage uploads, functions) is blocked before the page loads, and save results are faked. No real session is needed and nothing reaches the database.
+  - It covers: a typed address vs an in-app link vs a reload; Back → Keep ×3; Discard; Save and Cancel with the guard active; dirty → saving → ambiguous → Stay / Leave; rapid double Back (the result is recorded, whichever way it goes); a leftover marker; Forward; a late save after leaving (no toast, no navigation).
+  - The address and location key are checked after each step.
+  - It isn't part of `bun test` (the project has no browser runner); the doc explains how to run it.
+- Screenshots of the photos step and the dialogs at 390 and 1280. Full suite, typecheck, build.
+- `docs/verification/review-composer-3b.md`:
+  - The navigation design and its known limits
+  - The rapid double-Back result
+  - The list of exits
+  - The orphan rule (in memory only)
+  - Your signed-in re-test list: real uploads plus navigation protection
+- **Roadmap:** 3B stays "in progress" until you pass that list. If the rapid double-Back test fails, it's listed as an open decision.
 
 ## Not included
-3C, a full router migration, entry points, flag default, legacy forms, database, server-side orphan cleanup, the 428 older warnings.
+3C, a router migration, entry points, flag default, legacy forms, database, durable orphan cleanup, the 428 older warnings.
 
 ## Technical details
-- `store.ts`: `MEDIA_ADDED` / `MEDIA_REMOVED` actions.
-- `uploadSession.ts`: `DISCARD_LATE`; `orphaned` list.
-- `screen/historyGuard.ts`: pure machine and `traverse`.
-- `screen/useHistoryGuard.ts`: router binding (`useNavigate`, `useLocation`, `navigationType`).
-- `screen/locationPromptPolicy.ts`: location prompt snooze logic.
-- `ReviewComposerScreen.tsx`: photos step, upload counting, dialogs, `requestLeave`.
-- Tests: `__tests__/historyGuard.test.ts`, `__tests__/composerPage3bParity.test.tsx`.
+- `store.ts`: `MEDIA_ADDED` / `MEDIA_REMOVED`.
+- `uploadSession.ts`:
+  - Slot reservations: `reserve`, `release`
+  - Per-session finish rules
+  - A registry that outlives the screen, keyed by session id
+- `screen/historyGuard.ts`: pure machine and `traverse` with an expected key, timeout and abort.
+- `screen/useHistoryGuard.ts`: router binding (`useNavigate`, `useLocation`).
+- `screen/locationPromptPolicy.ts`: location prompt rules.
+- `ReviewComposerScreen.tsx`: photos step, slot counting, dialogs, `requestLeave`, the "still here" flag.
+- Tests: `__tests__/historyGuard.test.ts`, `__tests__/composerPage3bParity.test.tsx`, `__tests__/uploadSlots.test.ts`.
