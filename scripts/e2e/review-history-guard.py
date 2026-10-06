@@ -26,6 +26,11 @@ PROFILE = {"id": UID, "username": "e2e", "first_name": "E2E", "last_name": "Test
            "avatar_url": None, "bio": None, "location": None, "is_deleted": False, "deleted_at": None,
            "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z", "profile_completed": True}
 
+PLACE_ID = "11111111-1111-4111-8111-111111111111"
+PLACE = {"id": PLACE_ID, "name": "Ambur", "type": "place", "slug": "ambur", "is_deleted": False, "image_url": None,
+         "venue": "Ambur, Tamil Nadu, India", "description": "Ambur, Tamil Nadu, India", "parent_id": None,
+         "metadata": {}, "category_id": None, "api_source": None, "api_ref": None, "created_at": "2026-01-01T00:00:00Z"}
+
 blocked_writes = []
 results = []
 
@@ -43,6 +48,9 @@ async def route(r):
         if req.method != "GET" and name not in ("get_public_flags","has_role","is_admin"):
             pass
         return await r.fulfill(json=None)
+    if "/rest/v1/entities" in url and PLACE_ID in url:
+        single = "vnd.pgrst.object" in (req.headers.get("accept") or "")
+        return await r.fulfill(json=PLACE if single else [PLACE])
     if "/rest/v1/profiles" in url:
         single = "vnd.pgrst.object" in (req.headers.get("accept") or "")
         return await r.fulfill(json=PROFILE if single else [PROFILE])
@@ -150,6 +158,16 @@ async def main():
             await page.screenshot(path=str(OUT / f"rapid{width}.png"))
             print("   rapid dialog:", (await dialog_text(page))[:60])
             check(f"rapid double Back stays on the form {tag}", await composer_visible(page), page.url, required=False)
+
+            # 7. location prompt: Place, location off, permission "Ask", no snooze keys
+            await page.evaluate("localStorage.removeItem('locationPromptLastShown'); localStorage.removeItem('locationPromptLastSkipped')")
+            await page.goto(BASE + f"/review?entityId={PLACE_ID}", wait_until="networkidle")
+            await make_dirty(page)
+            for _ in range(2):
+                await page.get_by_role("button", name="Next").first.click(); await page.wait_for_timeout(1200)
+            body = await page.inner_text("body")
+            shown = await page.evaluate("localStorage.getItem('locationPromptLastShown')")
+            check(f"location prompt on photos step for a place {tag}", "Location Access" in body and shown is not None)
 
             check(f"no page errors {tag}", not errs, "; ".join(errs[:2]))
             await ctx.close()
