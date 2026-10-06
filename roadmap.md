@@ -396,5 +396,7 @@ cross-read between them.
 - [ ] 3B — review page (new + edit review) behind the rollout switch (off) — IN PROGRESS; see docs/verification/review-composer-3b.md
   - [x] First signed-in checklist passed (user)
   - [x] 3B close-out: upload race/slots/late uploads, photos-step parity, navigation protection (clean/dirty/saving/ambiguous)
+  - [x] 3B audit: "too many files" warning fixed; location prompt confirmed working (skipped when browser already allows location)
+  - [ ] Your check: pick 6 photos → warning shows
   - [ ] Signed-in re-test of real uploads + navigation protection — waiting on user
 - [ ] 3C — timeline modes on the page (blocked until 3B approved)
