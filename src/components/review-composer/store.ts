@@ -31,6 +31,7 @@ import {
 import type { SubjectOrigin } from '@/components/profile/reviews/categoryPersistence';
 import type { CuratedTagAnswer } from '@/components/profile/reviews/questionnaire/curatedTagInput';
 import { generateUUID } from '@/lib/uuid';
+import type { MediaItem } from '@/types/media';
 
 /* ------------------------------ session keys ------------------------------ */
 
