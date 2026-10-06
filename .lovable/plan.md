@@ -1,29 +1,52 @@
-# 3B audit: missing "too many photos" warning + location prompt answer
+# 3B audit: "too many photos" warning + why the location prompt didn't show
 
-## What I found
+## What I checked (this turn)
 
-**1. Missing warning (real bug, caused by 3B).**
-In the shared photo uploader, the files you pick are cut down to the free slots (4 minus what's already added) *before* the new page reserves them. When you pick more than fit (e.g. 6 photos with 0 added), the uploader keeps 4, reserves 4, sees "all granted", and never shows the "Too many files selected — Only the first N files will be processed" warning. The popup doesn't reserve slots, so it still shows the warning. Other warnings work the same on both: "Media limit reached" when all 4 are used and you tap Add, invalid file, one video per review.
+- **Live site has the new code.** The commongroundz.co bundle includes the new page's subject card, the location-prompt rules and the leave warnings. Nothing is stale.
+- **The prompt works in a reproduced run.** A test browser (fake sign-in, nothing saved) opened the new page with a **Place** called "Ambur", browser location permission at "Ask", `locationEnabled=false` and no snooze keys. On step 3 the "Location Access" card appeared and `locationPromptLastShown` was written at that moment.
+- **The type and question set are right.** "Tell us about your place" on your screen comes from the Place question set, and that set has the location prompt switched on. So "is it a place?" and "is this type allowed?" both pass.
+- **Storage keys match the popup:** `locationPromptLastShown`, `locationPromptLastSkipped`.
+- **The snooze rule matches the popup exactly** (correcting my earlier wording): if a Skip time is saved, only the 2-hour rule applies. If not, the 24-hour "last shown" rule applies.
 
-**2. Location prompt: it exists and works the same as the popup.** It shows on the photos step only when all of these are true:
-- The subject's type is **Food, Place, Experience or Event**. Movies, books, products, apps, services, etc. never show it — the popup follows the same rule.
-- Location isn't already turned on in the app, and the browser hasn't already granted location permission. If you allowed location before, you won't see it.
-- It wasn't shown in the last 24 hours, and you didn't tap Skip in the last 2 hours.
+## Why it didn't show for you
 
-One intended difference: the new page saves "last shown" when the prompt actually appears (the popup had a small bug and often didn't save it). So once you see it on the new page, it stays hidden for 24 hours.
+Your screenshot rules out three causes: the subject type (it's a place), the app's location switch (`locationEnabled` is false), and the snooze keys (both are missing). The page writes `locationPromptLastShown` the moment it decides to show the card. That key is missing, so the page decided **not** to show it, before rendering anything.
 
-**How to test by hand:** pick a restaurant/dish/place. In the browser's site settings, reset location permission to "Ask". In DevTools → Application → Local Storage, delete `locationPromptLastShown` and `locationPromptLastSkipped`. Reload and go to the photos step.
+Only one check is left that a screenshot can't show: **the browser's own location permission.** If Chrome reports it as "Allow" (granted), the prompt is skipped on purpose, on both the popup and the new page. Your storage has `lastPositionTimestamp`, which means this browser shared its location with the site before. So "Allow" is the likely state, even after a reset. One common reason: Chrome's "Reset permission" in the site-info panel doesn't always apply until every commongroundz.co tab is reloaded.
 
-**3. Other 3B leftovers.** Nothing else is missing compared with the popup's photos step (subject card, "Dish at …" line, read-only old title/place, media grid, counter text, hint). The known limits already written down (Forward after leaving, rare extra Back press) stay as they are.
+This is likely, not confirmed. The plan adds a way to see the exact reason on your own screen.
 
-## Fix
+## What I'll build
 
-- Shared photo uploader: when slots are reserved, compare against the **original** number of files picked, not the already-cut list. Show "Too many files selected — Only the first N files will be processed." whenever fewer files are accepted than you picked. Wording stays identical to the popup's. The popup's behavior doesn't change (it doesn't use slot reservation).
-- Add a test: picking 6 files with 0 added (and 3 files with 2 added) on the reserved-slot path shows the warning, and the popup path stays the same.
-- Add a "Location prompt — how to trigger" section and a step for the "too many photos" warning to the signed-in re-test in the 3B verification doc.
+1. **"Too many photos" warning (real bug, from 3B).** When you pick more photos than fit, show "Too many files selected — Only the first N files will be processed." It uses the same wording as the popup, and the popup itself doesn't change.
+2. **Show the reason on screen, for admins only.** On the photos step, a small grey line for admins shows why the prompt is or isn't showing: type allowed yes/no, app location on/off, browser permission (ask/allow/block/unknown), snooze times, and the final decision. Other users never see it. It gets removed when the switch to the new page goes live for everyone, together with the other temporary admin pieces.
+3. **Regression tests:**
+   - Place, location off, permission "Ask", no snooze keys → the prompt card appears on step 3, and "last shown" is saved at that moment.
+   - The same, but permission "Allow" → no card. Location on → no card. Movie/book → no card.
+   - Skip saved 1 hour ago → no card. Skip saved 3 hours ago → card.
+   - The two photo-limit cases.
+4. **Browser check:** add the Place location-prompt case to the existing repeatable browser test (fake sign-in, nothing saved).
+5. **Corrected manual test** in the 3B verification doc (below).
+
+## Corrected manual test (after the build)
+
+1. On commongroundz.co, open DevTools → Console and run:
+   `navigator.permissions.query({name:'geolocation'}).then(p => console.log(p.state))`
+   - `granted` → the prompt is skipped by design. Click the site-info icon left of the address → Location → "Ask (default)". Close and reopen the tab, then run the command again until it says `prompt`.
+2. In Application → Local Storage, delete `locationPromptLastShown` and `locationPromptLastSkipped`. Make sure `locationEnabled` is `false`.
+3. Start a review of a place or dish → step 3. The "Location Access" card should appear at the top. The admin reason line should say "showing".
+4. Tap Skip, go back a step and forward again → no card (snoozed for 2 hours).
+
+## Open question (not part of this fix)
+
+When the browser already allows location but the app's own location switch is off, neither the popup nor the new page asks. So app location stays off, quietly. This rule is older than 3B. I'll leave it as is unless you want it changed.
+
+3B stays open until you confirm both checks. 3C stays on hold.
 
 ## Technical details
 
-- `src/components/media/MediaUploader.tsx` `handleFileSelect`: compute `const picked = files.length`; on the `reserveSlots` path call `reserveSlots(Math.min(picked, remainingSlots))` and show the toast when `granted < picked`. The non-reserve branch is unchanged.
-- New vitest in `src/components/review-composer/__tests__/` rendering MediaUploader with a mocked `reserveSlots` and `useToast`.
-- No changes to the location policy, the store or the navigation guard.
+- `MediaUploader.handleFileSelect`: on the `reserveSlots` path, reserve `min(files.length, remainingSlots)` and show the toast when `granted < files.length`. The non-reserve branch stays the same.
+- `locationPromptPolicy.ts`: add `explainLocationPrompt(args)`, which returns `{ show, reason }` and is built on the existing rules. `shouldShowLocationPrompt` stays as a wrapper. Render the admin-only line in `ReviewComposerScreen` with `isAdmin` passed from the page.
+- New vitest that renders the screen's photos step with a mocked `LocationContext` and a Place subject. Assert the `LocationAccessPrompt` text and the localStorage write.
+- `scripts/e2e/review-history-guard.py`: add the intercepted Place entity case and assert "Location Access" on step 3.
+- Update `docs/verification/review-composer-3b.md` with the steps above. Update the roadmap's 3B entry with "location prompt acceptance open".
