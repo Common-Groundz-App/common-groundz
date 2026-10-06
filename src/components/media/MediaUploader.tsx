@@ -308,6 +308,7 @@ export function MediaUploader({
       return;
     }
 
+    const picked = files.length;
     let filesToProcess = Array.from(files).slice(0, remainingSlots);
     if (reserveSlots) {
       const granted = reserveSlots(filesToProcess.length);
@@ -319,7 +320,8 @@ export function MediaUploader({
         });
         return;
       }
-      if (granted < filesToProcess.length) {
+      // Compare with what was picked, not the already-trimmed list.
+      if (granted < picked) {
         toast({
           title: 'Too many files selected',
           description: `Only the first ${granted} files will be processed.`,
