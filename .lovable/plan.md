@@ -8,25 +8,24 @@
 - **Storage keys match the popup:** `locationPromptLastShown`, `locationPromptLastSkipped`.
 - **The snooze rule matches the popup exactly** (correcting my earlier wording): if a Skip time is saved, only the 2-hour rule applies. If not, the 24-hour "last shown" rule applies.
 
-## Why it didn't show for you
+## Why it didn't show for you (confirmed by your incognito test)
 
-Your screenshot rules out three causes: the subject type (it's a place), the app's location switch (`locationEnabled` is false), and the snooze keys (both are missing). The page writes `locationPromptLastShown` the moment it decides to show the card. That key is missing, so the page decided **not** to show it, before rendering anything.
+In incognito, the card shows on both the popup and the new page. Incognito starts with no saved site permissions and no stored data. So the code works. Your normal Chrome profile is the only difference.
 
-Only one check is left that a screenshot can't show: **the browser's own location permission.** If Chrome reports it as "Allow" (granted), the prompt is skipped on purpose, on both the popup and the new page. Your storage has `lastPositionTimestamp`, which means this browser shared its location with the site before. So "Allow" is the likely state, even after a reset. One common reason: Chrome's "Reset permission" in the site-info panel doesn't always apply until every commongroundz.co tab is reloaded.
+In that profile, Chrome already has location set to **Allow** for commongroundz.co. Your storage has `lastPositionTimestamp`, which shows the site got your location before. When the browser already allows location, the card is skipped on purpose, on both the popup and the new page. The card exists to ask for permission, and Chrome already gave it. The page decides this before anything appears, so `locationPromptLastShown` was never written. That's why the key was missing.
 
-This is likely, not confirmed. The plan adds a way to see the exact reason on your own screen.
+**No patch needed for the location prompt.** It behaves exactly like the popup. Location acceptance can be marked as passed based on your incognito result.
 
 ## What I'll build
 
 1. **"Too many photos" warning (real bug, from 3B).** When you pick more photos than fit, show "Too many files selected — Only the first N files will be processed." It uses the same wording as the popup, and the popup itself doesn't change.
-2. **Show the reason on screen, for admins only.** On the photos step, a small grey line for admins shows why the prompt is or isn't showing: type allowed yes/no, app location on/off, browser permission (ask/allow/block/unknown), snooze times, and the final decision. Other users never see it. It gets removed when the switch to the new page goes live for everyone, together with the other temporary admin pieces.
-3. **Regression tests:**
-   - Place, location off, permission "Ask", no snooze keys → the prompt card appears on step 3, and "last shown" is saved at that moment.
-   - The same, but permission "Allow" → no card. Location on → no card. Movie/book → no card.
+2. **Regression tests:**
+   - Place, location off, permission "Ask", no snooze keys → the card appears on step 3, and "last shown" is saved at that moment.
+   - Permission "Allow" → no card. Location on → no card. Movie/book → no card.
    - Skip saved 1 hour ago → no card. Skip saved 3 hours ago → card.
    - The two photo-limit cases.
-4. **Browser check:** add the Place location-prompt case to the existing repeatable browser test (fake sign-in, nothing saved).
-5. **Corrected manual test** in the 3B verification doc (below).
+3. **Browser check:** add the Place location-prompt case to the existing repeatable browser test (fake sign-in, nothing saved).
+4. **Corrected manual test** in the 3B verification doc (below). It explains that the card is skipped when the browser already allows location, so testing in incognito is the easy way to see it.
 
 ## Corrected manual test (after the build)
 
