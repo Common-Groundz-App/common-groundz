@@ -61,9 +61,11 @@ export default function ReviewComposerPage() {
   );
 }
 
+/** Return destination plus whether it came from a known in-app origin. */
 function useCancelTo(fallback: string) {
   const location = useLocation();
-  return safeOrigin((location.state as { from?: unknown } | null)?.from) ?? fallback;
+  const from = safeOrigin((location.state as { from?: unknown } | null)?.from);
+  return { cancelTo: from ?? fallback, fromKnown: from !== null };
 }
 
 /* --------------------------------- create --------------------------------- */
@@ -72,7 +74,7 @@ function CreateRoute({ userId }: { userId: string }) {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const entityId = params.get('entityId');
-  const cancelTo = useCancelTo('/home');
+  const { cancelTo, fromKnown } = useCancelTo('/home');
   const [load, setLoad] = useState<SubjectLoad | 'loading' | null>(entityId ? 'loading' : null);
 
   const run = useCallback(() => {
@@ -109,6 +111,7 @@ function CreateRoute({ userId }: { userId: string }) {
       userId={userId}
       preselected={load?.status === 'ok' ? load.value : null}
       cancelTo={cancelTo}
+      fromKnown={fromKnown}
     />
   );
 }
@@ -135,7 +138,7 @@ function EditRoute({ reviewId, userId, isAdmin }: { reviewId: string; userId: st
     };
   }, [reviewId, userId]);
   useEffect(() => run(), [run]);
-  const cancelTo = useCancelTo(cancelFallback);
+  const { cancelTo, fromKnown } = useCancelTo(cancelFallback);
 
   if (load === 'loading') return <ComposerSkeleton />;
   if (load.status === 'not_found') return <StatePanel title="Review not found" body="This review doesn't exist or was deleted." home />;
@@ -149,7 +152,7 @@ function EditRoute({ reviewId, userId, isAdmin }: { reviewId: string; userId: st
   }
   // Admins keep the existing bypass only on their own review (ownership checked above).
   if (!isAdmin && !isWithinEditWindow(load.value.createdAt)) return <ExpiredEdit loaded={load.value} cancelTo={cancelTo} />;
-  return <ReviewComposerScreen mode="edit-review" userId={userId} loaded={load.value} cancelTo={cancelTo} />;
+  return <ReviewComposerScreen mode="edit-review" userId={userId} loaded={load.value} cancelTo={cancelTo} fromKnown={fromKnown} />;
 }
 
 function ExpiredEdit({ loaded, cancelTo }: { loaded: LoadedReview; cancelTo: string }) {
