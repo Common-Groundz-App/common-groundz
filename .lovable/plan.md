@@ -8,45 +8,41 @@
 - **Storage keys match the popup:** `locationPromptLastShown`, `locationPromptLastSkipped`.
 - **The snooze rule matches the popup exactly** (correcting my earlier wording): if a Skip time is saved, only the 2-hour rule applies. If not, the 24-hour "last shown" rule applies.
 
-## Why it didn't show for you
+## Why it didn't show for you (confirmed by your incognito test)
 
-Your screenshot rules out three causes: the subject type (it's a place), the app's location switch (`locationEnabled` is false), and the snooze keys (both are missing). The page writes `locationPromptLastShown` the moment it decides to show the card. That key is missing, so the page decided **not** to show it, before rendering anything.
+In incognito, the card shows on both the popup and the new page. Incognito starts with no saved site permissions and no stored data. So the code works. Your normal Chrome profile is the only difference.
 
-Only one check is left that a screenshot can't show: **the browser's own location permission.** If Chrome reports it as "Allow" (granted), the prompt is skipped on purpose, on both the popup and the new page. Your storage has `lastPositionTimestamp`, which means this browser shared its location with the site before. So "Allow" is the likely state, even after a reset. One common reason: Chrome's "Reset permission" in the site-info panel doesn't always apply until every commongroundz.co tab is reloaded.
+In that profile, Chrome already has location set to **Allow** for commongroundz.co. Your storage has `lastPositionTimestamp`, which shows the site got your location before. When the browser already allows location, the card is skipped on purpose, on both the popup and the new page. The card exists to ask for permission, and Chrome already gave it. The page decides this before anything appears, so `locationPromptLastShown` was never written. That's why the key was missing.
 
-This is likely, not confirmed. The plan adds a way to see the exact reason on your own screen.
+**No patch needed for the location prompt.** It behaves exactly like the popup. Location acceptance can be marked as passed based on your incognito result.
 
 ## What I'll build
 
 1. **"Too many photos" warning (real bug, from 3B).** When you pick more photos than fit, show "Too many files selected — Only the first N files will be processed." It uses the same wording as the popup, and the popup itself doesn't change.
-2. **Show the reason on screen, for admins only.** On the photos step, a small grey line for admins shows why the prompt is or isn't showing: type allowed yes/no, app location on/off, browser permission (ask/allow/block/unknown), snooze times, and the final decision. Other users never see it. It gets removed when the switch to the new page goes live for everyone, together with the other temporary admin pieces.
-3. **Regression tests:**
-   - Place, location off, permission "Ask", no snooze keys → the prompt card appears on step 3, and "last shown" is saved at that moment.
-   - The same, but permission "Allow" → no card. Location on → no card. Movie/book → no card.
+2. **Regression tests:**
+   - Place, location off, permission "Ask", no snooze keys → the card appears on step 3, and "last shown" is saved at that moment.
+   - Permission "Allow" → no card. Location on → no card. Movie/book → no card.
    - Skip saved 1 hour ago → no card. Skip saved 3 hours ago → card.
    - The two photo-limit cases.
-4. **Browser check:** add the Place location-prompt case to the existing repeatable browser test (fake sign-in, nothing saved).
-5. **Corrected manual test** in the 3B verification doc (below).
+3. **Browser check:** add the Place location-prompt case to the existing repeatable browser test (fake sign-in, nothing saved).
+4. **Corrected manual test** in the 3B verification doc (below). It explains that the card is skipped when the browser already allows location, so testing in incognito is the easy way to see it.
 
 ## Corrected manual test (after the build)
 
-1. On commongroundz.co, open DevTools → Console and run:
-   `navigator.permissions.query({name:'geolocation'}).then(p => console.log(p.state))`
-   - `granted` → the prompt is skipped by design. Click the site-info icon left of the address → Location → "Ask (default)". Close and reopen the tab, then run the command again until it says `prompt`.
-2. In Application → Local Storage, delete `locationPromptLastShown` and `locationPromptLastSkipped`. Make sure `locationEnabled` is `false`.
-3. Start a review of a place or dish → step 3. The "Location Access" card should appear at the top. The admin reason line should say "showing".
-4. Tap Skip, go back a step and forward again → no card (snoozed for 2 hours).
+1. Open an incognito window, sign in, and start a review of a place or dish. On step 3 the "Location Access" card appears. (Already passed for you.)
+2. Tap Skip, go back a step and forward again → no card (snoozed for 2 hours).
+3. Pick 6 photos at once → "Too many files selected — Only the first 4 files will be processed." Only 4 upload.
+4. In a normal window where location is already allowed → no card. This is expected.
 
 ## Open question (not part of this fix)
 
 When the browser already allows location but the app's own location switch is off, neither the popup nor the new page asks. So app location stays off, quietly. This rule is older than 3B. I'll leave it as is unless you want it changed.
 
-3B stays open until you confirm both checks. 3C stays on hold.
+After the photo-warning check, 3B is done. Then 3C can start.
 
 ## Technical details
 
 - `MediaUploader.handleFileSelect`: on the `reserveSlots` path, reserve `min(files.length, remainingSlots)` and show the toast when `granted < files.length`. The non-reserve branch stays the same.
-- `locationPromptPolicy.ts`: add `explainLocationPrompt(args)`, which returns `{ show, reason }` and is built on the existing rules. `shouldShowLocationPrompt` stays as a wrapper. Render the admin-only line in `ReviewComposerScreen` with `isAdmin` passed from the page.
-- New vitest that renders the screen's photos step with a mocked `LocationContext` and a Place subject. Assert the `LocationAccessPrompt` text and the localStorage write.
+- New vitest that renders the screen's photos step with a mocked `LocationContext` and a Place subject. Assert the `LocationAccessPrompt` text and the localStorage write. Add policy cases for granted, enabled, ineligible type and the Skip windows.
 - `scripts/e2e/review-history-guard.py`: add the intercepted Place entity case and assert "Location Access" on step 3.
-- Update `docs/verification/review-composer-3b.md` with the steps above. Update the roadmap's 3B entry with "location prompt acceptance open".
+- Update `docs/verification/review-composer-3b.md`: replace the stale "Known limits" line about the missing location prompt and subject card, and add the steps above and the "browser already allows" rule.
