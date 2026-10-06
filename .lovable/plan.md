@@ -124,3 +124,25 @@ The full list of clickable items goes in the verification doc.
 - `screen/locationPromptPolicy.ts`: location prompt rules.
 - `ReviewComposerScreen.tsx`: photos step, slot counting, dialogs, `requestLeave`, the "still here" flag.
 - Tests: `__tests__/historyGuard.test.ts`, `__tests__/composerPage3bParity.test.tsx`, `__tests__/uploadSlots.test.ts`.
+
+## 5. Final corrections (override anything above that conflicts)
+1. **Entry points untouched:** no existing link is changed to add `state.from`. The page uses `state.from` when it's already there (the existing safe-origin rule). Otherwise it uses the fixed destination (the entity page from saved slugs, or `/home`).
+2. **History claim corrected:** after stepping back off the guard and replacing the base entry, the old guard entry stays in **forward** history. The doc says so. The test presses Forward after Save, Cancel and Discard, and must land on a fresh, clean form: nothing that was submitted comes back, no old dialog appears, and no save is repeated.
+3. **Clean Back without stepping into unknown history:** when Back lands on the base entry while clean, the page steps back once more only if `state.from` is known. Otherwise it replaces the address with the fixed destination.
+4. **Slot reservations wired into the uploader:**
+   - This needs one **small optional addition to the shared uploader** (`MediaUploader`): a `reserveSlots(requested) => granted` callback, called before any upload starts, and a `releaseSlot()` callback called exactly once per file on success, failure or cancel.
+   - If the callbacks aren't passed, the uploader behaves exactly as today.
+   - The video limit is unchanged.
+   - Disclosed here because the uploader is shared. Tests confirm the legacy popup's behavior is unchanged.
+5. **Registry cleanup:** a session's entry is removed from the in-memory upload registry once the session has ended, all its uploads have finished, and every delete-or-keep decision has run. Long sessions don't keep piling up entries. Tested.
+6. **Back acceptance rules — the browser test asserts them; it doesn't just record them:**
+
+| Case | Requirement |
+|---|---|
+| A single Back while dirty, saving or ambiguous | Must be protected |
+| Repeated Back after Keep / Discard / Leave | Must work |
+| Cancel, links, Add timeline update, other exits | Must be protected |
+| Tab close and reload | Must warn |
+| Very rapid double Back | Its own test case. If it escapes, it's reported as a **failing case** with the exact behavior shown. 3B stays in progress until you decide to accept it as a known limitation or fix it. A router migration is one option, not the only one, and is not started in 3B. |
+
+7. **Testing limits:** the browser tests with faked sign-in prove navigation and upload state only. Storage permissions and real photo and video delivery still need your signed-in re-test.
