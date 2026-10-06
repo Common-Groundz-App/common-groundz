@@ -63,8 +63,8 @@ async def composer_visible(page):
 
 async def make_dirty(page):
     # rating step: pick a rating so the form has something to lose
-    btn = page.locator("#composer-section-rating button, #composer-section-rating [role=radio]").first
-    await btn.click()
+    btn = page.locator("#composer-section-rating svg g[style*=transform-origin]").nth(3)
+    await btn.click(force=True)
     await page.wait_for_timeout(200)
 
 async def dialog_text(page):
