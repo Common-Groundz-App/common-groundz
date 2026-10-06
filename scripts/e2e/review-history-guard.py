@@ -111,7 +111,9 @@ async def main():
             for i in range(3):
                 await page.go_back(); await page.wait_for_timeout(500)
                 txt = await dialog_text(page)
-                ok = ok and await composer_visible(page) and "Discard your draft?" in txt
+                vis = await composer_visible(page)
+                print(f"   keep-iter {i}: visible={vis} url={page.url} dialog={txt[:40]!r}")
+                ok = ok and vis and "Discard your draft?" in txt
                 if i == 0: await page.screenshot(path=str(OUT / f"dirty-dialog{width}.png"))
                 await page.get_by_role("button", name="Keep editing").click(); await page.wait_for_timeout(300)
             check(f"dirty Back → Keep ×3 stays {tag}", ok, page.url)
@@ -145,6 +147,8 @@ async def main():
             await make_dirty(page)
             await page.evaluate("history.back(); history.back();")
             await page.wait_for_timeout(1200)
+            await page.screenshot(path=str(OUT / f"rapid{width}.png"))
+            print("   rapid dialog:", (await dialog_text(page))[:60])
             check(f"rapid double Back stays on the form {tag}", await composer_visible(page), page.url, required=False)
 
             check(f"no page errors {tag}", not errs, "; ".join(errs[:2]))
