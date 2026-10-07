@@ -40,13 +40,13 @@ To send an explicit `null` on Add, the shared add function gets one optional, ad
   - saved → "Timeline update saved"
   - newer update exists → "Cannot edit — A newer update exists."
   - hour passed → "Edit window closed (1 hour limit)"
-  - in both cases the form, text and photos stay on screen; nothing is deleted. "Add as a new update" moves the same text, rating, recommendation and photos into a new update form (photos carried over, never re-uploaded or deleted); the author still presses Save.
+  - in both cases the edit form, text and photos stay on screen with the explanation, so nothing typed is lost. "Add a new update" opens a normal, empty new-update form — nothing is copied or carried over, and saved photos are never reused by another update (shared photo ownership would need its own design later). Leaving the edit form follows the 3B rules: saved photos are never deleted; only photos uploaded in this visit are cleaned up.
   - conflict / not yours / not found → clear message, form kept
   - other error → "Failed to save your edit" / "Could not add the timeline update."
 - Save locked while pending.
 - Timeout → "couldn't confirm" state, nothing assumed; form and photos kept; Save stays locked until the author chooses; no automatic retry:
   - **Add:** the newest timeline entry is shown as evidence ("we found this entry — is it yours?"), never treated as proof, since another entry or identical text could match. "Try again" warns: "This could add a second update if the first one went through." Full duplicate-proofing needs a server-side save key — separate work.
-  - **Edit:** the page re-reads **that same update by its id** and shows whether it now holds the new text (and a newer saved time), as evidence only. "Try again" warns: "Your edit may already have been saved." It never mentions a second update, and a retry still goes through the latest-only and one-hour checks.
+  - **Edit:** the page re-reads **that same update by its id** and compares every field the edit sent — text, rating, recommendation and photos — as evidence only; a mismatch or a failed re-read stays "couldn't confirm". "Try again" warns: "Your edit may already have been saved." It never mentions a second update, and a retry still goes through the latest-only and one-hour checks.
 
 ## 3. Opening, access and leaving
 
@@ -71,8 +71,9 @@ To send an explicit `null` on Add, the shared add function gets one optional, ad
 ## Technical details
 
 - Modes `create-timeline-update` / `edit-timeline-update` and `buildCreateTimelinePayload` / `buildEditTimelinePayload` already exist from 3A; the screen gets a timeline branch driven by `caps.steps` (single step) and `caps.subject = 'inherited'`.
-- New loaders: `loadReviewForTimeline(reviewId, userId)` and `loadLatestUpdateForEdit(reviewId, updateId, userId)` returning `ok | not_found | unauthorized | wrong_review | not_latest | expired | error`; latest uses `created_at desc, id desc` (same as `fetchReviewUpdates` and the RPCs).
-- Timeout evidence compares the newest row's comment, rating, recommendation and `created_at`/`updated_at` with the attempt and reports "matches" or "unclear"; the author always confirms.
+- New loaders: `loadReviewForTimeline(reviewId, userId)` and `loadLatestUpdateForEdit(reviewId, updateId, userId)` returning `ok | not_found | unauthorized | wrong_review | not_latest | error`, plus an advisory `mayBeExpired` flag from the device clock. A blocking expired state comes only from the server (the edit function's `expired` result). Latest uses `created_at desc, id desc` (same as `fetchReviewUpdates` and the edit function).
+- Timeout evidence: Add → newest row compared with the attempt; Edit → the requested update by id, normalized comment, rating, recommendation and media compared with the sent payload. Result is "matches" or "unclear"; the author always confirms.
+- Explicit `null` on Add: verified against the live `review_updates` column during implementation; existing callers regression-tested to send exactly what they send today. Mocked browser tests can't prove storage, so stored/displayed behavior is part of your signed-in checklist.
 - Routes added in `App.tsx` inside the same protected wrapper and temporary admin/switch gate; noindex.
 - `serverErrors.fromTimelineStatus` maps edit results; `addReviewUpdate` boolean → ok/error.
 - `ReviewTimelineViewer.tsx`, `ReviewForm.tsx` untouched. No database changes, no AGENTS.md changes.
