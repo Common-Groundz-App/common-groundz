@@ -29,27 +29,29 @@ Recommendation and rating contract (tested state by state):
 | Never touched it | omitted (no statement) | the loaded value, unchanged |
 | Yes / Maybe / No | that value | that value |
 | "Base recommendation on rating" | `auto` | `auto` |
-| Cleared a selected choice | omitted — the server already treats a missing value and `null` the same way, so the result is identical | `null` |
+| Cleared a selected choice | `null` sent explicitly — kept apart from "never touched" as its own author intent | `null` |
 | Rating cleared | omitted | `null` (really clears it) |
 
-Edit loads and keeps all five stored states (`yes`, `maybe`, `no`, `auto`, `null`) exactly; a comment-only edit keeps `auto`.
+Edit loads and keeps all five stored states (`yes`, `maybe`, `no`, `auto`, `null`) exactly; a comment-only edit keeps `auto`. Tests cover what is stored and what the timeline then shows, not only what is sent.
+
+To send an explicit `null` on Add, the shared add function gets one optional, additive setting; every existing caller (the in-timeline form) keeps sending exactly what it sends today. No database change.
 
 - Edit → latest-update edit with full replace. Save-time results always win over what the page checked on open, using today's wording:
   - saved → "Timeline update saved"
-  - newer update exists → "Cannot edit — A newer update exists." (form kept, offer "Add a new update")
-  - hour passed → expired panel, offer "Add a new update"
+  - newer update exists → "Cannot edit — A newer update exists."
+  - hour passed → "Edit window closed (1 hour limit)"
+  - in both cases the form, text and photos stay on screen; nothing is deleted. "Add as a new update" moves the same text, rating, recommendation and photos into a new update form (photos carried over, never re-uploaded or deleted); the author still presses Save.
   - conflict / not yours / not found → clear message, form kept
   - other error → "Failed to save your edit" / "Could not add the timeline update."
 - Save locked while pending.
-- Timeout (add **and** edit) → "couldn't confirm" state, nothing assumed:
-  - form and photos kept; Save stays locked until the author chooses;
-  - the latest timeline entry is shown as evidence ("we found this entry — is it yours?"), never treated as proof, since another entry or identical text could match;
-  - choices: "Yes, it saved" (go to the entity page) or "Try again", which warns "This could add a second update if the first one went through." No automatic retry. Full duplicate-proofing needs a server-side save key — still separate work.
+- Timeout → "couldn't confirm" state, nothing assumed; form and photos kept; Save stays locked until the author chooses; no automatic retry:
+  - **Add:** the newest timeline entry is shown as evidence ("we found this entry — is it yours?"), never treated as proof, since another entry or identical text could match. "Try again" warns: "This could add a second update if the first one went through." Full duplicate-proofing needs a server-side save key — separate work.
+  - **Edit:** the page re-reads **that same update by its id** and shows whether it now holds the new text (and a newer saved time), as evidence only. "Try again" warns: "Your edit may already have been saved." It never mentions a second update, and a retry still goes through the latest-only and one-hour checks.
 
 ## 3. Opening, access and leaving
 
 - The edit address checks each of these on its own, with its own message: review exists, review is yours, update exists, update belongs to that review, update is the latest (same server order as the timeline: newest time, then id), update is still within its hour. "Not the latest" shows "Cannot edit — A newer update exists.", never "not found". A network failure always shows Retry, never "not found".
-- The hour check on open uses the server's timestamps and only affects what is shown; the save is the final authority, and at exactly one hour editing is closed.
+- The one-hour rule belongs to the server (checked: it uses the server's own clock, and exactly one hour counts as closed). The page has no cheap way to read the server's current time, so its check on open is only a hint: if the device clock says the hour has passed, the form still opens with a short note ("This update may be past its 1-hour edit window"), and Save gives the real answer. A wrong device clock can never hide an edit that is still allowed.
 - Admins: no bypass on timeline edits, matching the server.
 - Subjects that can't be shown normally: older reviews with no linked subject show their saved title read-only and still allow updates (as today); a deleted or unavailable subject shows "This subject is no longer available" read-only; nothing is ever attached to a different subject.
 - Save and Cancel go to the entity page (built from saved slugs) and reopen the timeline once via the existing one-time marker; Back/Forward never reopen it. When no entity page can be built (no subject or missing slugs), Save/Cancel go to the safe fallback (origin, else Home) with a short note, never an ID address.
