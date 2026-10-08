@@ -47,7 +47,7 @@ Each is found by search and listed in the verification notes; nothing outside th
 
 - Usage check: a week with the switch on and no regressions (your sign-off).
 - List of what 3E deletes: popup orchestration in `ReviewForm.tsx`, inline form in the viewer, the switch, release default, the dormant helper branch, legacy-only tests.
-- Known open items carried to 3E or later: scheduled sweep for leftover photos (incl. the 4 found in the 3C audit), server save key for duplicate-safe timeline adds, rapid double-Back.
+- Known open items carried to 3E or later: a scheduled sweep for photos left behind when a tab is closed mid-draft (the only remaining way leftovers can appear), server save key for duplicate-safe timeline adds, rapid double-Back.
 
 ## 7. Checks
 
