@@ -238,6 +238,12 @@ export function TimelineComposerScreen(props: Props) {
     const result = outcome as ReturnType<typeof fromTimelineStatus>;
     if (result.status === 'ok') {
       uploads.send({ type: 'COMMITTED' });
+    // Photos uploaded here but removed before saving are referenced by nothing.
+    void Promise.allSettled(
+      uploads
+        .committedLeftovers(state.values.media.map((m) => m.url), (state.storedUpdate?.media ?? []).map((m) => m.url))
+        .map((url) => deleteMedia(url)),
+    );
       dispatch({ type: 'SAVE_RESULT', sessionKey, result });
       toast(isEdit ? { title: 'Timeline update saved' } : { title: 'Update added', description: 'Your timeline update has been added successfully' });
       await guard.release();

@@ -9,6 +9,7 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   cleanupCandidates,
+  committedLeftovers,
   createUploadSession,
   uploadSessionReducer,
   type UploadSessionEvent,
@@ -46,6 +47,8 @@ export function useUploadSession(sessionKey: string) {
     recordUpload,
     send,
     cleanupCandidates: (preexisting: readonly string[] = []) => cleanupCandidates(session, preexisting),
+    committedLeftovers: (saved: readonly string[], preexisting: readonly string[] = []) =>
+      committedLeftovers(ref.current!, saved, preexisting),
     /** Earlier sessions in this mount; never auto-cleaned. */
     previousSessions: previous.current,
   };
