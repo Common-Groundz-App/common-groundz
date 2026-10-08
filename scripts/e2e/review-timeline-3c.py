@@ -36,7 +36,7 @@ import datetime
 REVIEW_ID = "33333333-3333-4333-8333-333333333333"
 UPDATE_ID = "44444444-4444-4444-8444-444444444444"
 OTHER_ID = "55555555-5555-4555-8555-555555555555"
-def iso(minutes_ago): return (datetime.datetime.utcnow() - datetime.timedelta(minutes=minutes_ago)).isoformat() + "Z"
+def iso(minutes_ago): return (datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None) - datetime.timedelta(minutes=minutes_ago)).isoformat() + "Z"
 REVIEW = {"id": REVIEW_ID, "user_id": UID, "entity_id": PLACE_ID, "category": "place", "title": "Ambur", "venue": None,
           "subtitle": "", "description": "first", "rating": 4, "media": [], "image_url": None, "visibility": "public",
           "experience_date": None, "metadata": {}, "status": "published", "created_at": iso(600),
@@ -68,7 +68,7 @@ async def route(r):
     if "/rest/v1/review_updates" in url:
         if S["updates_error"]: return await r.fulfill(status=500, json={"message": "down"})
         row = S["latest"] if "limit=1" in url else S["update"]
-        return await r.fulfill(json=row) if row else await r.fulfill(status=406, json={"code": "PGRST116"})
+        return await r.fulfill(json=row if single else ([row] if row else []))
     if "/rest/v1/reviews" in url: return await r.fulfill(json=REVIEW if single else [REVIEW])
     if "/rest/v1/entities" in url and PLACE_ID in url: return await r.fulfill(json=PLACE if single else [PLACE])
     if "/rest/v1/profiles" in url: return await r.fulfill(json=PROFILE if single else [PROFILE])
