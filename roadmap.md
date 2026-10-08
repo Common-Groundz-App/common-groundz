@@ -400,4 +400,5 @@ cross-read between them.
   - [ ] Your check: pick 6 photos → warning shows
   - [ ] Signed-in re-test of real uploads + navigation protection — waiting on user
 - [x] 3B approved
-- [ ] 3C — timeline modes on the page: built and tested (docs/verification/review-composer-3c.md); waiting on your signed-in checklist
+- [x] 3C — timeline modes on the page (signed-in checks passed; final audit in docs/verification/review-composer-3c.md)
+- [ ] 3D — cutover of entry points (plan awaiting approval)

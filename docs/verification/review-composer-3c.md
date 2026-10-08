@@ -37,3 +37,16 @@ Not tested in a browser: real saves, the timeout panel, timeline reopening on th
 6. Edit an update older than an hour → form opens with the note; Save shows "Edit window closed (1 hour limit)", text kept.
 7. Add photos (try 6 at once), remove one, Cancel → Discard: saved photos stay on the update.
 8. From the review page's "You've already reviewed this" → Add timeline update opens the new page.
+
+## Final audit (2026-10-08, after your signed-in checks)
+Database (review 8fa6b2a4…, Isha Foundation Chikkaballapura):
+- New update 9884785f…: correct review_id, owner = review author, comment trimmed, rating 2, would_recommend `no`, 2 photos with session ids, created_at server time; edited at 11:33 on the **same row** (updated_at moved, created_at unchanged, 4 rows total — no duplicate).
+- Review recomputed: timeline_count 4 = rows, has_timeline true, latest_rating 2 = newest rated update.
+- No new reviews created; no invalid recommendation values (all rows are null/yes/maybe/no/auto); 0 updates authored by someone other than the review owner.
+- Insert rule: only the review's owner can add (`user_id = auth.uid()` and owns the review). Edit function: owner, latest-only under lock, server-clock hour, no admin bypass.
+- **Finding, fixed:** each session uploaded 4 photos but saved 2; the 2 removed before saving stayed in storage unreferenced (4 files in total). The same gap existed on the 3B review page. Now, after a *confirmed* save only, photos uploaded in that visit and not saved are deleted — never saved/pre-existing photos, never while saving or unconfirmed. The 4 existing leftover files are untouched (cleanup sweep is separate work).
+- Known, unchanged: photos removed from an already-saved update during an edit are left in storage (same as the in-timeline form).
+
+Scope: no app button links to the new routes; `ReviewTimelineViewer.tsx` and `ReviewForm.tsx` unchanged in 3C. **The rollout switch `reviews.composer_page_enabled` is currently ON in the database** (set from the admin panel), so any signed-in user who types a `/review…` address can use the page. Buttons still open the legacy flow.
+Tracking: the in-timeline form records no events, so the page records none.
+Tests: 1026 passed, 3 skipped; type check clean; browser check 32/32.

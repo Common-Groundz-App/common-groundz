@@ -47,3 +47,14 @@ export function cleanupCandidates(s: UploadSessionState, preexistingUrls: readon
   if (s.settlement !== 'open') return [];
   return s.uploads.filter((u) => !preexistingUrls.includes(u));
 }
+
+/**
+ * Step 3C audit — after a CONFIRMED save, photos uploaded in this session but
+ * removed before saving are referenced by nothing and safe to delete. Never
+ * pre-existing media, never anything in the saved list, and only once the
+ * save is confirmed (never while saving or ambiguous).
+ */
+export function committedLeftovers(s: UploadSessionState, savedUrls: readonly string[], preexistingUrls: readonly string[] = []): string[] {
+  if (s.settlement !== 'committed') return [];
+  return s.uploads.filter((u) => !savedUrls.includes(u) && !preexistingUrls.includes(u));
+}

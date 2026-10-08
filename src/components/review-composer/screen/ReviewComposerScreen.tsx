@@ -385,6 +385,12 @@ export function ReviewComposerScreen(props: Props) {
       return;
     }
     uploads.send({ type: 'COMMITTED' });
+    // Photos uploaded here but removed before saving are referenced by nothing.
+    void Promise.allSettled(
+      uploads
+        .committedLeftovers(state.values.media.map((m) => m.url), (state.stored?.media ?? []).map((m) => m.url))
+        .map((url) => deleteMedia(url)),
+    );
     logFunnel({ event: 'review_submitted', source: 'review_form', entityType: (display?.type ?? undefined) as never });
     dispatch({ type: 'SAVE_RESULT', sessionKey, result: { status: 'ok' } });
     await goToEntity(subjectId, isEdit ? 'Your changes were saved' : 'Your review was published');
