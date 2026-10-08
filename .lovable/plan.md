@@ -5,6 +5,7 @@ Goal: when the rollout switch is on, every normal "write / edit review" and "add
 ## 0. Before starting
 
 - The switch is **on** in the database right now (it was turned on from the admin panel for testing). 3D needs it **off** while building, and turned on deliberately at the end. Please turn it off in the admin panel, or approve a one-line reset as part of 3D.
+- Leftover photos: 8 files in storage that no review, update or post uses — 4 from your 3B photo-limit test on Oct 6 (the visit ended without Cancel, e.g. tab closed, which never cleans up) and 4 from your two 3C adds (photos removed before Save, a gap now fixed). They are harmless and invisible. 3D starts by deleting exactly these 8, after re-checking that nothing references them.
 
 ## 1. One routing helper, one switch reader
 
@@ -46,7 +47,7 @@ Each is found by search and listed in the verification notes; nothing outside th
 
 - Usage check: a week with the switch on and no regressions (your sign-off).
 - List of what 3E deletes: popup orchestration in `ReviewForm.tsx`, inline form in the viewer, the switch, release default, the dormant helper branch, legacy-only tests.
-- Known open items carried to 3E or later: scheduled sweep for leftover photos (incl. the 4 found in the 3C audit), server save key for duplicate-safe timeline adds, rapid double-Back.
+- Known open items carried to 3E or later: a scheduled sweep for photos left behind when a tab is closed mid-draft (the only remaining way leftovers can appear), server save key for duplicate-safe timeline adds, rapid double-Back.
 
 ## 7. Checks
 
