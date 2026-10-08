@@ -1,63 +1,70 @@
-# Step 3D — Switch normal entry points to the new review page
+# 3C.1 close-out, then 3D cutover
 
-Goal: when the rollout switch is on, every normal "write / edit review" and "add / edit timeline update" action opens the new page, and the timeline viewer becomes read-only. When it is off, everything behaves exactly as today. The legacy popup and inline form stay in the code for rollback until 3E.
+Two separate steps, approved and reported separately. 3C.1 runs first; 3D starts only after you approve the 3C.1 report.
 
-## 0. Before starting
+## Correction from the 3C report
 
-- The switch is **on** in the database right now (it was turned on from the admin panel for testing). 3D needs it **off** while building, and turned on deliberately at the end. Please turn it off in the admin panel, or approve a one-line reset as part of 3D.
-- Leftover photos: 8 files in storage that no review, update or post uses — 4 from your 3B photo-limit test on Oct 6 (the visit ended without Cancel, e.g. tab closed, which never cleans up) and 4 from your two 3C adds (photos removed before Save, a gap now fixed). They are harmless and invisible. 3D starts by deleting exactly these 8, after re-checking that nothing references them.
+The 8 leftover photos are not invisible: they are in a public photo bucket, so anyone who has the exact web address can open them. Nothing in the app links to them, so they can't be found by browsing.
 
-## 1. One routing helper, one switch reader
+---
 
-- A single helper decides where each action goes, given the switch: `write review (subject?)`, `edit review (id)`, `add update (review id)`, `edit update (review id, update id)`. Switch on → the new page address; off → today's popup/inline behavior.
-- Only this helper reads the switch. Release default stays `legacy`; loading or failure = legacy (fail-closed, as today).
-- The page passes the origin (`from`) so Cancel returns where the user came from.
+## Step 3C.1 — finish 3C (no routing changes)
 
-## 2. Entry points moved to the helper
+1. **Remove the rating "Clear" button** from the timeline page, so it matches today's timeline form exactly. Update the parity table and tests.
+2. **Browser-test the two untested cases** on the timeline pages (faked sign-in, writes blocked), at phone and desktop width:
+   - the "couldn't confirm" panel: Add (newest entry shown, "Try again" warns about a second update) and Edit (that same update re-checked, edit-specific warning);
+   - rapid double-Back on both timeline pages.
+   Results are reported as passed or failed. If rapid double-Back escapes, I report it and you decide: accept it as a known limit, or ask for a fix. It is not moved to 3E silently.
+3. **Rollout switch:** you turn it OFF in the admin panel (or approve a one-line reset). It stays off through 3D until you approve turning it on.
+4. Full tests, type check, build; verification notes and roadmap updated; 3C marked complete only when 1–3 pass.
 
-| Where | Action |
-|---|---|
-| Home "+" composer button | Write review |
-| Entity page (write / "You've already reviewed this" / `?compose=update`) | Write review / add update |
-| Entity page reviews list and timeline cards | Edit review, add/edit update |
-| Shared owner menu (review cards on profile, entity, feed) | Edit review |
-| Profile reviews tab | Write / edit review |
-| Timeline viewer "Add Timeline Update" and an update's "Edit" | Add / edit update |
-| Popup's own "already reviewed → add update" and "edit window closed" | Add update |
+## Separate cleanup action — the 8 leftover photos (needs your explicit approval)
 
-Each is found by search and listed in the verification notes; nothing outside this list changes. Delete, visibility change and admin moderation stay where they are.
+- Exact list: 4 files under session `8162b991…` (Oct 6, 3B photo-limit test), 2 under `8d661012…` and 2 under `3acac8bc…` (Oct 8, 3C adds). The full file paths are listed for you before anything is deleted.
+- Re-check right before deletion that no review, timeline update, post or entity references any of them.
+- Delete through the storage service (not by editing the database directly), then confirm that they are gone and that the saved photos in the same folders are still there.
+- Not part of any code change. Future leftovers from closed tabs need a server-side sweep (separate future work).
 
-## 3. Timeline viewer read-only when the page is on
+---
 
-- Switch on: the viewer shows the timeline only; "Add Timeline Update" and per-update "Edit" become links to the page. Undo/delete of the latest update stays (it is not part of the composer).
-- Switch off: the viewer is byte-for-byte today's behavior, including the inline form.
-- The one-time reopen after saving on the page keeps working, so you land back on the viewer.
+## Step 3D — switch normal entry points to the page (revised)
 
-## 4. Gate cleanup on the page
+Built with the switch OFF. Turned on only after you approve the tested cutover.
 
-- Remove the temporary "admins always allowed" gate. The page opens when the switch is on; when it is off, a direct `/review…` address shows "Not available yet" with a link back. (Admins test by turning the switch on.)
-- `?compose=update` links: switch on → owner goes to `/review/:id/timeline/new`, others to the entity page; off → unchanged.
+### 1. One flag source, one pure routing decision
+- The only flag reader is the existing `useReviewComposerImplementation`. Loading or failure means legacy.
+- A pure helper: `action + implementation → { page address + state } | legacy`, for write review, edit review, add update and edit update. No second flag-reading path.
+- No flicker: while the flag is loading, a button does the legacy action only if it is clicked after loading ends. A tap during loading waits for the answer, so a single click never opens the legacy popup and then also navigates to the page.
 
-## 5. Rollback
+### 2. Entry-point inventory (exhaustive)
+- Every review / timeline composer entry point found by searching the code is listed in the verification notes (starting set: home "+" button, entity page write / already-reviewed / `?compose=update`, entity reviews list and timeline cards, shared owner menu, profile reviews tab, timeline viewer add/edit, the popup's own "add update" hand-offs).
+- For each one: correct review/update ids passed, ownership and the one-hour edit rule unchanged, and a test that it goes to the page when the switch is on and does exactly today's action when it is off.
+- Delete, visibility and admin moderation stay where they are.
 
-- Switch off from the admin panel → every button returns to the popup/inline form on the next screen load; nothing to deploy. Open pages finish their save normally.
-- Verified both directions in tests and in the browser.
+### 3. Return navigation, per action
+| Action | Save | Cancel |
+|---|---|---|
+| Write review | entity page of the saved review | known in-app origin, else Home |
+| Edit review | entity page | known origin, else entity page |
+| Add / edit update | entity page + timeline reopens once | entity page + timeline reopens once |
+- "Origin" is only an address the app itself passed in, never assumed from browser history. The one-time reopen marker and safe fallbacks stay as built in 3B/3C.
 
-## 6. Ready for 3E (removal), recorded but not done
+### 4. Timeline viewer when the switch is on
+- Read-only timeline; "Add Timeline Update" and per-update "Edit" become links to the page. Undo/delete stays.
+- Switch off: exactly today's viewer with its form.
 
-- Usage check: a week with the switch on and no regressions (your sign-off).
-- List of what 3E deletes: popup orchestration in `ReviewForm.tsx`, inline form in the viewer, the switch, release default, the dormant helper branch, legacy-only tests.
-- Known open items carried to 3E or later: a scheduled sweep for photos left behind when a tab is closed mid-draft (the only remaining way leftovers can appear), server save key for duplicate-safe timeline adds, rapid double-Back.
+### 5. Gate and rollback
+- Remove the temporary "admins always allowed" gate; the page follows the switch only.
+- **Open sessions are latched:** the page checks the switch when it opens. A composer opened while the switch was on keeps working if the switch later turns off — dirty, saving or "couldn't confirm" forms are never replaced by "Not available yet" and can still Save or Cancel. New direct `/review…` visits and all buttons follow the switch at once.
+- `?compose=update`: on → owner goes to `/review/:id/timeline/new`, others to the entity page; off → unchanged.
 
-## 7. Checks
-
-- Tests: helper on/off/loading/failure for every action; each entry point routes via the helper; viewer read-only on, unchanged off; gate removed; `?compose=update` both ways.
-- Browser (faked sign-in, writes blocked) at 390 and 1280: each entry point with the switch on and off, rollback mid-session, Back/Cancel returns to the origin.
-- Full suite, type check, build. Signed-in checklist for you. 3D is marked done only after your check.
+### 6. Checks
+- Tests: helper for every action × on/off/loading/failure; each inventoried entry point; viewer read-only on / unchanged off; gate removed; latched session survives switch-off; no double action during loading.
+- Browser (faked sign-in, writes blocked) at 390 and 1280: every entry point with on and off; switch turned off mid-session (draft kept, Save/Cancel work); return navigation per the table; Back/Forward.
+- Full suite, type check, build. Signed-in cutover and rollback checklist for you. 3D is done only after your check; 3E needs your sign-off and no open blockers, not just a week passing.
 
 ## Technical details
-
-- New `src/services/review/composerRoutes.ts` (pure: action + implementation → `{ kind: 'page', to, state } | { kind: 'legacy' }`) and a thin hook over `useReviewComposerImplementation`.
-- Edited call sites: `SmartComposerButton.tsx`, `EntityV4.tsx`, `ReviewsSection.tsx`, `ReviewOwnerMenu.tsx`, `ProfileReviews.tsx`, `profile/reviews/ReviewCard.tsx`, `ReviewTimelineViewer.tsx` (on-branch only), `ReviewForm.tsx` (two hand-off buttons only).
-- `ReviewComposerPage.tsx`: remove `canUseReviewComposerPage` admin branch; keep the switch check.
-- No database changes beyond optionally resetting the switch to off; no AGENTS.md changes.
+- 3C.1: edit `TimelineComposerScreen.tsx` (remove Clear), extend `scripts/e2e/review-timeline-3c.py` (timeout via delayed fake responses; rapid Back), docs and roadmap.
+- Cleanup: storage API removal of 8 listed objects in `post_media` after a fresh reference query.
+- 3D: new `src/services/review/composerRoutes.ts` + thin hook; call-site edits per the inventory; `ReviewComposerPage.tsx` drops `canUseReviewComposerPage`'s admin branch and latches the switch value at mount; `ReviewTimelineViewer.tsx` gets an on-branch only.
+- No database schema changes; no AGENTS.md changes.
