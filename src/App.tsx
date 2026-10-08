@@ -225,6 +225,17 @@ function App() {
                       <ReviewComposerPage />
                     </AppProtectedRoute>
                   } />
+                  {/* Step 3C — timeline updates on the same gated page. */}
+                  <Route path="/review/:reviewId/timeline/new" element={
+                    <AppProtectedRoute>
+                      <ReviewComposerPage />
+                    </AppProtectedRoute>
+                  } />
+                  <Route path="/review/:reviewId/timeline/:updateId/edit" element={
+                    <AppProtectedRoute>
+                      <ReviewComposerPage />
+                    </AppProtectedRoute>
+                  } />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
                 {/* The single app-wide notifications drawer. */}
