@@ -399,4 +399,5 @@ cross-read between them.
   - [x] 3B audit: "too many files" warning fixed; location prompt confirmed working (skipped when browser already allows location)
   - [ ] Your check: pick 6 photos → warning shows
   - [ ] Signed-in re-test of real uploads + navigation protection — waiting on user
-- [ ] 3C — timeline modes on the page (blocked until 3B approved)
+- [x] 3B approved
+- [ ] 3C — timeline modes on the page: built and tested (docs/verification/review-composer-3c.md); waiting on your signed-in checklist

@@ -410,6 +410,10 @@ export function ReviewComposerScreen(props: Props) {
   const requestCancel = () => requestLeave(() => navigate(props.cancelTo, { replace: true }));
 
   const openTimeline = (reviewId: string | null) => {
+    // Step 3C — inside the gated page, a known review opens the timeline page.
+    if (reviewId) {
+      return requestLeave(() => navigate(`/review/${reviewId}/timeline/new`, { replace: true, state: { from: props.cancelTo } }));
+    }
     if (!subjectId) return;
     const entityId = subjectId;
     requestLeave(async () => {

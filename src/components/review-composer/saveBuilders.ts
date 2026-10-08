@@ -60,7 +60,8 @@ export interface CreateTimelinePayload {
   comment: string;
   media: MediaItem[];
   rating?: number;
-  would_recommend?: Exclude<WouldRecommendValue, null>;
+  /** Omitted = never touched; null = explicitly cleared; 'auto' = base on rating. */
+  would_recommend?: WouldRecommendValue;
 }
 
 export interface EditTimelinePayload {
@@ -176,8 +177,10 @@ export function buildEditReviewPayload(input: {
 export function buildCreateTimelinePayload(input: {
   values: ReviewComposerValues;
   reviewId: string;
+  /** Whether the author interacted with the recommendation control. */
+  recommendationTouched?: boolean;
 }): BuildResult<CreateTimelinePayload> {
-  const { values, reviewId } = input;
+  const { values, reviewId, recommendationTouched } = input;
   const payload: CreateTimelinePayload = {
     review_id: reviewId,
     comment: values.text.trim(),
@@ -187,6 +190,7 @@ export function buildCreateTimelinePayload(input: {
   const { baseOnRating, choice } = values.recommendation;
   if (baseOnRating) payload.would_recommend = 'auto';
   else if (choice) payload.would_recommend = choice;
+  else if (recommendationTouched) payload.would_recommend = null;
   return { ok: true, payload };
 }
 
