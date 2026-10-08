@@ -115,6 +115,12 @@ export const addReviewUpdate = async (
   comment: string,
   media?: MediaItem[],
   wouldRecommend?: WouldRecommendValue,
+  /**
+   * Step 3C — additive. When true, an explicit `null` recommendation is sent
+   * as `null` (the author cleared their answer) instead of being omitted.
+   * Existing callers don't pass it and behave exactly as before.
+   */
+  options?: { sendExplicitNull?: boolean },
 ): Promise<boolean> => {
   try {
     // Shaped to match the generated `review_updates` Insert row: `rating` is
@@ -125,7 +131,7 @@ export const addReviewUpdate = async (
       rating?: number;
       comment: string;
       media?: Json;
-      would_recommend?: string;
+      would_recommend?: string | null;
     } = {
       review_id: reviewId,
       user_id: userId,
@@ -142,6 +148,8 @@ export const addReviewUpdate = async (
     // is omitted so the previous non-null intent stays authoritative.
     if (wouldRecommend !== null && wouldRecommend !== undefined) {
       insert.would_recommend = wouldRecommend;
+    } else if (wouldRecommend === null && options?.sendExplicitNull) {
+      insert.would_recommend = null;
     }
 
     const { error } = await supabase
