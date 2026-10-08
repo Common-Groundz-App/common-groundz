@@ -525,9 +525,9 @@ function TimelineAmbiguousPanel(p: {
           )}
         </div>
       )}
-      {p.retryAllowed && (
+      {p.evidence && (
         <p className="text-sm text-muted-foreground">
-          {c.retryWarning} Save is unlocked — press it only if you're sure.
+          {p.retryAllowed ? `${c.retryWarning} Save is unlocked — press it only if you're sure.` : `Try again: ${c.retryWarning}`}
         </p>
       )}
     </div>
