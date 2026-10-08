@@ -203,6 +203,7 @@ function TimelineRoute({ reviewId, updateId, userId }: { reviewId: string; updat
   if (load.status === 'error') return retry;
   if (load.status === 'not_found') return <StatePanel title="Review not found" body="This review doesn't exist or was deleted." home />;
   if (load.status === 'unauthorized') return <StatePanel title="You can only add updates to your own review" body="Moderation tools are separate." home />;
+  if (load.status !== 'ok') return retry;
   const u = load.update;
   if (!updateId || !u) {
     return <TimelineComposerScreen mode="create-timeline-update" userId={userId} loaded={load.ctx} cancelTo={cancelTo} fromKnown={fromKnown} />;
