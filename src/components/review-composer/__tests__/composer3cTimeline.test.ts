@@ -112,3 +112,19 @@ describe('ambiguous copy', () => {
     expect(c.title).toMatch(/couldn't confirm/);
   });
 });
+
+import { createUploadSession, uploadSessionReducer, committedLeftovers } from '../uploadSession';
+describe('photos removed before a confirmed save', () => {
+  const up = (s: any, url: string) => uploadSessionReducer(s, { type: 'UPLOADED', key: 'k', url });
+  it('only after commit, only unsaved session uploads, never pre-existing', () => {
+    let s = createUploadSession('k', 'id');
+    s = up(up(up(s, 'a'), 'b'), 'old');
+    expect(committedLeftovers(s, ['a'])).toEqual([]); // still open
+    s = uploadSessionReducer(s, { type: 'SAVING' });
+    expect(committedLeftovers(s, ['a'])).toEqual([]);
+    s = uploadSessionReducer(s, { type: 'AMBIGUOUS' });
+    expect(committedLeftovers(s, ['a'])).toEqual([]);
+    s = uploadSessionReducer(s, { type: 'COMMITTED' });
+    expect(committedLeftovers(s, ['a'], ['old'])).toEqual(['b']);
+  });
+});
