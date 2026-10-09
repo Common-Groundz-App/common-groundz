@@ -1,26 +1,21 @@
-# Fix: the new review Edit page can't save (with or without photo changes)
+# Fix: review edits fail on both the new page and the old pop-up
 
-## What I checked
-- **Old pop-up vs new page:** both send the same fields: headline, text, rating, cover photo, photos, who can see it, date and extra details. Both leave the subject alone. There's no obvious missing field.
-- **Database edit rules:** the save is refused if the subject, author, system fields or non-questionnaire details change, or if it's past the 1-hour window. The Afnan review was created at 14:58 UTC, so both your tries (15:09 and 15:33) were inside the hour.
-- **Stored review:** it has no extra details saved yet (empty), no experience date, a 5 rating and 4 photos. It was never updated, so both saves were fully refused.
-- **Photos:** the save fails even without photo changes, so photo removal isn't the trigger. The new photo-cleanup rules also run on every save that includes photos, so they're still a suspect.
-- I can't see the exact error. Server logs for that time are empty, and I can't sign in to the preview as you on this project.
+## What we know
+- The error you found (`search_funnel_events` check) is unrelated. It's search tracking, and it doesn't block anything.
+- Both forms now fail, even with no photo changes. Before today's photo-cleanup change, the old pop-up's edit worked. So the likely cause is one of the new photo-cleanup rules that run on every review save. This is not yet confirmed: the server logs I can reach are empty for that time.
+- The Afnan review is unchanged. Each save was fully refused.
 
 ## Steps
-1. **Show the real reason on screen.** For an unrecognised save error, the "Couldn't save your review" toast will also show the server's short reason, such as `review_metadata_locked` or a database message. It never shows personal data. This turns the next failure into an exact diagnosis.
-2. **Reproduce locally first.** In my local test database, load the real review edit rules plus the new photo-cleanup rules. Then replay exactly what the new page sends for a review like Afnan's: empty details, no date, 4 photos, unchanged and with 2 removed. Do the same with what the old pop-up sends, and compare which one is refused and why.
-3. **Fix the actual cause** with the smallest change, in either the page or the database rules. Processing stays OFF.
-4. **Add regression tests:** editing a review with no changes, with text changed, and with photos removed must save. Removed photos must be queued, not deleted.
-5. **You test:** open Afnan's Edit, press Save changes with no changes, then again after removing 2 photos. Both should save, and the review should show 2 photos. If it still fails, the toast now shows the reason and you send me a screenshot.
-
-## Old pop-up
-Not audited further. It's being removed soon.
+1. **Capture the exact error, changing nothing.** Replay a no-change save of the Afnan review as your account, inside a test that is always undone. It returns only the database's error message, and no data is changed. I couldn't run this in plan mode.
+2. **Fix the actual rule** that error points to, with one small database change. Processing stays OFF. Re-run my local test suite with the real review edit rules loaded too, so this kind of break is caught next time.
+3. **Confirm again with the always-undone test:** a no-change save and a save with 2 photos removed both succeed. The removed photos are queued (not deleted).
+4. **Show the real reason in the error message.** If a review save fails for an unknown reason, the message will include the short server reason, so we never have to guess again.
+5. **You test:** edit Afnan's review, press Save changes (no changes), then remove 2 photos and save. Both should work, and the review should show 2 photos.
+6. **Separately (optional):** fix the search-tracking error. It's harmless but noisy.
 
 ## Still off
 Processing, schedule, weekly deletion, the review page rollout and 3D.
 
 ## Technical details
-- Update path: `updateReview()` → PATCH `reviews` + `.select().single()`. Payload from `buildEditReviewPayload`.
-- Triggers to replay: `reviews_00_enforce_edit_window` (identity, metadata, system-field locks and window), `media_guard`, and `reviews_queue_removed_media`. Also the SELECT-after-update under RLS.
-- Toast change is in `ReviewComposerScreen.tsx` catch for `status === 'error'`. Use error `code` and `message`, truncated.
+- Step 1: a `DO` block sets `request.jwt.claims` to the owner and `SET LOCAL ROLE authenticated`. It runs the same `UPDATE reviews` (`media`, `image_url`, `description` and `updated_at` unchanged values), catches `SQLSTATE`/`SQLERRM`, and re-raises it so the transaction always rolls back.
+- Suspects: `media_guard` (BEFORE), `reviews_queue_removed_media` (AFTER) and their helper calls. That includes function EXECUTE revokes, the function owner, and `jsonb_path_query strict` on the server version. Also their interaction with `reviews_00_enforce_edit_window` and RLS `.select()` after update.
