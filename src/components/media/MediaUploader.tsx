@@ -7,6 +7,7 @@ import { Image as ImageIcon, Film, Upload, X } from 'lucide-react';
 import {
   uploadMedia,
   ALLOWED_MEDIA_TYPES,
+  ALLOWED_IMAGE_TYPES,
   validateMediaFile,
   MAX_VIDEOS_PER_POST,
 } from '@/services/mediaService';
@@ -51,6 +52,11 @@ interface MediaUploaderProps {
   reserveSlots?: (requested: number) => number;
   /** Optional: called exactly once per reserved file (success, failure or skip). */
   releaseSlot?: () => void;
+  /**
+   * Optional: when false, video files are refused (pick and drop) before any
+   * slot is reserved or upload starts. Default true (posts unchanged).
+   */
+  allowVideo?: boolean;
 }
 
 /**
@@ -247,6 +253,7 @@ export function MediaUploader({
   onUploadsChange,
   reserveSlots,
   releaseSlot,
+  allowVideo = true,
 }: MediaUploaderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -294,8 +301,23 @@ export function MediaUploader({
     objectUrlsRef.current.delete(url);
   };
 
-  const handleFileSelect = async (files: FileList | null) => {
-    if (!files || !user || disabled) return;
+  const acceptTypes = (allowVideo ? ALLOWED_MEDIA_TYPES : ALLOWED_IMAGE_TYPES).join(',');
+
+  const handleFileSelect = async (input: FileList | File[] | null) => {
+    if (!input || !user || disabled) return;
+    let files: File[] = Array.from(input);
+    if (!allowVideo) {
+      const photos = files.filter((f) => !f.type.startsWith('video/'));
+      if (photos.length < files.length) {
+        toast({
+          title: 'Photos only',
+          description: 'Videos can\'t be added here yet. Please add photos instead.',
+          variant: 'destructive',
+        });
+      }
+      files = photos;
+      if (files.length === 0) return;
+    }
 
     const remainingSlots = maxMediaCount - currentMediaCount;
 
@@ -309,7 +331,7 @@ export function MediaUploader({
     }
 
     const picked = files.length;
-    let filesToProcess = Array.from(files).slice(0, remainingSlots);
+    let filesToProcess = files.slice(0, remainingSlots);
     if (reserveSlots) {
       const granted = reserveSlots(filesToProcess.length);
       if (granted <= 0) {
@@ -503,7 +525,7 @@ export function MediaUploader({
             const input = document.createElement('input');
             input.type = 'file';
             input.multiple = true;
-            input.accept = ALLOWED_MEDIA_TYPES.join(',');
+            input.accept = acceptTypes;
             input.onchange = (e) =>
               handleFileSelect((e.target as HTMLInputElement).files);
             input.click();
@@ -550,7 +572,7 @@ export function MediaUploader({
           const input = document.createElement('input');
           input.type = 'file';
           input.multiple = true;
-          input.accept = ALLOWED_MEDIA_TYPES.join(',');
+          input.accept = acceptTypes;
           input.onchange = (e) => handleFileSelect((e.target as HTMLInputElement).files);
           input.click();
         }}
@@ -560,9 +582,13 @@ export function MediaUploader({
             <Upload size={24} className="text-primary" />
           </div>
           <div>
-            <p className="font-medium">Add photos or a short video to your experience</p>
+            <p className="font-medium">
+              {allowVideo ? 'Add photos or a short video to your experience' : 'Add photos'}
+            </p>
             <p className="text-sm text-muted-foreground">
-              Images up to 10 MB · 1 video up to 100 MB, 60 seconds (MP4, MOV, WebM)
+              {allowVideo
+                ? 'Images up to 10 MB · 1 video up to 100 MB, 60 seconds (MP4, MOV, WebM)'
+                : 'Images up to 10 MB (JPG, PNG, GIF, WebP)'}
             </p>
             <p className="text-xs font-medium mt-1">
               {currentMediaCount}/{maxMediaCount} media items used

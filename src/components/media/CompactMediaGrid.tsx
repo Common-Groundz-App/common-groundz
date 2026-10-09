@@ -12,6 +12,8 @@ import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 interface CompactMediaGridProps {
   media: MediaItem[];
   onRemove?: (media: MediaItem) => void;
+  /** Optional: hide the remove button for items that return false. */
+  canRemove?: (media: MediaItem) => boolean;
   className?: string;
   maxVisible?: number;
   onOpenLightbox?: (index: number) => void;
@@ -22,6 +24,7 @@ interface CompactMediaGridProps {
 export function CompactMediaGrid({
   media,
   onRemove,
+  canRemove,
   className,
   maxVisible = 4,
   onOpenLightbox,
@@ -122,7 +125,7 @@ export function CompactMediaGrid({
             </div>
             
             {/* Remove button - show on hover or always on mobile */}
-            {onRemove && (
+            {onRemove && (!canRemove || canRemove(item)) && (
               <Button
                 variant="secondary"
                 size="icon"

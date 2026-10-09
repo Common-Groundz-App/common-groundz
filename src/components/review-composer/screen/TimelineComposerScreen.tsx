@@ -418,15 +418,17 @@ export function TimelineComposerScreen(props: Props) {
                 <span className="text-lg">🖼️</span>
                 <span>Your media ({state.values.media.length}/4)</span>
               </Label>
-              <CompactMediaGrid media={state.values.media} onRemove={handleMediaRemove} maxVisible={4} className="group" />
+              <CompactMediaGrid
+                canRemove={(m) => m.type !== 'video'} media={state.values.media} onRemove={handleMediaRemove} maxVisible={4} className="group" />
             </div>
           )}
           <div className="space-y-2">
             <Label className="mb-1 flex items-center gap-2 font-medium">
               <span className="text-lg">📸</span>
-              <span>Add photos & videos</span>
+              <span>Add photos</span>
             </Label>
             <MediaUploader
+                allowVideo={false}
               sessionId={uploads.sessionId}
               onMediaUploaded={handleMediaAdded}
               initialMedia={state.values.media}
@@ -438,8 +440,8 @@ export function TimelineComposerScreen(props: Props) {
             />
             <p className="mt-1 text-xs text-muted-foreground">
               {state.values.media.length > 0
-                ? `${state.values.media.length}/4 media items added - Add photos or videos to make your update stand out`
-                : 'Add photos or videos to make your update stand out'}
+                ? `${state.values.media.length}/4 media items added - Add photos to make your update stand out`
+                : 'Add photos to make your update stand out'}
             </p>
           </div>
           {err('media') && <FieldError message={err('media')!} />}

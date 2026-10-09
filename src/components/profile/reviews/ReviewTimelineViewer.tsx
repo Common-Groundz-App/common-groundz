@@ -804,6 +804,7 @@ export const ReviewTimelineViewer = ({
                             <span>Your media ({selectedMedia.length}/{MAX_MEDIA_COUNT})</span>
                           </label>
                           <CompactMediaGrid
+                canRemove={(m) => m.type !== 'video'}
                             media={selectedMedia}
                             onRemove={handleMediaRemove}
                             maxVisible={MAX_MEDIA_COUNT}
@@ -816,9 +817,10 @@ export const ReviewTimelineViewer = ({
                       <div className="space-y-2">
                         <label className="flex items-center gap-2 text-sm font-medium mb-1">
                           <span className="text-lg">📸</span>
-                          <span>Add photos & videos</span>
+                          <span>Add photos</span>
                         </label>
                         <MediaUploader
+                allowVideo={false}
                           sessionId={`review-update-${Date.now()}`}
                           onMediaUploaded={handleMediaUploaded}
                           initialMedia={selectedMedia}
@@ -827,8 +829,8 @@ export const ReviewTimelineViewer = ({
                         />
                         <p className="text-xs text-muted-foreground mt-1">
                           {selectedMedia.length > 0 
-                            ? `${selectedMedia.length}/${MAX_MEDIA_COUNT} media items added - Add photos or videos to make your update stand out`
-                            : "Add photos or videos to make your update stand out"
+                            ? `${selectedMedia.length}/${MAX_MEDIA_COUNT} media items added - Add photos to make your update stand out`
+                            : "Add photos to make your update stand out"
                           }
                         </p>
                       </div>
