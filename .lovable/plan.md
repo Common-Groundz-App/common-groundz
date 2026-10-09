@@ -1,50 +1,58 @@
-# Media cleanup: correct the record, delete the 8, audit every case (stop before 3D)
+# Media cleanup: correct the record, audit every case, deletion approved separately (3D separate)
 
 ## What is happening, in plain words
 
 Uploading a photo puts a file in storage right away, before you press Save. Saving a review or update only stores a link to that file. When the link goes away, the file stays unless something deletes it. A file with no link left is an orphan.
 
-## Correcting my last report (Codex was right)
+## Correcting my last report
 
-I said all three sessions "uploaded 4 and saved 2", with the extras being "over-limit" uploads. That was wrong:
-- **Oct 6 session (8162b991…):** 4 files, all orphans. This was the draft from the photo-limit test that was left without saving or cancelling. None were saved.
-- **Oct 8 sessions (8d661012…, 3acac8bc…):** 4 uploaded, 2 saved, 2 removed before Save. This was the "removed before save" gap, which is now fixed.
+I said all three sessions "uploaded 4 and saved 2", with the extras being over-limit uploads. That was wrong:
+- **Oct 6 session (8162b991…):** 4 uploaded, all orphans. The draft was left without Save or Cancel.
+- **Oct 8 sessions (8d661012…, 3acac8bc…):** each had 4 uploaded, 2 saved and 2 removed before Save. This "removed before Save" gap is now fixed.
 
-So the totals stand (12 = 4 to keep + 8 orphans), but the explanation was wrong. The verification notes will be corrected.
+The totals still stand: 12 files, 4 to keep and 8 orphans.
 
-## How each case behaves in the code today
+## How each case behaves in the code today (to be confirmed by the audit)
 
 | Situation | Today |
 |---|---|
-| More than 4 picked | Spare slots are reserved before uploading. Extra files are refused with a warning and never uploaded (fixed in 3B). |
+| More than 4 picked | Extra files are refused with a warning and never uploaded (3B). |
 | Upload finishes after you left | Deleted if the draft was left unsaved. Kept if a save was in progress or unclear. |
-| New upload removed, then Save confirmed | Deleted after the save is confirmed (fixed in 3C). |
-| Cancel | Only this visit's new uploads are deleted. Photos saved earlier are untouched. |
+| New upload removed, then Save confirmed | Deleted after a confirmed save (3C). |
+| Cancel | Only this visit's new uploads are deleted. Earlier saved media is untouched. |
 | Save result unclear | Nothing is deleted. |
-| **A photo/video saved earlier is removed during Edit, then saved** | **Not deleted. The file is left behind as an orphan.** The cleanup code deliberately skips anything saved earlier. |
-| Tab closed or reloaded mid-draft | Files may be left behind (known gap, like Oct 6). |
-| Videos | Not checked yet. Videos go through a separate video host, and deleting the storage file may leave the hosted video and its preview image behind. |
+| **Saved photo/video removed during Edit, then saved** | **The file is left behind.** The cleanup deliberately skips earlier saved media. |
+| Tab closed or reloaded mid-draft | Files may be left behind (known gap). |
+| Videos | Not checked yet. Hosted video, preview image and poster may each need their own deletion. |
 
-## Steps in this approval
+## Steps in this approval (read-only, except the notes correction)
 
-1. **Delete the 8 orphans.** First, re-check every place media can be linked from. Then delete only those 8 exact files through the storage service. Afterwards, confirm the 8 are gone, the 4 saved photos still open, and no saved content changed.
-2. **Fix the record.** Correct how the Oct 6 and Oct 8 orphans came about in the verification notes.
-3. **Audit only, no fixes.** For photos and videos separately, confirm each row of the table above from the code and the live data. This includes:
-   - the video path (hosted video, preview image, poster file);
-   - the existing admin orphan-cleanup tools, which could be the future server sweep.
-4. **Propose the fix for "removed during Edit"** for you to approve before anything changes:
-   - delete only after the edit is confirmed saved;
-   - only files no longer in the saved update;
-   - after a fresh check that no other review, update, post or entity still links to them;
-   - never on Cancel or when the save result is unclear;
-   - same rules for videos, including their hosted copy.
-5. Report back and stop. 3D stays untouched.
+1. **Correct the verification notes** with the true Oct 6 and Oct 8 causes.
+2. **Deletion report only, no deletion.**
+   - Give the bucket and the full, unabridged paths of the 8 candidates and the 4 files to keep.
+   - Run a fresh reference check, listing every place checked: posts, reviews (media and cover image), timeline updates, entity photos, entity images, video upload records, profile pictures, and any other media field found.
+   - Match web addresses and storage paths in every form they're stored, including inside structured media lists.
+   - Any check that errors counts as "unknown", not "safe".
+   - Deleting the 8 files becomes a separate approval after you see this report.
+3. **Photo and video lifecycle audit.** Confirm each row of the table above for both the old pop-up forms and the new pages. Report which gaps affect which.
+   - **Videos:** map out exactly what is saved (storage file, hosted video ID, playback ID, preview, poster) and which deletion each part needs.
+   - **Shared files:** check whether one file can legitimately be linked from more than one place, for example copied posts, entity photos taken from reviews, or cover images.
+   - **Existing cleanup tools:** check the existing admin orphan-cleanup tools. They wait until files are 7 days old, and they may not cover video records or profile pictures. Decide whether they can become the reliable sweep.
+4. **Propose, don't build, the "removed during Edit" fix.** Removed saved media only becomes a *candidate* after a confirmed edit. The server then:
+   - re-checks every reference across all places media can be linked from;
+   - deletes only files with zero references;
+   - retries failures;
+   - keeps anything whose ownership or save result is uncertain.
 
-## Why this order
+   Server-side is preferred over cleanup in the browser, which can be interrupted or race with another save. Videos stay on their own route until the audit proves photo deletion is safe for them.
+5. Report back and stop.
 
-The 8 files are confirmed unlinked, so deleting them is safe and separate from everything else. The "removed during Edit" gap would leave a new orphan every time someone removes an old photo. That matters most once the new page becomes the default in 3D, so it gets audited and decided first.
+## About 3D
+
+Cleanup is tracked separately from 3D. My recommendation is to decide on the Edit-removal fix before 3D makes the new page the default, because that gap grows with normal use. You choose whether it actually blocks 3D after seeing the audit.
 
 ## Technical details
-- Gap source: `committedLeftovers()` in `uploadSession.ts` excludes the stored update/review media (`ReviewComposerScreen.tsx:391`, `TimelineComposerScreen.tsx:244`).
-- Existing pieces to evaluate: `cleanupReviewMedia` in `services/review/core.ts`, and the edge functions `cleanup-orphan-media`, `cleanup-orphan-media-execute` and `admin-media-cleanup-*`.
-- Deletion is done with the storage API in the `post_media` bucket, never with SQL on `storage.objects`.
+- Gap source: `committedLeftovers()` in `uploadSession.ts` excludes stored media (`ReviewComposerScreen.tsx:391`, `TimelineComposerScreen.tsx:244`).
+- `cleanup-orphan-media` (dry-run) only collects posts.media, reviews.media/image_url, review_updates.media, entity_photos.url and entities.image_url. Coverage gaps such as `mux_upload_mappings`, `mux_uploads` and profile avatars are to be verified.
+- Any later deletion uses the storage API on `post_media`, never SQL on `storage.objects`.
+- roadmap.md gets this task once out of plan mode (plan mode only allows plan edits).
