@@ -403,5 +403,7 @@ cross-read between them.
 - [x] 3C — timeline modes on the page (signed-in checks passed; final audit in docs/verification/review-composer-3c.md)
 - [x] 3C.1 close-out built and tested (Clear removed, timeout panel + Back tests); awaiting your approval of the report
   - [ ] Your decision: rapid double-Back escapes on the timeline pages — accept or fix
-- [ ] Orphan-photo cleanup (8 files) — needs separate approval
+- [x] Media lifecycle audit + deletion report (docs/verification/media-lifecycle-audit.md)
+- [ ] Delete the 8 orphan files — waiting on your approval
+- [ ] Edit-removal cleanup fix + safe sweep coverage — proposal waiting on your approval
 - [ ] 3D — cutover of entry points (plan approved for reference; not started)
