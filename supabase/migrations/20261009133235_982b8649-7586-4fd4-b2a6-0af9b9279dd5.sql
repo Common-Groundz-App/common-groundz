@@ -1,0 +1,1 @@
+REVOKE ALL ON public.media_deletion_candidates FROM anon, authenticated, PUBLIC;

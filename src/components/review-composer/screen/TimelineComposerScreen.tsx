@@ -37,7 +37,7 @@ import { getCapabilities } from '../modes';
 import { canSubmit, hasUnsavedChanges, useComposerController } from '../store';
 import { validateForSubmit } from '../stepEngine';
 import { buildCreateTimelinePayload, buildEditTimelinePayload } from '../saveBuilders';
-import { fromTimelineCreate, fromTimelineStatus } from '../serverErrors';
+import { fromTimelineCreate, fromTimelineStatus, MEDIA_RETIRED_TOAST } from '../serverErrors';
 import { gatherAmbiguousSaveEvidence, type AmbiguousSaveEvidence } from '../reconcile';
 import { useUploadSession } from '../useUploadSession';
 import type { RecommendationChoice, StoredReviewRecord, StoredTimelineUpdateRecord } from '../values';
@@ -252,6 +252,7 @@ export function TimelineComposerScreen(props: Props) {
     }
     uploads.send({ type: 'SAVE_FAILED' });
     dispatch({ type: 'SAVE_RESULT', sessionKey, result });
+    if (result.status === 'media_retired') toast(MEDIA_RETIRED_TOAST);
     if (result.status === 'error') {
       toast({
         title: 'Error',
