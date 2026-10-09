@@ -82,3 +82,10 @@ This is the corrected design from the approved plan: states, a per-file transact
 - Timeline updates 1414f4f9… and 9884785f… (review 8fa6b2a4…) still list exactly those 4 URLs, 2 each. Their `updated_at` is unchanged from Oct 8, and no database content changed.
 - The dashboard left an `.emptyFolderPlaceholder` in session folder 8162b991…. It's harmless and unreferenced.
 - Not verified in a signed-in browser (external auth). The data and URLs show the photos will display.
+
+## D2. Verified complete end-to-end (Oct 9, 17:33 UTC)
+- Setup: a fresh Afnan review got 4 photos (6 were chosen and the 2 extras were turned away before upload). An edit then removed 2 of them, and a previously deleted Afnan review had queued its 4. That made 6 `queued` candidates, all still present in storage while processing was OFF.
+- Before the run: 270 objects in `post_media`, processing OFF, no worker schedule.
+- Run: the owner turned processing ON, invoked `process-media-deletions` once by hand, then turned processing OFF. Report: claimed 6, deleted 6, retry/failed/stale 0.
+- After the run: all 6 candidates are `deleted`, 0 of the 6 paths are left in storage, and a removed URL returns 400. The count is now 264 (exactly 6 fewer). The 2 photos still attached to review 88b0a418… are present and return 200. Nothing unrelated changed.
+- Processing is OFF, there's no worker cron, and the weekly sweep (`cleanup-orphan-media-weekly-dryrun`) is still report-only.
