@@ -88,7 +88,7 @@ worker claim (token + lease, path lock, fixed order)
 2. **Comparing the whole record.** Removed paths are worked out as *all old paths on the record minus all new paths*. For a review that means its media and cover image together; for a timeline update, its media. So a photo that's still the cover is never queued.
 3. **Whole-thread deletion test.** Deleting a whole thread queues every saved photo from the review and its timeline updates exactly once. The browser no longer deletes them.
 4. **While processing is off**, which is how it ships:
-   - Queueing still happens. Re-adding a *queued* file is **allowed**: under the shared lock, the save cancels that file's queue entry.
+   - Queueing still happens. Re-adding a *queued* file is **allowed**. Under the same per-file lock, the save moves the record from *queued* to **kept**. The record is **never cancelled or erased**, so the history stays and the daily re-check can reconsider the file once processing is on.
    - Only *deleting*, *deleted* or *failed* files are rejected, so normal users are never blocked just because processing is off.
    - Nothing is ever deleted.
    - Changes from installing the migration: queue entries start appearing, saves that re-add a deleted or failed file are rejected, and the browser stops deleting files after a thread is deleted.
@@ -107,3 +107,18 @@ worker claim (token + lease, path lock, fixed order)
 9. **AGENTS.md.** This project's own instructions ask for each architecture decision to be recorded in AGENTS.md as one rule. One line is added there; it isn't a prerequisite.
 
 **Still off afterwards:** processing, any schedule, the weekly sweep's delete mode, and the rollout switch. I report test results and blockers, then stop.
+
+## Last clarifications (from the final reviews)
+
+- **Re-attaching a queued file:** *queued* → **kept**, taken under the shared per-file lock, never cancelled or erased.
+  - Once processing is on, the daily re-check runs: still referenced → stays *kept*; no references left → back to *queued*, then normal cleanup.
+  - **Regression test:** remove → queued → re-attach while processing is off → kept → the last reference disappears → the daily re-check returns it to queued.
+- **Guards stay on every table that keeps files.** The daily re-check only replaces extra removal triggers on other tables. It never replaces the guards that block new links while a file is being deleted.
+- **The daily re-check uses the same per-file lock.** The check and the move back to *queued* happen in one transaction with the lock held. Two-session tests cover both orders (attach first, then re-check; re-check first, then attach), with processing both on and off.
+- **What "turning processing off" means:**
+  - it stops new claims;
+  - the worker checks the setting right before each storage delete and skips the delete if processing is off;
+  - a delete request already sent to storage may still finish and can't be undone, so the worker records it as *deleted*;
+  - the run report lists any work that was in progress.
+- **If the two-session tests can't run**, processing stays off and they're reported as blocked, never replaced with mocks.
+- **Not approved yet:** turning processing on, and the live one-photo deletion test. Each needs a separate yes from you.
