@@ -21,6 +21,7 @@ export type ComposerServerResult =
   | { status: 'existing_review'; reviewId: string | null }
   | { status: 'conflict' }
   | { status: 'not_found' }
+  | { status: 'media_retired' }
   | { status: 'error'; cause?: unknown };
 
 export type BlockedReason =
@@ -31,7 +32,19 @@ export type BlockedReason =
   | 'not_found'
   | 'subject_not_found';
 
-const TIMELINE_STATUSES = ['ok', 'expired', 'not_latest', 'unauthorized', 'conflict', 'not_found'] as const;
+const TIMELINE_STATUSES = ['ok', 'expired', 'not_latest', 'unauthorized', 'conflict', 'not_found', 'media_retired'] as const;
+
+/** Server refused a photo that was already removed and is queued/being deleted. */
+export function isMediaRetiredError(error: unknown): boolean {
+  const e = error as { message?: unknown; details?: unknown } | null;
+  return typeof e?.message === 'string' && e.message.includes('MEDIA_PATH_RETIRED');
+}
+
+export const MEDIA_RETIRED_TOAST = {
+  title: 'A photo was already removed',
+  description: 'One of these photos was removed earlier. Remove it and add it again, then save.',
+  variant: 'destructive' as const,
+};
 type TimelineStatus = (typeof TIMELINE_STATUSES)[number];
 
 /** Timeline edit / undo RPC statuses (already typed by the service). */
@@ -48,11 +61,13 @@ export function fromTimelineCreate(ok: boolean): ComposerServerResult {
 }
 
 export function fromCreateReviewError(error: unknown, existingReviewId: string | null = null): ComposerServerResult {
+  if (isMediaRetiredError(error)) return { status: 'media_retired' };
   if (isOwnReviewUniqueViolation(error)) return { status: 'existing_review', reviewId: existingReviewId };
   return { status: 'error', cause: error };
 }
 
 export function fromUpdateReviewError(error: unknown): ComposerServerResult {
+  if (isMediaRetiredError(error)) return { status: 'media_retired' };
   if (isEditWindowClosedError(error)) return { status: 'expired' };
   return { status: 'error', cause: error };
 }

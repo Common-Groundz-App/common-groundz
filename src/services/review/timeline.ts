@@ -204,7 +204,7 @@ export const deleteLatestReviewUpdate = async (
   }
 };
 
-export type EditUpdateResult = 'ok' | 'expired' | 'not_latest' | 'unauthorized' | 'conflict' | 'error';
+export type EditUpdateResult = 'ok' | 'expired' | 'not_latest' | 'unauthorized' | 'conflict' | 'media_retired' | 'error';
 
 /**
  * Step 3.0A (F2) — the five distinct recommendation states for a timeline
@@ -239,6 +239,7 @@ export const editLatestReviewUpdate = async (
     });
     if (error) {
       console.error('Error editing timeline update:', error);
+      if (typeof error.message === 'string' && error.message.includes('MEDIA_PATH_RETIRED')) return 'media_retired';
       return 'error';
     }
     const status = (data as { status?: string } | null)?.status as EditUpdateResult | undefined;

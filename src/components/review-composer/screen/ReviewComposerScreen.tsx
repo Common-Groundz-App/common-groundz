@@ -51,7 +51,7 @@ import {
 } from '../store';
 import { nextStep, stepCount, validateForSubmit } from '../stepEngine';
 import { buildCreateReviewPayload, buildEditReviewPayload } from '../saveBuilders';
-import { fromCreateReviewError, fromUpdateReviewError } from '../serverErrors';
+import { fromCreateReviewError, fromUpdateReviewError, MEDIA_RETIRED_TOAST } from '../serverErrors';
 import { gatherAmbiguousSaveEvidence } from '../reconcile';
 import { useUploadSession } from '../useUploadSession';
 import type { SectionId } from '../values';
@@ -370,6 +370,7 @@ export function ReviewComposerScreen(props: Props) {
       uploads.send({ type: 'SAVE_FAILED' });
       dispatch({ type: 'SAVE_RESULT', sessionKey, result });
       if (result.status === 'existing_review' && subjectId) runExistingCheck(subjectId);
+      if (result.status === 'media_retired') toast(MEDIA_RETIRED_TOAST);
       if (result.status === 'error') {
         toast({ title: "Couldn't save your review", description: 'Please try again.', variant: 'destructive' });
       }

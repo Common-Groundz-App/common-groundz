@@ -106,10 +106,8 @@ export const deleteReviewThread = async (
       return status === 'not_found' || status === 'unauthorized' ? status : 'error';
     }
     notifyReviewsChanged();
-    const urls = Array.isArray(result?.mediaToClean) ? result!.mediaToClean : [];
-    if (urls.length > 0) {
-      void cleanupReviewMedia(urls);
-    }
+    // Saved photos are queued for server-side cleanup by the database in the
+    // same transaction; the browser never deletes persisted media.
     return 'deleted';
   } catch (error) {
     console.error('Error in deleteReviewThread:', error);
