@@ -12,6 +12,7 @@
  */
 import { isOwnReviewUniqueViolation } from '@/services/review/ownReview';
 import { isEditWindowClosedError } from '@/utils/reviewEditPolicy';
+import { isMediaRetiredError } from '@/utils/mediaRetired';
 
 export type ComposerServerResult =
   | { status: 'ok'; id?: string }
@@ -33,12 +34,6 @@ export type BlockedReason =
   | 'subject_not_found';
 
 const TIMELINE_STATUSES = ['ok', 'expired', 'not_latest', 'unauthorized', 'conflict', 'not_found', 'media_retired'] as const;
-
-/** Server refused a photo that was already removed and is queued/being deleted. */
-export function isMediaRetiredError(error: unknown): boolean {
-  const e = error as { message?: unknown; details?: unknown } | null;
-  return typeof e?.message === 'string' && e.message.includes('MEDIA_PATH_RETIRED');
-}
 
 export const MEDIA_RETIRED_TOAST = {
   title: 'A photo was already removed',

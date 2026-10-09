@@ -1,3 +1,4 @@
+import { isMediaRetiredError } from '@/utils/mediaRetired';
 import type { Json } from '@/integrations/supabase/types';
 import { notifyReviewsChanged } from './reviewChangeEvents';
 import { supabase } from '@/integrations/supabase/client';
@@ -239,7 +240,7 @@ export const editLatestReviewUpdate = async (
     });
     if (error) {
       console.error('Error editing timeline update:', error);
-      if (typeof error.message === 'string' && error.message.includes('MEDIA_PATH_RETIRED')) return 'media_retired';
+      if (isMediaRetiredError(error)) return 'media_retired';
       return 'error';
     }
     const status = (data as { status?: string } | null)?.status as EditUpdateResult | undefined;
