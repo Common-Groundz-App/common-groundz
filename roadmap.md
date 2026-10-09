@@ -401,4 +401,7 @@ cross-read between them.
   - [ ] Signed-in re-test of real uploads + navigation protection — waiting on user
 - [x] 3B approved
 - [x] 3C — timeline modes on the page (signed-in checks passed; final audit in docs/verification/review-composer-3c.md)
-- [ ] 3D — cutover of entry points (plan awaiting approval)
+- [x] 3C.1 close-out built and tested (Clear removed, timeout panel + Back tests); awaiting your approval of the report
+  - [ ] Your decision: rapid double-Back escapes on the timeline pages — accept or fix
+- [ ] Orphan-photo cleanup (8 files) — needs separate approval
+- [ ] 3D — cutover of entry points (plan approved for reference; not started)
