@@ -1,6 +1,6 @@
 # 3C.1 close-out, then 3D cutover
 
-Two separate steps, approved and reported separately. 3C.1 runs first; 3D starts only after you approve the 3C.1 report.
+Strict order, each approved separately: **3C.1 (this approval) → your review of the 3C.1 report → photo cleanup (separate approval) → 3D (separate approval) → your signed-in cutover/rollback test → 3E later.** Approving this plan starts 3C.1 only. The cleanup and 3D sections below are kept for reference and are not carried out.
 
 ## Correction from the 3C report
 
@@ -34,7 +34,7 @@ Built with the switch OFF. Turned on only after you approve the tested cutover.
 ### 1. One flag source, one pure routing decision
 - The only flag reader is the existing `useReviewComposerImplementation`. Loading or failure means legacy.
 - A pure helper: `action + implementation → { page address + state } | legacy`, for write review, edit review, add update and edit update. No second flag-reading path.
-- No flicker: while the flag is loading, a button does the legacy action only if it is clicked after loading ends. A tap during loading waits for the answer, so a single click never opens the legacy popup and then also navigates to the page.
+- While the flag is loading, a tap becomes **one** pending action and the button shows as busy/disabled; further taps are ignored. When the flag resolves, that action runs once (page or legacy); if loading fails, the legacy action runs once. One click never opens the legacy popup and also goes to the page.
 
 ### 2. Entry-point inventory (exhaustive)
 - Every review / timeline composer entry point found by searching the code is listed in the verification notes (starting set: home "+" button, entity page write / already-reviewed / `?compose=update`, entity reviews list and timeline cards, shared owner menu, profile reviews tab, timeline viewer add/edit, the popup's own "add update" hand-offs).
@@ -55,7 +55,7 @@ Built with the switch OFF. Turned on only after you approve the tested cutover.
 
 ### 5. Gate and rollback
 - Remove the temporary "admins always allowed" gate; the page follows the switch only.
-- **Open sessions are latched:** the page checks the switch when it opens. A composer opened while the switch was on keeps working if the switch later turns off — dirty, saving or "couldn't confirm" forms are never replaced by "Not available yet" and can still Save or Cancel. New direct `/review…` visits and all buttons follow the switch at once.
+- **Open sessions are latched — only after the switch is confirmed on:** route opens → switch state resolved successfully → confirmed "page" → only then the session is latched. Loading, failure or the release default never latch anything just because the page mounted. A latched composer keeps working if the switch later turns off: dirty, saving or "couldn't confirm" forms are never replaced by "Not available yet" and can still Save or Cancel. New direct `/review…` visits and all buttons follow the switch at once.
 - `?compose=update`: on → owner goes to `/review/:id/timeline/new`, others to the entity page; off → unchanged.
 
 ### 6. Checks
