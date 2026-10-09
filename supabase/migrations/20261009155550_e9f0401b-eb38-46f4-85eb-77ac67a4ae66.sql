@@ -1,0 +1,1 @@
+ALTER FUNCTION public.enforce_review_edit_window() SET search_path = public, extensions, pg_temp;
