@@ -1784,6 +1784,54 @@ export type Database = {
         }
         Relationships: []
       }
+      media_deletion_candidates: {
+        Row: {
+          attempts: number
+          claim_token: string | null
+          created_at: string
+          id: string
+          kept_checked_at: string | null
+          last_error: string | null
+          lease_until: string | null
+          next_attempt_at: string
+          path: string
+          source_id: string | null
+          source_table: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          claim_token?: string | null
+          created_at?: string
+          id?: string
+          kept_checked_at?: string | null
+          last_error?: string | null
+          lease_until?: string | null
+          next_attempt_at?: string
+          path: string
+          source_id?: string | null
+          source_table?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          claim_token?: string | null
+          created_at?: string
+          id?: string
+          kept_checked_at?: string | null
+          last_error?: string | null
+          lease_until?: string | null
+          next_attempt_at?: string
+          path?: string
+          source_id?: string | null
+          source_table?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       media_views: {
         Row: {
           anon_session_id: string | null
@@ -3864,6 +3912,30 @@ export type Database = {
         Args: { p_update_id: string }
         Returns: Json
       }
+      admin_list_media_deletion_candidates: {
+        Args: { p_limit?: number; p_status?: string }
+        Returns: {
+          attempts: number
+          claim_token: string | null
+          created_at: string
+          id: string
+          kept_checked_at: string | null
+          last_error: string | null
+          lease_until: string | null
+          next_attempt_at: string
+          path: string
+          source_id: string | null
+          source_table: string | null
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "media_deletion_candidates"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       admin_moderate_entity: {
         Args: {
           _action: string
@@ -4012,6 +4084,13 @@ export type Database = {
         Args: { p_post_id: string; p_user_id: string }
         Returns: boolean
       }
+      claim_media_deletions: {
+        Args: { p_lease_seconds?: number; p_limit?: number }
+        Returns: {
+          claim_token: string
+          path: string
+        }[]
+      }
       cleanup_expired_cached_photos: { Args: never; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_spaced_hashtags: { Args: never; Returns: Json }
@@ -4089,6 +4168,15 @@ export type Database = {
       entity_slug_is_taken: {
         Args: { candidate: string; exclude_entity_id?: string }
         Returns: boolean
+      }
+      finish_media_deletion: {
+        Args: {
+          p_error?: string
+          p_outcome: string
+          p_path: string
+          p_token: string
+        }
+        Returns: string
       }
       fix_duplicate_slugs: { Args: never; Returns: number }
       fuzzy_match_entity: {
@@ -4671,6 +4759,7 @@ export type Database = {
         Args: { p_presented: string }
         Returns: boolean
       }
+      list_kept_media_paths: { Args: never; Returns: string[] }
       log_admin_action: {
         Args: {
           p_action_type: string
@@ -4792,6 +4881,23 @@ export type Database = {
           similarity: number
         }[]
       }
+      media_cleanup_processing_enabled: { Args: never; Returns: boolean }
+      media_guard_added: {
+        Args: { p_new: string[]; p_old: string[] }
+        Returns: undefined
+      }
+      media_path_keep_count: { Args: { p: string }; Returns: number }
+      media_path_lock: { Args: { p: string }; Returns: undefined }
+      media_queue_removed: {
+        Args: {
+          p_id: string
+          p_new: string[]
+          p_old: string[]
+          p_table: string
+        }
+        Returns: undefined
+      }
+      media_url_decode: { Args: { p: string }; Returns: string }
       migrate_to_hierarchical_slugs: {
         Args: { batch_size?: number }
         Returns: {
@@ -4800,10 +4906,12 @@ export type Database = {
         }[]
       }
       normalize_identity_name: { Args: { input_name: string }; Returns: string }
+      normalize_owned_media_path: { Args: { p: string }; Returns: string }
       notification_allowed: {
         Args: { _category: string; _user_id: string }
         Returns: boolean
       }
+      owned_media_paths_from_jsonb: { Args: { j: Json }; Returns: string[] }
       parse_comment_mentions: {
         Args: { p_author_id: string; p_content: string }
         Returns: {
@@ -4833,6 +4941,7 @@ export type Database = {
         Returns: number
       }
       prune_search_rate_limits: { Args: never; Returns: undefined }
+      recheck_kept_media: { Args: { p_limit?: number }; Returns: number }
       recompute_review_timeline_state: {
         Args: { p_review_id: string }
         Returns: undefined
@@ -4847,6 +4956,10 @@ export type Database = {
           p_latest_intent: string
         }
         Returns: Json
+      }
+      review_owned_paths: {
+        Args: { p_image: string; p_media: Json }
+        Returns: string[]
       }
       review_timeline_lock_key: {
         Args: { p_review_id: string }
