@@ -33,15 +33,18 @@ c8508bd3-35a9-4cce-a7c8-0b5fc2bca965/8d661012-2a9c-4f43-810e-f2b8dec9216f/78a542
 - Confirm the 4 saved photos still open and no content changed.
 
 **B. Photo-only review and timeline forms** (old pop-up and new pages):
-- new videos are refused when picked and when dragged in, with a short message;
+- new videos are refused when picked and when dragged in, with a short message. Refused videos never start uploading and never take up a photo slot;
 - the wording changes to "Add photos";
-- existing videos still play and stay attached when editing, including the May 2025 one;
+- **existing saved videos** (including the May 2025 one):
+  - keep playing and count toward the limit of 4;
+  - stay attached through ordinary edits, comment-only edits and Cancel;
+  - **can't be removed or replaced from Edit yet**: the remove button is hidden for them until video cleanup exists;
 - posts and home keep Mux exactly as today;
-- tests cover all of this.
+- tests cover: picking refused, dragging refused, no upload or slot used, photos still work, posts unchanged, an existing video kept through edits and Cancel, and no remove button on it.
 
-**C. Read-only video check:** look for review-session videos sent to Mux but never linked back. Report only.
+**C. Read-only video check:** look for videos sent to Mux but never linked back. Where it can't be proven that a video came from a review, it's labelled "unknown". Report only.
 
-**D. The corrected cleanup design**, written into the audit notes. Nothing is built.
+**D. The corrected cleanup design**, written into the audit notes. **Design only.** No table, trigger, worker or automatic deletion is built.
 
 ## Corrected cleanup design (D)
 
@@ -54,7 +57,11 @@ c8508bd3-35a9-4cce-a7c8-0b5fc2bca965/8d661012-2a9c-4f43-810e-f2b8dec9216f/78a542
    - deleted: can never be added again.
    - failed / uncertain: can't be added, and an admin reviews it.
    - kept: a reference was found, so the file returns to normal use.
-5. **Worker:** under the file lock, it marks the file *deleting* and runs a final reference check across every listed place. Still referenced → *kept*. Otherwise it deletes through the storage service. An already-missing file counts as success. Errors are retried, then marked *failed*.
+5. **Worker, in two steps:**
+   - **Database step:** one transaction holds the file lock only while it runs. It does the final reference check across every listed place, then commits either *kept* or *deleting*. The lock ends with that transaction.
+   - **Storage step:** only after *deleting* is committed does it call the storage service. Every save that newly adds a path respects the committed *deleting* state, so no lock needs to span the storage call.
+   - An already-missing file counts as success. Errors are retried, then marked *failed*.
+   - The design includes tests where a save and a deletion run at the same moment.
 6. **Coverage document:** the exact columns and JSON shapes covered:
    - `posts.media[].url/thumbnail_url`
    - `reviews.media[]`, `reviews.image_url`
@@ -70,7 +77,18 @@ c8508bd3-35a9-4cce-a7c8-0b5fc2bca965/8d661012-2a9c-4f43-810e-f2b8dec9216f/78a542
 
 ## Then stop
 
-The rollout switch stays off. 3D can be built with it off. It's turned on only after B is live, D is built and verified, and the 3D checks pass. Mux for reviews becomes its own phase after 3D.
+I report A–D and stop, with the rollout switch off.
+
+```text
+next, separately approved:
+D2  build + verify the cleanup system
+3D  can be built with the switch OFF in parallel
+ON  needs B live + 3D checks passed
+    + your decision on whether D2 must be done first
+later: Mux for reviews/updates (own phase), then retire the old forms
+```
+
+Whether D2 must come before the switch goes on is decided when you approve D2, not in this step. My recommendation is yes, because the new page makes edits the main path.
 
 ## Technical details
 - B: an optional `allowVideo` prop on MediaUploader, default `true`, so posts are unchanged. It filters both the file input and drop handlers, and existing `initialMedia` videos stay.
