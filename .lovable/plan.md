@@ -81,3 +81,29 @@ worker claim (token + lease, path lock, fixed order)
 - `delete_review_thread` keeps returning `mediaToClean`, but the client ignores it. The DELETE triggers queue the paths instead.
 - Processing flag: an `app_config` key `media_cleanup.processing_enabled=false`, read by the worker.
 - One AGENTS.md rule ("saved media is deleted only by the server queue") is required by project conventions and is the only edit to that file.
+
+## Final corrections (from both reviews)
+
+1. **Re-checking "kept" files.** Instead of adding triggers to every table, the worker re-checks *kept* files every day. If nothing that keeps the file still uses it, the file goes back to queued, and from there the normal locked process takes over. This runs only when processing is on.
+2. **Comparing the whole record.** Removed paths are worked out as *all old paths on the record minus all new paths*. For a review that means its media and cover image together; for a timeline update, its media. So a photo that's still the cover is never queued.
+3. **Whole-thread deletion test.** Deleting a whole thread queues every saved photo from the review and its timeline updates exactly once. The browser no longer deletes them.
+4. **While processing is off**, which is how it ships:
+   - Queueing still happens. Re-adding a *queued* file is **allowed**: under the shared lock, the save cancels that file's queue entry.
+   - Only *deleting*, *deleted* or *failed* files are rejected, so normal users are never blocked just because processing is off.
+   - Nothing is ever deleted.
+   - Changes from installing the migration: queue entries start appearing, saves that re-add a deleted or failed file are rejected, and the browser stops deleting files after a thread is deleted.
+5. **Browser cleanup safeguards stay.** Cancel cleanup still runs only while the visit's save state is open, never while saving or unclear. Late uploads keep the 3B rules. Files are deleted only after a confirmed save, and only if they're absent from what was saved.
+   - Added test: a timeout after a successful save, followed by leaving the page, deletes nothing that was saved.
+6. **Locked-down functions.**
+   - Running the claim, finish and re-check functions is revoked from public, anon and authenticated users; only the server role can run them.
+   - Admins read through one read-only function that checks the admin role.
+   - Tests prove signed-in non-admins and guests are refused.
+7. **Realistic test database.** It's loaded with the real current table definitions, existing save and delete functions, triggers and permissions, taken read-only from the live schema. If it can't run, the race tests are reported as **blocked**, never replaced with mocks.
+8. **Verifying the keep/ignore policy before building:**
+   - confirm the cached tables only hold copies of outside images (zero `post_media` paths today);
+   - confirm notification images fall back to a placeholder when missing.
+
+   Anything unconfirmed is treated as "keeps the file".
+9. **AGENTS.md.** This project's own instructions ask for each architecture decision to be recorded in AGENTS.md as one rule. One line is added there; it isn't a prerequisite.
+
+**Still off afterwards:** processing, any schedule, the weekly sweep's delete mode, and the rollout switch. I report test results and blockers, then stop.
