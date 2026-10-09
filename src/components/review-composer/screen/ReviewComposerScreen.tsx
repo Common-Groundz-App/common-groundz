@@ -372,7 +372,8 @@ export function ReviewComposerScreen(props: Props) {
       if (result.status === 'existing_review' && subjectId) runExistingCheck(subjectId);
       if (result.status === 'media_retired') toast(MEDIA_RETIRED_TOAST);
       if (result.status === 'error') {
-        toast({ title: "Couldn't save your review", description: 'Please try again.', variant: 'destructive' });
+        const reason = (error as { code?: string } | null)?.code;
+        toast({ title: "Couldn't save your review", description: reason ? `Please try again. (Reason: ${reason})` : 'Please try again.', variant: 'destructive' });
       }
       return;
     }
