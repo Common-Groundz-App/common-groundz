@@ -1,18 +1,23 @@
-# Media next steps (revised): delete the 8, safe edit-cleanup design, photo-only reviews proposal
+# Media next steps (revision 3): delete the 8, photo-only reviews, corrected cleanup design
 
 ## My take on the reviews
 
-Both are right, and I've folded in every point:
-- **Race condition.** My earlier idea (lock a row, re-check, delete) was not truly safe, because deleting a file can't happen inside the same database step as the check. The fix is a simple rule enforced by the database: **once a file is queued for deletion, nothing can link to it again.** With that rule in place, a final check followed by a delete is safe.
-- **Video test.** No test writes to live content from my side. It becomes a short manual checklist for you, covering both the review and the timeline paths, plus cleaning up the test video afterwards.
-- **Photo-only reviews.** This is proposed with exact behaviour and only built after your OK. Posts and the home page keep Mux unchanged.
-- **3D.** It can be built with the switch off. Turning it on waits for the photo cleanup and the video decision.
-- **Mux for reviews** becomes its own phase after 3D.
+I agree with both reviewers. Where they differed, I chose this:
+- **No live video test.** The code already shows review videos can't be linked back from Mux, because only posts are supported. A test would also create a hosted video that we can't currently delete. So I'll do a read-only check instead: see whether any review video was ever sent to Mux and left unlinked.
+- **Build photo-only reviews now.** It's small, easy to undo, and closes the "broken option" risk before 3D. Posts and the home page are untouched.
+- **Cleanup system: corrected design only, no build.** All of Codex's four gaps and ChatGPT's two are addressed below.
 
-One addition of mine: the old pop-up forms also leave removed photos behind. The same server cleanup will serve them later, at no extra design cost.
+## How edited reviews are saved
 
-## Approving this plan approves deleting exactly these 8 files (bucket `post_media`)
+Timeline edits go through a server function (`edit_latest_review_update`). Root-review edits save straight to the reviews table from the browser, with no server function.
 
+So queueing must not rely on the browser. Instead, a database trigger on both tables queues removed photos in the **same database transaction** as the edit.
+- If the save commits, the queue entry exists, even if the browser timed out.
+- If the save fails, nothing is queued.
+
+## Approving this plan approves
+
+**A. Deleting exactly these 8 files** (bucket `post_media`):
 ```text
 c8508bd3-35a9-4cce-a7c8-0b5fc2bca965/3acac8bc-746f-400a-9ef1-a160c971a21f/0fd6a00c-1a58-4676-9608-6c03362acbeb.png
 c8508bd3-35a9-4cce-a7c8-0b5fc2bca965/3acac8bc-746f-400a-9ef1-a160c971a21f/dc0c15a1-6a33-403d-a24f-f7e00e0c787f.png
@@ -23,48 +28,52 @@ c8508bd3-35a9-4cce-a7c8-0b5fc2bca965/8162b991-72ef-46ba-acd3-4c3c7d80a7ae/af8c8a
 c8508bd3-35a9-4cce-a7c8-0b5fc2bca965/8d661012-2a9c-4f43-810e-f2b8dec9216f/47b425d6-20ae-4878-99af-d278501fe2f1.png
 c8508bd3-35a9-4cce-a7c8-0b5fc2bca965/8d661012-2a9c-4f43-810e-f2b8dec9216f/78a542b6-4b1f-41fe-bb49-174b01a55ae8.png
 ```
+- Re-check every reference right before deleting. Skip any file that's linked or whose check is uncertain.
+- Report what was actually deleted.
+- Confirm the 4 saved photos still open and no content changed.
 
-If you'd rather approve deletion on its own, reject this and I'll split it out.
+**B. Photo-only review and timeline forms** (old pop-up and new pages):
+- new videos are refused when picked and when dragged in, with a short message;
+- the wording changes to "Add photos";
+- existing videos still play and stay attached when editing, including the May 2025 one;
+- posts and home keep Mux exactly as today;
+- tests cover all of this.
 
-## Steps
+**C. Read-only video check:** look for review-session videos sent to Mux but never linked back. Report only.
 
-1. **Delete the 8.**
-   - Re-run the full reference check right before deleting. If any file shows a link, or the check errors, that file is skipped.
-   - Delete only the 8, through the storage service.
-   - Confirm the 8 are gone, the 4 saved photos still open, and no saved content changed. Record it in the audit notes.
-2. **Video checklist for you** (no automated writes):
-   - attach a video on the new review page and on a new timeline update;
-   - save, then watch for up to 10 minutes whether each becomes playable;
-   - check the old May 2025 review video still plays;
-   - delete the test review or update afterwards.
+**D. The corrected cleanup design**, written into the audit notes. Nothing is built.
 
-   I'll then check the database and Mux records read-only and report.
-3. **Revised cleanup design (written only, not built):**
-   - **States:** queued, deleting, deleted, kept, failed.
-   - **Rule:** a database check on every place media can be linked from rejects any save that links a file that is queued or deleting. A stale second tab re-saving a removed photo gets a clear "this photo was removed, please re-add it" message. Fresh uploads always get new file names, so normal use never hits this.
-   - **Queueing:** files are queued only inside the confirmed edit itself, as part of the same database save. Nothing is queued on Cancel, a failed save, or an unclear save. One shared path serves review and timeline edits.
-   - **Worker:** claims a file by moving it to *deleting* (saved first), then runs a final reference check. Still linked → *kept*. Zero → storage delete → *deleted*.
-   - **Uncertain outcomes:** an error or timeout leaves the file in *deleting* and it's retried later. Deleting an already-missing file counts as success. It stays *failed* after N attempts, for admin review.
-   - **Weekly sweep:** widened to every place found in the audit, and stays report-only. A dry run must show the entity-suggestion photo and the 4 saved photos kept.
-4. **Photo-only proposal** (written only, built after your OK):
-   - review and timeline forms reject new videos from both picking and drag-and-drop;
-   - wording changes to photos only;
-   - existing videos still play and stay attached when editing;
-   - posts and home are untouched.
-5. Stop. Report results 1–2 and the designs 3–4.
+## Corrected cleanup design (D)
 
-## Order after this
+1. **Queueing:** a trigger on reviews and review_updates fires after a media change in the same transaction. It queues *old minus new* paths, normalised with one shared path function.
+2. **One lock per file:** queueing, the claim before deletion, and every save that *newly adds* a path all take the same short per-file lock. So a save and a deletion can't interleave.
+3. **Only newly added paths are checked.** A save that keeps a file it already had is never rejected, even if that file is queued for another record. Shared files stay usable, and unrelated edits never fail.
+4. **States:**
+   - queued: can't be newly added; the worker re-checks it later.
+   - deleting: can't be newly added.
+   - deleted: can never be added again.
+   - failed / uncertain: can't be added, and an admin reviews it.
+   - kept: a reference was found, so the file returns to normal use.
+5. **Worker:** under the file lock, it marks the file *deleting* and runs a final reference check across every listed place. Still referenced → *kept*. Otherwise it deletes through the storage service. An already-missing file counts as success. Errors are retried, then marked *failed*.
+6. **Coverage document:** the exact columns and JSON shapes covered:
+   - `posts.media[].url/thumbnail_url`
+   - `reviews.media[]`, `reviews.image_url`
+   - `review_updates.media[]`
+   - `entity_photos.url`
+   - `entities.image_url`, `entities.stored_photo_urls`
+   - `entity_suggestions.suggested_images`
+   - `profiles.avatar_url` / `cover_url`
+   - Mux records
 
-```text
-approve 3 + 4 -> build photo-only + cleanup
-3D built with switch OFF (can run in parallel)
-switch ON only after: photo cleanup safe, video hidden or working, 3D checks pass
-then: Mux for reviews/updates (own phase), then retire the old forms
-```
+   It also covers how full addresses, signed addresses and bare paths are normalised, and the tests for shared files and the entity-suggestion photo.
+7. **Weekly sweep:** widened to the same coverage, and stays report-only.
+
+## Then stop
+
+The rollout switch stays off. 3D can be built with it off. It's turned on only after B is live, D is built and verified, and the 3D checks pass. Mux for reviews becomes its own phase after 3D.
 
 ## Technical details
-- The guard is a `BEFORE INSERT OR UPDATE` trigger on posts, reviews, review_updates, entity_photos, entities and entity_suggestions. It extracts the bucket paths from media/url fields and raises when any matches a `media_deletion_candidates` row in `queued`/`deleting`.
-- Queueing happens in `edit_latest_review_update` and the review edit path: old minus new media, normalised with the same logic as `extractMediaPath`.
-- The worker is a service-role edge function. The claim is an `UPDATE … SET status='deleting' … RETURNING` with `FOR UPDATE SKIP LOCKED`.
-- The video restriction would use an optional `allowVideo={false}` prop on MediaUploader, so the default behaviour is unchanged for posts.
-- roadmap.md gets these tasks once out of plan mode.
+- B: an optional `allowVideo` prop on MediaUploader, default `true`, so posts are unchanged. It filters both the file input and drop handlers, and existing `initialMedia` videos stay.
+- C: `mux_uploads` rows whose upload_id is not in `mux_upload_mappings`, joined against the review composer's session usage.
+- D lock: `pg_advisory_xact_lock(hashtextextended(path, 0))`, taken in the guard trigger for added paths, the queue trigger, and the worker claim RPC.
+- roadmap.md gets A–D once out of plan mode.
