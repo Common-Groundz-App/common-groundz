@@ -52,3 +52,26 @@ DELETE CANDIDATES (0 references anywhere):
 3. Extend the sweep's reference list to every source in section 1 before any deletion is enabled.
 4. Videos: delete the poster and the Mux asset together, only after a zero-reference check. Before building this, register review and update content types in the Mux mappings, or block video on reviews.
 5. Optional: route the old pop-up forms through the same candidate list.
+
+---
+
+# Follow-up (Oct 9, revision-3 plan)
+
+## A. Deleting the 8 — blocked, nothing deleted
+This project's backend gives me read-only access with no admin storage key, so I can't delete through the storage API. SQL deletes on storage tables are ruled out. Next step: the owner deletes the 8 listed paths in the Supabase dashboard (Storage → post_media), then I re-check read-only that the 8 are gone and the 4 kept photos are still there.
+
+## B. Photo-only review/timeline forms — built
+- `MediaUploader` has an optional `allowVideo` prop, default true, so posts and home are unchanged.
+  - When it's false, videos are filtered out of both picking and drag-and-drop **before** any photo slot is reserved or upload starts, and a "Photos only" toast shows.
+  - The file picker only offers image types, and the wording reads "Add photos".
+- `CompactMediaGrid` has an optional `canRemove`. The review forms hide Remove on videos, so an existing video can't be removed or replaced in Edit, but it still plays, counts toward the 4, and is saved unchanged.
+- This applies to four places: the new review page, the new timeline page, the old review pop-up (step 3) and the old inline timeline form.
+- Tests are in `__tests__/photoOnlyReviews.test.tsx`: drop refused, no slot or upload, mixed drop keeps photos, picker has images only, post default unchanged, no Remove on videos. The related suites pass, with 368 passed.
+
+## C. Mux videos never linked back (read-only)
+- Test uploads: 13 (12 ready, 1 waiting), May 20–28. Origin unknown.
+- Non-test uploads: 3, all ready with a hosted asset, from the same user on Jun 1, Oct 5 and Oct 6 2026. Their playback IDs appear in **no** post, review or timeline update. Origin is **unknown**. The Oct 5–6 dates line up with 3B testing, but that isn't proven.
+- These hosted videos can't be deleted by anything in the app today. They're candidates for the later "Mux for reviews" phase. Nothing was done to them.
+
+## D. Cleanup design
+This is the corrected design from the approved plan: states, a per-file transaction lock, checks only on newly added paths, a two-step worker where the database step commits *deleting* before the storage call, coverage of the columns listed in section 1, and a report-only sweep. **Not built.**

@@ -178,6 +178,7 @@ const StepThree = ({
             </span>
           </Label>
           <CompactMediaGrid
+                canRemove={(m) => m.type !== 'video'}
             media={selectedMedia}
             onRemove={(media) => onMediaRemove(media.url)}
             maxVisible={MAX_MEDIA_COUNT}
@@ -190,9 +191,10 @@ const StepThree = ({
       <div className="space-y-2">
         <Label className="flex items-center gap-2 font-medium mb-1">
           <span className="text-lg">📸</span>
-          <span>Add photos & videos</span>
+          <span>Add photos</span>
         </Label>
         <MediaUploader
+                allowVideo={false}
           sessionId={uuidv4()}
           onMediaUploaded={onMediaAdd}
           initialMedia={selectedMedia}
@@ -201,8 +203,8 @@ const StepThree = ({
         />
         <p className="text-xs text-muted-foreground mt-1">
           {selectedMedia.length > 0
-            ? `${selectedMedia.length}/${MAX_MEDIA_COUNT} media items added - Add photos or videos to make your review stand out`
-            : 'Add photos or videos to make your review stand out'}
+            ? `${selectedMedia.length}/${MAX_MEDIA_COUNT} media items added - Add photos to make your review stand out`
+            : 'Add photos to make your review stand out'}
         </p>
       </div>
     </div>
