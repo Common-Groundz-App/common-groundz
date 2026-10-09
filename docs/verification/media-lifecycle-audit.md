@@ -75,3 +75,10 @@ This project's backend gives me read-only access with no admin storage key, so I
 
 ## D. Cleanup design
 This is the corrected design from the approved plan: states, a per-file transaction lock, checks only on newly added paths, a two-step worker where the database step commits *deleting* before the storage call, coverage of the columns listed in section 1, and a report-only sweep. **Not built.**
+
+## A. Verified complete (Oct 9, 11:05 UTC — deletion by owner via dashboard)
+- All 8 listed objects are absent from `storage.objects`, and their public URLs return 400.
+- The 4 kept photos are present and their public URLs return 200 image/png.
+- Timeline updates 1414f4f9… and 9884785f… (review 8fa6b2a4…) still list exactly those 4 URLs, 2 each. Their `updated_at` is unchanged from Oct 8, and no database content changed.
+- The dashboard left an `.emptyFolderPlaceholder` in session folder 8162b991…. It's harmless and unreferenced.
+- Not verified in a signed-in browser (external auth). The data and URLs show the photos will display.
