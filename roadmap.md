@@ -407,6 +407,6 @@ cross-read between them.
 - [x] Delete the 8 orphan files — done by owner, verified (8 gone, 4 kept photos open, no data changed)
 - [x] Review/timeline forms photo-only (existing videos kept, not removable)
 - [x] Read-only Mux check: 3 non-test hosted videos linked nowhere (origin unknown)
-- [ ] D2 build server cleanup (design written) — waiting on your approval
+- [x] D2 server cleanup of removed review/timeline photos — built and verified end-to-end (processing OFF, unscheduled)
 - [ ] Later: Mux for reviews/updates (own phase, after 3D)
 - [ ] 3D — cutover of entry points (plan approved for reference; not started)
