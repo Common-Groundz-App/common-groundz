@@ -375,14 +375,9 @@ export function TimelineComposerScreen(props: Props) {
               isInteractive={true}
             />
             {!!state.values.rating && (
-              <>
-                <span className="font-medium" style={{ color: getSentimentColor(state.values.rating) }}>
-                  {state.values.rating.toFixed(1)}
-                </span>
-                <Button type="button" variant="ghost" size="sm" onClick={() => dispatch({ type: 'SET_VALUE', sessionKey, id: 'rating', value: null })}>
-                  Clear
-                </Button>
-              </>
+              <span className="font-medium" style={{ color: getSentimentColor(state.values.rating) }}>
+                {state.values.rating.toFixed(1)}
+              </span>
             )}
           </div>
           {err('rating') && <FieldError message={err('rating')!} />}

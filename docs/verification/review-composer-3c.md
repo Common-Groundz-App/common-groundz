@@ -11,7 +11,7 @@ In-timeline form (`ReviewTimelineViewer.tsx`) and popup unchanged.
 ## Parity (in-timeline form vs page)
 | Item | In-timeline form | Page | Status |
 |---|---|---|---|
-| Rating optional | yes | yes, plus Clear | Same (+clear) |
+| Rating optional | yes | yes (no extra Clear button, removed in 3C.1) | Same |
 | Would you still recommend it? / tap to clear / Base on rating | yes | same controls | Same |
 | Comment required, trimmed | yes | yes, Save disabled when empty | Same |
 | Photos up to 4 | yes | 3B uploader (slots, too-many warning, late uploads) | Same+ |
@@ -50,3 +50,13 @@ Database (review 8fa6b2a4…, Isha Foundation Chikkaballapura):
 Scope: no app button links to the new routes; `ReviewTimelineViewer.tsx` and `ReviewForm.tsx` unchanged in 3C. **The rollout switch `reviews.composer_page_enabled` is currently ON in the database** (set from the admin panel), so any signed-in user who types a `/review…` address can use the page. Buttons still open the legacy flow.
 Tracking: the in-timeline form records no events, so the page records none.
 Tests: 1026 passed, 3 skipped; type check clean; browser check 32/32.
+
+## 3C.1 close-out (2026-10-09)
+- Rating "Clear" button removed — rating now matches the in-timeline form exactly.
+- Rollout switch confirmed OFF in the database.
+- Browser (`scripts/e2e/review-timeline-3c.py`, fake sign-in, writes intercepted; slow saves simulated by holding the fake answer past the 20 s limit), 390 and 1280: **56/56 required checks passed**, including:
+  - Add timeout: newest entry shown as "is it yours?", never called saved; "could add a second update" warning; Save locked until "Try again"; leaving warns "couldn't confirm".
+  - Edit timeout: that same update re-read; match → "Your edit looks saved" + "Yes, it saved"; mismatch → "couldn't confirm your edit"; edit-only warning, no "second update" wording.
+  - Back → Keep → Back again stays protected on both pages.
+- **Rapid double-Back: ESCAPES on both timeline pages at both widths** (two Back presses fired back-to-back in the same instant leave the page to the previous screen; the draft is not kept). Single Back, repeated Back with Keep, Cancel and in-page links stay protected. Decision needed: accept as a documented browser-router limit, or ask for a fix.
+- Full suite, type check and build rerun.

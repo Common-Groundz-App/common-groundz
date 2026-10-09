@@ -41,7 +41,7 @@ REVIEW = {"id": REVIEW_ID, "user_id": UID, "entity_id": PLACE_ID, "category": "p
           "subtitle": "", "description": "first", "rating": 4, "media": [], "image_url": None, "visibility": "public",
           "experience_date": None, "metadata": {}, "status": "published", "created_at": iso(600),
           "has_timeline": True, "timeline_count": 1}
-S = {"update": None, "latest": None, "updates_error": False, "rpc": {"status": "ok"}}
+S = {"update": None, "latest": None, "updates_error": False, "rpc": {"status": "ok"}, "hang": False}
 def upd(**o):
     d = {"id": UPDATE_ID, "review_id": REVIEW_ID, "user_id": UID, "rating": 3, "comment": "earlier note",
          "media": [], "would_recommend": "auto", "created_at": iso(10), "updated_at": iso(10)}
@@ -60,10 +60,12 @@ async def route(r):
         if name == "has_role": return await r.fulfill(json=True)
         if name == "edit_latest_review_update":
             blocked_writes.append(f"RPC {name} (answered by the test, never sent)")
+            if S["hang"]: await asyncio.sleep(23)
             return await r.fulfill(json=S["rpc"])
         return await r.fulfill(json={} if name == "get_public_flags" else None)
     if req.method not in ("GET", "HEAD", "OPTIONS"):
         blocked_writes.append(f"{req.method} {url.split('?')[0]}")
+        if S["hang"]: await asyncio.sleep(23)
         return await r.fulfill(status=403, body='{"message":"blocked by e2e"}', content_type="application/json")
     if "/rest/v1/review_updates" in url:
         if S["updates_error"]: return await r.fulfill(status=500, json={"message": "down"})
@@ -167,6 +169,56 @@ async def main():
             check(f"open: network failure → Retry {t}", "Retry" in body and "not found" not in body.lower())
             S.update(updates_error=False)
 
+            # 3C.1 — "couldn't confirm" panel: Add
+            S.update(update=None, latest=None, hang=True)
+            await go(page, NEW)
+            await page.fill("#timeline-comment", "slow add")
+            S["latest"] = upd(comment="slow add")
+            await page.get_by_role("button", name="Add update").click(); await page.wait_for_timeout(22500)
+            body = await page.inner_text("body")
+            await page.screenshot(path=str(OUT / f"ambiguous-add{width}.png"))
+            check(f"add timeout: evidence shown, not called saved {t}", "is it yours?" in body and "slow add" in body and "Your edit looks saved" not in body)
+            check(f"add timeout: retry warns about a second update {t}", "could add a second update" in body and "may already have been saved" not in body)
+            check(f"add timeout: Save stays locked {t}", await page.get_by_role("button", name="Add update").is_disabled())
+            await page.get_by_role("button", name="Try again").click(); await page.wait_for_timeout(300)
+            check(f"add timeout: Try again unlocks Save once chosen {t}", await page.get_by_role("button", name="Add update").is_enabled())
+            await page.go_back(); await page.wait_for_timeout(600)
+            check(f"add timeout: leaving warns 'couldn't confirm' {t}", "couldn't confirm" in (await dialog_text(page)).lower())
+
+            # 3C.1 — "couldn't confirm" panel: Edit (same update re-read by id)
+            S.update(update=upd(), latest=upd(), rpc={"status": "ok"})
+            await go(page, EDIT)
+            await page.fill("#timeline-comment", "slow edit")
+            S["update"] = upd(comment="slow edit")
+            await page.get_by_role("button", name="Save update").click(); await page.wait_for_timeout(22500)
+            body = await page.inner_text("body")
+            await page.screenshot(path=str(OUT / f"ambiguous-edit{width}.png"))
+            check(f"edit timeout: re-read matches → asks to confirm {t}", "Your edit looks saved" in body and "Yes, it saved" in body)
+            check(f"edit timeout: edit-specific warning only {t}", "may already have been saved" in body and "second update" not in body)
+            S["update"] = upd(comment="something else")
+            await page.get_by_role("button", name="Check again").click(); await page.wait_for_timeout(1500)
+            body = await page.inner_text("body")
+            check(f"edit timeout: mismatch stays unconfirmed {t}", "couldn't confirm your edit" in body.lower() and "Yes, it saved" in body)
+            S.update(hang=False)
+
+            # 3C.1 — Back protection on both timeline pages
+            for label, path in (("add", NEW), ("edit", EDIT)):
+                S.update(update=upd(), latest=upd())
+                await go(page, "/home"); await go(page, path)
+                await page.fill("#timeline-comment", "draft " + label)
+                await page.go_back(); await page.wait_for_timeout(600)
+                ok1 = "Discard your draft?" in await dialog_text(page)
+                await page.get_by_role("button", name="Keep editing").click(); await page.wait_for_timeout(300)
+                await page.go_back(); await page.wait_for_timeout(600)
+                ok2 = "Discard your draft?" in await dialog_text(page) and await page.locator("#timeline-comment").count() == 1
+                await page.get_by_role("button", name="Keep editing").click(); await page.wait_for_timeout(300)
+                check(f"{label}: Back → Keep → Back again stays protected {t}", ok1 and ok2)
+                await page.evaluate("history.back(); history.back();"); await page.wait_for_timeout(1500)
+                await page.screenshot(path=str(OUT / f"rapid-{label}{width}.png"))
+                kept = await page.locator("#timeline-comment").count() == 1
+                check(f"{label}: rapid double Back stays on the form {t}", kept, page.url, required=False)
+                if await page.get_by_role("button", name="Keep editing").count(): await page.get_by_role("button", name="Keep editing").click()
+
             check(f"no page errors {t}", not errs, "; ".join(errs[:2]))
             await ctx.close()
         await b.close()
@@ -174,6 +226,7 @@ async def main():
     for w in blocked_writes[:12]: print("  ", w)
     failed = [r for r in results if r[3] and not r[1]]
     print(f"\nRequired: {len(results) - len(failed)} passed, {len(failed)} failed")
+    for r in [r for r in results if not r[3]]: print("Rapid double-Back:", "protected" if r[1] else "ESCAPES", r[0])
     sys.exit(1 if failed else 0)
 
 asyncio.run(main())
