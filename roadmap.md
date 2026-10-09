@@ -404,7 +404,7 @@ cross-read between them.
 - [x] 3C.1 close-out built and tested (Clear removed, timeout panel + Back tests); awaiting your approval of the report
   - [ ] Your decision: rapid double-Back escapes on the timeline pages — accept or fix
 - [x] Media lifecycle audit + deletion report (docs/verification/media-lifecycle-audit.md)
-- [ ] Delete the 8 orphan files — approved; blocked: needs dashboard deletion by owner (no admin storage key), then read-only verify
+- [x] Delete the 8 orphan files — done by owner, verified (8 gone, 4 kept photos open, no data changed)
 - [x] Review/timeline forms photo-only (existing videos kept, not removable)
 - [x] Read-only Mux check: 3 non-test hosted videos linked nowhere (origin unknown)
 - [ ] D2 build server cleanup (design written) — waiting on your approval
