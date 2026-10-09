@@ -1,11 +1,14 @@
-# Status of the 4 photos from the deleted Afnan review (read-only check, no changes)
+# New Afnan review: photo check (read-only, nothing changed)
 
-## What was found
-- The review is gone, so the delete worked.
-- All 4 photos are still in storage. They are not orphaned and have not been deleted.
-- Deleting the review put all 4 on the server's cleanup list ("queued"). This is what should happen: the cleanup worker is still switched OFF, so they stay where they are until it is turned on.
+## Result: everything worked as intended
 
-## Next step (needs separate approval, not part of this plan)
-- Leave them queued until processing is enabled. Or, when you're ready, turn processing on for one controlled run, then confirm the 4 files are gone and other saved photos are still there.
+**Choosing 6 photos:** only 4 were uploaded. The 2 extra photos were turned away before they left your device, so nothing needs deleting. The review's folder has exactly 4 files.
 
-Nothing gets changed by approving this plan.
+**Editing and removing 2:** the edit saved. The review now has 2 photos ("supabase error" and "incognito"). The 2 you removed are still in storage, and both are on the server's cleanup list (queued). They aren't orphans. They'll be deleted once cleanup is switched on.
+
+**Earlier, deleted review:** its 4 photos are also queued, not orphaned.
+
+So 6 photos are waiting for cleanup, and every one of them is tracked.
+
+## Next step (separate approval)
+Switch cleanup on for one controlled run. Then confirm that the 6 queued files are gone and that the 2 photos on the current review still load. Cleanup is turned off again afterwards unless you decide otherwise.
