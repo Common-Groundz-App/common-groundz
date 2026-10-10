@@ -1,3 +1,9 @@
+/**
+ * NOTE: the legacy inline timeline add/edit form in this file is FROZEN —
+ * rollback only, do not extend. While the `reviews.composer_page_enabled`
+ * switch is ON (the normal state since 3D) the viewer is read-only and
+ * Add/Edit open the new page composer. Removal of the inline form is 3E.
+ */
 import React, { useState, useEffect } from 'react';
 import { useReviewComposerNavigate } from '@/hooks/useReviewComposerNavigate';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';

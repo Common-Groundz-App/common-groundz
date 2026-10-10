@@ -1,4 +1,4 @@
-# Step 3D — entry-point cutover (built with the switch OFF)
+# Step 3D — entry-point cutover — COMPLETE (verified signed-in, switch ON)
 
 Plan: `.lovable/plan/step-3d-send-every-review-button-to-the-new-review-page-2026-10-10.md`
 
@@ -45,3 +45,15 @@ Admin bypass removed (`resolvePageGate`). A route session latches only after the
 6. `/entity/<slug>?compose=update` → your timeline page; on someone else's entity → entity page.
 7. With a draft open, switch OFF in another tab, then reload the app config → draft stays, Save/Cancel work.
 8. Switch OFF: every button opens the popup again; `/review` shows "Not available yet".
+
+## Signed-in results (owner, 2026-10-10) — ALL PASSED
+- Home Create → Review: new review for "Spider-Man: Brand New Day" with 4 photos + text published from the page.
+- Entity page Write Review: "Madagascar Centella Quick Calming Pad" review published from the page.
+- Edit review: text-only edit saved; second edit removing 2 photos saved, and the 2 removed photos appeared in the admin media-cleanup queue (D2).
+- Add timeline update: 2 rings + 1 photo + text posted from the timeline page; edit to 1 ring, photo removed, text changed — saved.
+- Timeline viewer is read-only; its buttons open the page; Undo/Delete work inline.
+- `/entity/spider-man-brand-new-day?compose=update` (owner) → `/review/e82e6db7-1a00-4953-be7f-bcf10f8fef65/timeline/new`; `/entity/vedhara-cafe?compose=update` (no own review) → normal entity page.
+- Mid-draft switch OFF: unsaved draft survived, Save worked; a brand-new review action opened the old popup. Switch turned back ON.
+
+## Close-out decision (2026-10-10)
+3D is complete. The switch stays ON. The legacy popup (`ReviewForm`) and the legacy inline timeline form in `ReviewTimelineViewer` are FROZEN — dormant rollback path only, no new features or fixes there. 3E (removing the popup, the switch and `?compose=update` compatibility) is deferred until the next round of new-review-page changes is stable.
