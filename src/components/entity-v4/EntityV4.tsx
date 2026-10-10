@@ -14,6 +14,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
 import { useEntityTimelineSummary } from '@/hooks/use-entity-timeline-summary';
+import { useReviewComposerNavigate } from '@/hooks/useReviewComposerNavigate';
+import { resolveComposerTarget } from '@/services/review/composerRoutes';
 import { useToast } from '@/hooks/use-toast';
 import { EntityFollowerModal } from '@/components/entity/EntityFollowerModal';
 import { EntityRecommendationModal } from '@/components/entity/EntityRecommendationModal';
@@ -239,19 +241,24 @@ const EntityV4 = () => {
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isRecommendationModalOpen, setIsRecommendationModalOpen] = useState(false);
 
+  // Step 3D — every review entry point goes through the one routing decision.
+  const composer = useReviewComposerNavigate();
+
   // Phase 3.5b — auto-open ReviewForm when arriving via ?compose=review deep link.
   const [searchParams, setSearchParams] = useSearchParams();
   const composeHandledRef = useRef(false);
   useEffect(() => {
     if (composeHandledRef.current) return;
     if (searchParams.get('compose') !== 'review') return;
-    if (!user || !entity) return;
+    if (!user || !entity || !composer.isResolved) return;
     composeHandledRef.current = true;
-    setIsReviewFormOpen(true);
     const next = new URLSearchParams(searchParams);
     next.delete('compose');
     setSearchParams(next, { replace: true });
-  }, [searchParams, user, entity, setSearchParams]);
+    const target = resolveComposerTarget({ kind: 'write', entityId: entity.id }, composer.implementation, location.pathname);
+    if (target === 'legacy') setIsReviewFormOpen(true);
+    else navigate(target.to, { state: target.state });
+  }, [searchParams, user, entity, setSearchParams, composer.isResolved, composer.implementation, navigate, location.pathname]);
   
   
   // Review Lifecycle Step 1 — the viewer's own review at ANY visibility, from
@@ -301,18 +308,36 @@ const EntityV4 = () => {
   }, [location, entity, user, ownReviewLookup, ownReviewEntityId, userReview, navigate]);
 
   // Arriving from the review form's "Add an update" (?compose=update).
+  // Step 3D compatibility (remove in 3E): switch on → owner goes to the
+  // timeline page, anyone else stays on the entity page; switch off → unchanged.
   const composeUpdateHandledRef = useRef(false);
   useEffect(() => {
     if (composeUpdateHandledRef.current) return;
     if (searchParams.get('compose') !== 'update') return;
+    if (!composer.isResolved) return;
+    const stripParam = () => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('compose');
+      setSearchParams(next, { replace: true });
+    };
+    if (composer.implementation === 'page') {
+      if (!entity) return;
+      if (user && (!ownReviewLookup || ownReviewEntityId !== entity.id)) return; // own-review lookup pending
+      composeUpdateHandledRef.current = true;
+      if (user && userReview && userReview.user_id === user.id && userReview.entity_id === entity.id) {
+        const target = resolveComposerTarget({ kind: 'addUpdate', reviewId: userReview.id }, 'page', location.pathname);
+        if (target !== 'legacy') navigate(target.to, { replace: true, state: target.state });
+        return;
+      }
+      stripParam();
+      return;
+    }
     if (!userReview) return;
     composeUpdateHandledRef.current = true;
     setTimelineReviewId(userReview.id);
     setIsTimelineViewerOpen(true);
-    const next = new URLSearchParams(searchParams);
-    next.delete('compose');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, userReview, setSearchParams]);
+    stripParam();
+  }, [searchParams, userReview, setSearchParams, composer.isResolved, composer.implementation, entity, user, ownReviewLookup, ownReviewEntityId, navigate, location.pathname]);
 
   const getSidebarButtonConfig = () => {
     if (!userReview) {
@@ -344,14 +369,16 @@ const EntityV4 = () => {
   const handleAddReview = () => {
     if (!requireAuth({ action: 'review', entityName: entity?.name, entityId: entity?.id, surface: 'entity_v4' })) return;
     
-    setIsReviewFormOpen(true);
+    composer.open({ kind: 'write', entityId: entity?.id ?? null }, () => setIsReviewFormOpen(true));
   };
 
   const handleStartTimeline = (reviewId: string) => {
     if (!requireAuth({ action: 'timeline', entityName: entity?.name, entityId: entity?.id, surface: 'entity_v4' })) return;
     
-    setTimelineReviewId(reviewId);
-    setIsTimelineViewerOpen(true);
+    composer.open({ kind: 'addUpdate', reviewId }, () => {
+      setTimelineReviewId(reviewId);
+      setIsTimelineViewerOpen(true);
+    });
   };
 
   const handleReviewSubmit = async () => {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useReviewComposerNavigate } from '@/hooks/useReviewComposerNavigate';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -103,6 +104,9 @@ export const ReviewTimelineViewer = ({
   const MAX_MEDIA_COUNT = 4;
 
   const isOwner = user?.id === reviewOwnerId;
+  // Step 3D — with the switch on, Add/Edit open the page (viewer is read-only);
+  // switch off keeps the inline form exactly as before.
+  const composer = useReviewComposerNavigate();
 
   useEffect(() => {
     if (isOpen) {
@@ -637,7 +641,7 @@ export const ReviewTimelineViewer = ({
                                 <TooltipProvider delayDuration={150}>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <DropdownMenuItem onClick={() => startEditUpdate(update)} className="flex items-center gap-2">
+                                      <DropdownMenuItem disabled={composer.isPending} onClick={() => composer.open({ kind: 'editUpdate', reviewId, updateId: update.id }, () => startEditUpdate(update))} className="flex items-center gap-2">
                                         <Pencil className="h-4 w-4" /> Edit
                                       </DropdownMenuItem>
                                     </TooltipTrigger>
@@ -736,7 +740,8 @@ export const ReviewTimelineViewer = ({
                 <div className="border-t pt-4 mt-6">
                   {!isAddingUpdate ? (
                     <Button
-                      onClick={() => setIsAddingUpdate(true)}
+                      disabled={composer.isPending}
+                      onClick={() => composer.open({ kind: 'addUpdate', reviewId }, () => setIsAddingUpdate(true))}
                       className="w-full gap-2"
                       variant="outline"
                     >
