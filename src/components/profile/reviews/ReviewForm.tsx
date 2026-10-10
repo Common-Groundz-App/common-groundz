@@ -3,7 +3,7 @@
  * This is the legacy popup review composer. It is unreachable while the
  * `reviews.composer_page_enabled` switch is ON (the normal state since 3D).
  * No new features or product changes here; all review/timeline work targets
- * the new page composer (src/components/review-composer). Removal is 3E.
+ * the new full-page review composer. Removal is 3E.
  */
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
