@@ -1,4 +1,4 @@
-# Step 3D — entry-point cutover (built with the switch OFF)
+# Step 3D — entry-point cutover — COMPLETE (verified signed-in, switch ON)
 
 Plan: `.lovable/plan/step-3d-send-every-review-button-to-the-new-review-page-2026-10-10.md`
 
