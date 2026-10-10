@@ -1,38 +1,63 @@
 # Step 3D — send every review button to the new review page
 
-This follows the 3D plan you approved earlier for reference. The plan stays the same. One change: the old popup is going away soon and there are no users yet, so the "switch off" path only needs to keep today's behaviour. It does not need new checks of its own.
-
-The rollout switch stays OFF while this is built. You turn it on after you've tested it signed in.
+This follows the 3D plan you approved earlier for reference, with the reviewers' corrections added. The rollout switch stays OFF while this is built. You turn it on after your signed-in test.
 
 ## What changes for you (once the switch is on)
-- **Write a review, edit a review, add an update, edit an update:** every button opens the full review page instead of the popup. That covers the home "+" button, the entity page (write / already reviewed / the "add update" link), review cards, the owner "..." menu, the profile reviews tab and the timeline.
+- **Write a review, edit a review, add an update, edit an update:** every button opens the full review page instead of the popup. That covers the home "+" button, the entity page (write / already reviewed), review cards, the owner "..." menu, the profile reviews tab, the timeline, and the popup's own "add update" hand-off.
 - **Timeline:** becomes read-only. "Add update" and "Edit" open the page. Undo and delete stay where they are.
-- **After Save:** you land on the entity page. After an update, the timeline reopens once.
-- **After Cancel:** you go back to where you came from. If that's unknown, you go to the entity page or Home.
 - **Switch off:** everything works exactly as it does today, with the popup.
-- Delete, visibility and admin moderation don't change.
+- Delete, visibility, admin moderation, the one-hour edit rule and the "only the newest update can be edited" rule don't change.
+
+## Where you land after Save or Cancel (same as the earlier approved table)
+| Action | Save | Cancel |
+|---|---|---|
+| Write review | entity page of the saved review | where you came from (if the app knows it), else Home |
+| Edit review | entity page | where you came from, else entity page |
+| Add / edit update | entity page, timeline reopens once | entity page, timeline reopens once |
+
+"Where you came from" means only a page the app itself passed along, never a guess from browser history.
+
+## Page addresses
+- The review page addresses keep using permanent database IDs: `/review`, `/review?entityId=<entity ID>`, `/review/<review ID>/edit`, `/review/<review ID>/timeline/new`, `/review/<review ID>/timeline/<update ID>/edit`.
+- The entity's web-address name (slug) is used only to build the entity page you return to. It is never used to find the review or update.
+
+## Old "add update" links (`?compose=update`)
+- Switch on, and you own the review: you go to `/review/<review ID>/timeline/new`.
+- Switch on, and you aren't the owner or the link is invalid: you see the normal entity page.
+- Switch off: works exactly as it does today.
+- This compatibility goes away in 3E together with the popup.
 
 ## How it works
-1. **One routing decision.** A single helper takes the action and the switch state and returns either "go to this page" or "use the popup". While the switch is still loading, the first tap waits and later taps are ignored. If loading fails, the popup is used. One tap never does both.
-2. **Every button uses that helper:** SmartComposerButton, EntityV4, ReviewsSection, ReviewCard, ReviewOwnerMenu, ProfileReviews, ReviewTimelineViewer and openExistingReviewTimelineUpdate. A final search confirms no other button opens the popup.
-3. **Page gate.** The temporary "admins can always open it" rule is removed, so the page follows the switch only. A page that is already open stays usable if the switch turns off mid-session: your draft, Save and Cancel keep working.
-4. **"Add update" link on the entity page.** The review owner goes to the add-update page. Anyone else goes to the entity page.
+1. **One routing decision.** A single helper takes the action and the switch state and returns either "go to this page" or "use the popup".
+2. **Taps while the switch is loading.** The first tap waits, and the button shows as busy. Later taps are ignored. That waiting tap is cancelled if you leave that screen or the review it was for changes. If loading fails, the popup is used once. One tap never does both.
+3. **Every button uses that helper:** SmartComposerButton, EntityV4 (including `?compose=update`), ReviewsSection, ReviewCard, ReviewOwnerMenu, ProfileReviews, ReviewTimelineViewer and openExistingReviewTimelineUpdate. A final search confirms nothing else opens the popup. The full list goes into the verification notes.
+4. **Page gate.** The temporary "admins can always open it" rule is removed, so the page follows the switch only.
+5. **Turning the switch off mid-session doesn't lose work.** An open review page stays usable: your draft, Save, Cancel and "couldn't confirm" all keep working. The page only stays open this way once it has confirmed the switch is on. A page that is still loading, or failed to load, never stays open this way. Opening a new page checks the switch again. An open popup or timeline form also keeps its draft if the switch changes. New taps follow the new setting right away.
 
 ## Checks
-- Tests: the routing helper for every action with the switch on, off, loading and failed; each button goes to the page when the switch is on; the timeline is read-only when it's on; the admin-only rule is gone; an open page survives the switch turning off; no double action while loading.
-- Browser at phone and desktop width, with a faked sign-in and saving blocked: every button with the switch on, plus a quick spot check with it off.
+- **Tests:**
+  - the routing helper for every action with the switch on, off, loading and failed;
+  - every button goes to the page when the switch is on, and does exactly today's popup action when it's off;
+  - one tap gives one action, and a waiting tap is cancelled when you leave the screen;
+  - the `?compose=update` link for owner, non-owner and invalid review, with the switch on and off;
+  - the timeline is read-only when the switch is on and unchanged when it's off;
+  - the admin-only rule is gone;
+  - an open page survives the switch turning off, and a new page checks the switch again.
+- **Browser checks** at phone and desktop width, with a faked sign-in and saving blocked: every button with the switch on and with it off, the Save/Cancel table above, and Back/Forward.
 - Full test suite, type check and build.
-- Then your signed-in checklist: turn the switch on, try every button, turn it off and confirm the popup is back. 3D counts as done only after your check.
+- **The earlier edit failure is already fixed and confirmed.** Your signed-in edit (removing 2 photos) saved during the cleanup test. Your checklist re-checks a text-only edit and a photo-removal edit on the page.
+- **Your signed-in checklist:** turn the switch on and try every button, including the Save/Cancel destinations and an old "add update" link. Then turn it off and confirm the popup is back. 3D counts as done only after your check.
 
 ## Not included
-- Turning the switch on (you do that after testing).
-- Deleting the popup and the switch (that's 3E).
+- Turning the switch on.
+- Deleting the popup, the switch or `?compose=update` (that's 3E).
 - Video for reviews.
 - Any change to the database or the photo cleanup.
 
 ## Technical details
-- New `src/services/review/composerRoutes.ts`: a pure function `resolveComposerTarget(action, implementation)` for write/editReview/addUpdate/editUpdate. It returns `{ to, state }` or `'legacy'`. A thin hook `useReviewComposerNavigate` sits on top of the existing `useReviewComposerImplementation` and is the only reader of the switch.
-- Page addresses come from the persisted entity and parent slugs, plus the one-time state marker for the timeline reopen. The 3B/3C origin rules are reused.
-- `ReviewComposerPage.tsx`: drop the admin branch of `canUseReviewComposerPage`, and remember the switch state only after it has been confirmed on.
-- `ReviewTimelineViewer.tsx`: only the switch-on path changes.
-- The list of buttons is recorded in `docs/verification/review-composer-3d.md`. Roadmap updated.
+- New `src/services/review/composerRoutes.ts`: a pure function `resolveComposerTarget(action, implementation)` that returns `{ to, state }` or `'legacy'`, with ID-based paths only.
+- A hook `useReviewComposerNavigate` is the only reader of `useReviewComposerImplementation`. It keeps a pending-action ref tied to the target IDs, which is cleared on unmount or when the target changes.
+- Return destinations use the existing persisted-slug builder and the one-time timeline-reopen state.
+- `ReviewComposerPage.tsx`: drop the admin branch of `canUseReviewComposerPage`. Remember the switch state per session only after it is confirmed on.
+- `ReviewTimelineViewer.tsx`: only the switch-on path changes. The legacy inline form keeps its mounted state.
+- The list of buttons is recorded in `docs/verification/review-composer-3d.md`. Roadmap updated. No AGENTS.md changes.
