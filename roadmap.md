@@ -409,4 +409,4 @@ cross-read between them.
 - [x] Read-only Mux check: 3 non-test hosted videos linked nowhere (origin unknown)
 - [x] D2 server cleanup of removed review/timeline photos — built and verified end-to-end (processing OFF, unscheduled)
 - [ ] Later: Mux for reviews/updates (own phase, after 3D)
-- [ ] 3D — cutover of entry points (plan approved for reference; not started)
+- [ ] 3D — cutover of entry points: built with switch OFF, tests + browser checks pass (docs/verification/review-composer-3d.md); waiting on your signed-in ON/OFF check
