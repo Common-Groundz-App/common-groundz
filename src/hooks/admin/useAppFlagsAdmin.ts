@@ -24,6 +24,7 @@ const ALLOWED_KEYS = [
   'entity_extraction.search_brand_logo_lookup_enabled',
   'notifications.realtime_enabled',
   'reviews.composer_page_enabled',
+  'media_cleanup.processing_enabled',
 ] as const;
 
 type AllowedKey = (typeof ALLOWED_KEYS)[number];

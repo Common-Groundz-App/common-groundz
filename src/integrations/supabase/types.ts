@@ -1832,6 +1832,36 @@ export type Database = {
         }
         Relationships: []
       }
+      media_deletion_runs: {
+        Row: {
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          ok: boolean
+          report: Json | null
+          started_at: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          ok?: boolean
+          report?: Json | null
+          started_at?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          ok?: boolean
+          report?: Json | null
+          started_at?: string
+        }
+        Relationships: []
+      }
       media_views: {
         Row: {
           anon_session_id: string | null
@@ -3936,6 +3966,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      admin_media_deletion_status: { Args: never; Returns: Json }
       admin_moderate_entity: {
         Args: {
           _action: string

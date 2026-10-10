@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { AdminMediaDeletionQueueCard } from './AdminMediaDeletionQueueCard';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -399,6 +400,7 @@ export const AdminMediaCleanupPanel: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <AdminMediaDeletionQueueCard />
       {/* Status header */}
       <Card>
         <CardHeader>
