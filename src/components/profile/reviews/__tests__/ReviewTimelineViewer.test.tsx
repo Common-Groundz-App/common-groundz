@@ -5,6 +5,9 @@ import { MemoryRouter } from 'react-router-dom';
 
 import { ReviewTimelineViewer } from '../ReviewTimelineViewer';
 
+vi.mock('@/hooks/useReviewComposerNavigate', () => ({
+  useReviewComposerNavigate: () => ({ open: (_a: unknown, legacy: () => void) => legacy(), isPending: false, isResolved: true, implementation: 'legacy' }),
+}));
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'owner-1' } }),
 }));

@@ -11,7 +11,7 @@ import {
 } from '@/hooks/useReviewComposerImplementation';
 import { openExistingReviewTimelineUpdate, isRetryableOpenResult } from '../screen/openExistingReviewTimelineUpdate';
 import { isUuid } from '../screen/loaders';
-import { canUseReviewComposerPage, safeOrigin } from '@/pages/ReviewComposerPage';
+import { resolvePageGate, safeOrigin } from '@/pages/ReviewComposerPage';
 
 describe('rollout switch (F6)', () => {
   it('release default is legacy', () => expect(REVIEW_COMPOSER_RELEASE_DEFAULT).toBe('legacy'));
@@ -36,11 +36,13 @@ describe('rollout switch (F6)', () => {
   });
 });
 
-describe('temporary pre-cutover gate', () => {
-  it('admins can test; others only when the switch is on', () => {
-    expect(canUseReviewComposerPage('legacy', true)).toBe(true);
-    expect(canUseReviewComposerPage('legacy', false)).toBe(false);
-    expect(canUseReviewComposerPage('page', false)).toBe(true);
+describe('3D page gate (no admin bypass)', () => {
+  it('follows the switch only; latched sessions stay open', () => {
+    expect(resolvePageGate({ implementation: 'legacy', isResolved: true, latched: false })).toBe('unavailable');
+    expect(resolvePageGate({ implementation: 'page', isResolved: true, latched: false })).toBe('open');
+    expect(resolvePageGate({ implementation: 'legacy', isResolved: false, latched: false })).toBe('loading');
+    expect(resolvePageGate({ implementation: 'legacy', isResolved: true, latched: true })).toBe('open');
+    expect(resolvePageGate({ implementation: 'legacy', isResolved: false, latched: true })).toBe('open');
   });
 });
 
@@ -91,10 +93,10 @@ describe('3B boundaries', () => {
       const p = join(d, n);
       return statSync(p).isDirectory() ? walk(p) : /\.(t|j)sx?$/.test(n) ? [p] : [];
     });
-  it('no existing entry point links to the new page yet', () => {
+  it('only the shared routing helper builds composer addresses', () => {
     const offenders = walk(ROOT)
-      .filter((f) => !/review-composer|ReviewComposerPage|App\.tsx$/.test(f))
-      .filter((f) => /ReviewComposerPage|['"`]\/review(\?|['"`])|\/review\/[^'"`\s]*\/edit/.test(readFileSync(f, 'utf8')))
+      .filter((f) => !/review-composer|ReviewComposerPage|App\.tsx$|composerRoutes|__tests__|\.test\./.test(f))
+      .filter((f) => /['"`]\/review(\?|['"`])|\/review\/[^'"`\s]*\/edit/.test(readFileSync(f, 'utf8')))
       .map((f) => relative(ROOT, f));
     expect(offenders).toEqual([]);
   });

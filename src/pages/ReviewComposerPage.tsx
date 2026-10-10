@@ -1,9 +1,10 @@
 /**
- * Step 3B — /review, /review?entityId=<id>, /review/:reviewId/edit.
+ * Step 3B/3C/3D — /review, /review?entityId=<id>, /review/:reviewId/edit,
+ * /review/:reviewId/timeline/new, /review/:reviewId/timeline/:updateId/edit.
  *
- * TEMPORARY pre-cutover gate (remove in 3D): the page opens only when the
- * rollout switch resolves to `page` or the user is a server-verified admin.
- * No existing button links here yet.
+ * Step 3D gate: the page follows the rollout switch only. A route session is
+ * latched once the switch is confirmed on, so a later switch-off never
+ * replaces an open draft; a new route visit checks the switch again.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -14,6 +15,7 @@ import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useReviewComposerImplementation } from '@/hooks/useReviewComposerImplementation';
 import { isWithinEditWindow } from '@/utils/reviewEditPolicy';
 import { findOwnReviewForEntity } from '@/services/review/ownReview';
+import { safeOrigin } from '@/services/review/composerRoutes';
 import { ReviewComposerScreen, ComposerSkeleton } from '@/components/review-composer/screen/ReviewComposerScreen';
 import {
   loadReviewForEdit,
@@ -26,20 +28,21 @@ import { TimelineComposerScreen, type LoadedTimelineContext } from '@/components
 import { loadUpdateForEdit, type UpdateLoad } from '@/components/review-composer/screen/timelineLoaders';
 import {
   isRetryableOpenResult,
-  openExistingReviewTimelineUpdate,
   type OpenTimelineResult,
 } from '@/components/review-composer/screen/openExistingReviewTimelineUpdate';
 
-/** Only same-app paths are accepted as a return destination. */
-export function safeOrigin(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  if (!value.startsWith('/') || value.startsWith('//') || value.startsWith('/review')) return null;
-  return value;
-}
+export { safeOrigin };
 
-/** Temporary 3B gate. */
-export function canUseReviewComposerPage(implementation: 'legacy' | 'page', isAdmin: boolean) {
-  return implementation === 'page' || isAdmin;
+export type PageGate = 'loading' | 'open' | 'unavailable';
+
+/**
+ * Step 3D gate (no admin bypass). `latched` is true only when this route
+ * session previously saw the switch confirmed on.
+ */
+export function resolvePageGate(input: { implementation: 'legacy' | 'page'; isResolved: boolean; latched: boolean }): PageGate {
+  if (input.latched) return 'open';
+  if (!input.isResolved) return 'loading';
+  return input.implementation === 'page' ? 'open' : 'unavailable';
 }
 
 export default function ReviewComposerPage() {
@@ -47,14 +50,21 @@ export default function ReviewComposerPage() {
   const { isAdmin, isLoading: adminLoading } = useIsAdmin();
   const { implementation, isResolved } = useReviewComposerImplementation();
   const { reviewId, updateId } = useParams();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const isTimeline = reviewId !== undefined && pathname.includes('/timeline/');
   const isEdit = reviewId !== undefined && !isTimeline;
 
-  const gateReady = !adminLoading && (isResolved || isAdmin);
+  const routeKey = `${pathname}${search}`;
+  const [latchedKey, setLatchedKey] = useState<string | null>(null);
+  const confirmedOn = isResolved && implementation === 'page';
+  useEffect(() => {
+    if (confirmedOn) setLatchedKey(routeKey);
+  }, [confirmedOn, routeKey]);
+  const gate = resolvePageGate({ implementation, isResolved, latched: latchedKey === routeKey });
+
   let body: React.ReactNode;
-  if (!user || !gateReady) body = <ComposerSkeleton />;
-  else if (!canUseReviewComposerPage(implementation, isAdmin)) body = <NotAvailable />;
+  if (!user || gate === 'loading' || (isEdit && adminLoading)) body = <ComposerSkeleton />;
+  else if (gate === 'unavailable') body = <NotAvailable />;
   else if (isTimeline) body = <TimelineRoute reviewId={reviewId!} updateId={updateId ?? null} userId={user.id} />;
   else body = isEdit ? <EditRoute reviewId={reviewId!} userId={user.id} isAdmin={isAdmin} /> : <CreateRoute userId={user.id} />;
 

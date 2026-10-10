@@ -29,6 +29,7 @@ import {
   REVIEW_MODERATION_DELETE_TITLE,
 } from '@/utils/reviewEditPolicy';
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
+import { useReviewComposerNavigate } from '@/hooks/useReviewComposerNavigate';
 import type { Review } from '@/services/reviewService';
 
 interface ReviewOwnerMenuProps {
@@ -61,6 +62,7 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const composer = useReviewComposerNavigate();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -76,9 +78,16 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
   const afterHour = !isWithinEditWindow(review.created_at);
   const hasEditAction = isOwner && !!(onEdit || editableReview);
 
+  // Step 3D — Edit and Add timeline update go through the one routing decision.
+  const handleEdit = () =>
+    composer.open({ kind: 'editReview', reviewId: review.id }, () => (onEdit ? onEdit() : setIsEditing(true)));
+  const handleAddUpdate = () =>
+    onAddTimelineUpdate && composer.open({ kind: 'addUpdate', reviewId: review.id }, onAddTimelineUpdate);
+
   const editItem = hasEditAction ? (
     <DropdownMenuItem
-      onClick={() => (onEdit ? onEdit() : setIsEditing(true))}
+      onClick={handleEdit}
+      disabled={composer.isPending}
       className="flex items-center gap-2"
     >
       <Pencil className="h-4 w-4" /> Edit
@@ -132,7 +141,7 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={stop}>
           {isOwner && onAddTimelineUpdate && (
-            <DropdownMenuItem onClick={onAddTimelineUpdate} className="flex items-center gap-2">
+            <DropdownMenuItem onClick={handleAddUpdate} disabled={composer.isPending} className="flex items-center gap-2">
               <Plus className="h-4 w-4" /> Add timeline update
             </DropdownMenuItem>
           )}

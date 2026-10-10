@@ -7,6 +7,7 @@ import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchUserProfile } from '@/services/profileService';
+import { useReviewComposerNavigate } from '@/hooks/useReviewComposerNavigate';
 
 interface SmartComposerButtonProps {
   onContentCreated?: () => void;
@@ -18,6 +19,9 @@ type ContentType = 'review';
 export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartComposerButtonProps) {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
+  // Step 3D — review entry goes through the one routing decision.
+  const composer = useReviewComposerNavigate();
+  const openComposer = composer.open;
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('review');
@@ -78,28 +82,34 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
         return;
       }
 
-      setSelectedContentType(contentType as ContentType);
-      setIsPopoverOpen(false);
-      setIsDialogOpen(true);
+      const legacy = () => {
+        setSelectedContentType(contentType as ContentType);
+        setIsPopoverOpen(false);
+        setIsDialogOpen(true);
 
-      // Support both payload shapes + reset stale data
-      if (detail.entity) {
-        const normalizedId = detail.entity.id ?? detail.entity.entity_id;
-        setEntityData({
-          ...detail.entity,
-          id: normalizedId,
-          name: detail.entity.name ?? '',
-          type: detail.entity.type ?? 'product',
-        });
-      } else if (detail.entityId) {
-        setEntityData({
-          id: detail.entityId,
-          name: detail.entityName ?? '',
-          type: detail.entityType ?? 'product',
-        });
-      } else {
-        setEntityData(null);
-      }
+        // Support both payload shapes + reset stale data
+        if (detail.entity) {
+          const normalizedId = detail.entity.id ?? detail.entity.entity_id;
+          setEntityData({
+            ...detail.entity,
+            id: normalizedId,
+            name: detail.entity.name ?? '',
+            type: detail.entity.type ?? 'product',
+          });
+        } else if (detail.entityId) {
+          setEntityData({
+            id: detail.entityId,
+            name: detail.entityName ?? '',
+            type: detail.entityType ?? 'product',
+          });
+        } else {
+          setEntityData(null);
+        }
+      };
+      if (contentType !== 'review') return legacy();
+      setIsPopoverOpen(false);
+      const entityId = detail.entity ? detail.entity.id ?? detail.entity.entity_id : detail.entityId;
+      openComposer({ kind: 'write', entityId: entityId ?? null }, legacy);
     };
 
     window.addEventListener('open-create-post-dialog', handleOpenDialog);
@@ -107,7 +117,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
     return () => {
       window.removeEventListener('open-create-post-dialog', handleOpenDialog);
     };
-  }, [navigate]);
+  }, [navigate, openComposer]);
 
   const handleContentCreated = () => {
     setIsDialogOpen(false);
@@ -160,9 +170,12 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
                 <span>Post</span>
               </button>
               <button
-                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
+                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors disabled:opacity-50"
+                disabled={composer.isPending}
+                aria-busy={composer.isPending}
                 onClick={() => {
-                  handleContentTypeSelect('review');
+                  setIsPopoverOpen(false);
+                  openComposer({ kind: 'write' }, () => handleContentTypeSelect('review'));
                 }}
               >
                 <Star size={16} className="text-yellow-500" />

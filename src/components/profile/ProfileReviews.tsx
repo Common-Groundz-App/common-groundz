@@ -6,6 +6,7 @@ import ReviewCard from './reviews/ReviewCard';
 import ReviewForm from './reviews/ReviewForm';
 import ReviewFilters from './reviews/ReviewFilters';
 import { useAuth } from '@/contexts/AuthContext';
+import { useReviewComposerNavigate } from '@/hooks/useReviewComposerNavigate';
 import { resolveReviewDisplayType, displayTypeValue } from './reviews/reviewDisplayType';
 
 interface ProfileReviewsProps {
@@ -16,6 +17,9 @@ interface ProfileReviewsProps {
 const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) => {
   const { user } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  // Step 3D — write-review goes through the one routing decision.
+  const composer = useReviewComposerNavigate();
+  const openWrite = () => composer.open({ kind: 'write' }, () => setIsFormOpen(true));
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'latest' | 'highestRated' | 'mostLiked'>('latest');
   
@@ -120,7 +124,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
       <div className="max-w-3xl mx-auto">
         <EmptyReviews 
           isOwnProfile={isOwnProfile} 
-          onCreateReview={() => setIsFormOpen(true)} 
+          onCreateReview={openWrite} 
         />
         {isFormOpen && isOwnProfile && (
           <ReviewForm 
@@ -143,7 +147,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
         onFilterChange={setActiveFilter}
         onSortChange={setSortBy}
         onClearFilters={clearFilters}
-        onAddNew={() => setIsFormOpen(true)}
+        onAddNew={openWrite}
       />
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -57,6 +57,9 @@ describe('Group 6B (a) — the doorway always renders V4', () => {
 });
 
 // ---- (b) metadata on the real V4 ----
+vi.mock('@/hooks/useReviewComposerNavigate', () => ({
+  useReviewComposerNavigate: () => ({ open: (_a: unknown, legacy: () => void) => legacy(), isPending: false, isResolved: true, implementation: 'legacy' }),
+}));
 vi.mock('@/components/seo/SEOHead', () => ({
   default: (props: Record<string, unknown>) => { seoProps.calls.push(props); return null; },
 }));

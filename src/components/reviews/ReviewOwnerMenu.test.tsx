@@ -6,6 +6,9 @@ import { ReviewOwnerMenu } from './ReviewOwnerMenu';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: vi.fn(() => false) }));
+vi.mock('@/hooks/useReviewComposerNavigate', () => ({
+  useReviewComposerNavigate: () => ({ open: (_a: unknown, legacy: () => void) => legacy(), isPending: false }),
+}));
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'owner-1' } }),

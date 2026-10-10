@@ -62,7 +62,7 @@ async def route(r):
             blocked_writes.append(f"RPC {name} (answered by the test, never sent)")
             if S["hang"]: await asyncio.sleep(23)
             return await r.fulfill(json=S["rpc"])
-        return await r.fulfill(json={} if name == "get_public_flags" else None)
+        return await r.fulfill(json={"reviews": {"composer_page_enabled": True}} if name == "get_public_flags" else None)
     if req.method not in ("GET", "HEAD", "OPTIONS"):
         blocked_writes.append(f"{req.method} {url.split('?')[0]}")
         if S["hang"]: await asyncio.sleep(23)
