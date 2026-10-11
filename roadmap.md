@@ -409,8 +409,9 @@ cross-read between them.
 - [x] Read-only Mux check: 3 non-test hosted videos linked nowhere (origin unknown)
 - [x] D2 server cleanup of removed review/timeline photos — built and verified end-to-end (processing OFF, unscheduled)
 - [ ] Review video (Mux) — plan .lovable/plan/review-video-mux-final-plan-2026-10-11.md
-  - [x] Phase 1 server foundation: applied, 31/31 database tests (docs/verification/review-video-phase-1.md)
-  - [ ] Phase 1 two-connection concurrency tests (needs dblink extension — awaiting your OK)
+  - [x] Phase 1 server foundation: applied (docs/verification/review-video-phase-1.md)
+  - [x] Phase 1 close-out: strict one-hour rule (broken-video exception removed), 39/39 database tests, outage check
+  - [ ] Phase 1 two-connection concurrency tests — blocked: needs a throwaway test account from you, then approval of the exact helper code (no dblink)
   - [ ] Phase 2 composers (create/edit) — waiting on your approval
   - [ ] Phase 3 shared player + display
   - [ ] Phase 4 integration + your signed-in checklist
