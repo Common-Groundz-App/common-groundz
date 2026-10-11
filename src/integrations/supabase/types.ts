@@ -4782,6 +4782,7 @@ export type Database = {
       is_search_brand_logo_lookup_enabled: { Args: never; Returns: boolean }
       is_search_image_cse_fallback_enabled: { Args: never; Returns: boolean }
       is_search_image_firecrawl_enabled: { Args: never; Returns: boolean }
+      is_trusted_server_context: { Args: never; Returns: boolean }
       is_valid_influence_cron_secret: {
         Args: { p_presented: string }
         Returns: boolean
@@ -4936,6 +4937,7 @@ export type Database = {
           updated_count: number
         }[]
       }
+      mux_upload_is_broken: { Args: { p_upload_id: string }; Returns: boolean }
       normalize_identity_name: { Args: { input_name: string }; Returns: string }
       normalize_owned_media_path: { Args: { p: string }; Returns: string }
       notification_allowed: {
@@ -4951,6 +4953,10 @@ export type Database = {
         }[]
       }
       patch_content_media_from_mux: {
+        Args: { p_mapping_id: string }
+        Returns: string
+      }
+      patch_review_media_from_mux: {
         Args: { p_mapping_id: string }
         Returns: string
       }
@@ -4978,6 +4984,14 @@ export type Database = {
         Returns: undefined
       }
       refresh_social_influence_scores_v2: { Args: never; Returns: number }
+      remove_broken_review_video: {
+        Args: {
+          p_content_id: string
+          p_content_type: string
+          p_mux_upload_id: string
+        }
+        Returns: Json
+      }
       repair_hashtag_relationships: { Args: never; Returns: Json }
       resolve_review_recommendation: {
         Args: {
@@ -4986,6 +5000,24 @@ export type Database = {
           p_envelope: Json
           p_latest_intent: string
         }
+        Returns: Json
+      }
+      review_cover_from_media: { Args: { p_media: Json }; Returns: string }
+      review_media_is_broken_removal: {
+        Args: { p_new: Json; p_old: Json }
+        Returns: boolean
+      }
+      review_media_only_trusted_mux_changes: {
+        Args: { p_new: Json; p_old: Json; p_owner: string }
+        Returns: boolean
+      }
+      review_media_video_count: { Args: { p_media: Json }; Returns: number }
+      review_mux_patch_is_valid: {
+        Args: { p_new: Json; p_old: Json }
+        Returns: boolean
+      }
+      review_mux_truth_item: {
+        Args: { p_item: Json; p_owner: string }
         Returns: Json
       }
       review_owned_paths: {
@@ -5040,6 +5072,10 @@ export type Database = {
       sync_mux_post_mappings: {
         Args: { p_content_id: string; p_items: Json }
         Returns: Json
+      }
+      sync_review_mux_mappings: {
+        Args: { p_id: string; p_media: Json; p_type: string; p_user: string }
+        Returns: undefined
       }
       toggle_comment_like: {
         Args: {
