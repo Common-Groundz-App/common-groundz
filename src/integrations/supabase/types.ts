@@ -4937,7 +4937,6 @@ export type Database = {
           updated_count: number
         }[]
       }
-      mux_upload_is_broken: { Args: { p_upload_id: string }; Returns: boolean }
       normalize_identity_name: { Args: { input_name: string }; Returns: string }
       normalize_owned_media_path: { Args: { p: string }; Returns: string }
       notification_allowed: {
@@ -4984,14 +4983,6 @@ export type Database = {
         Returns: undefined
       }
       refresh_social_influence_scores_v2: { Args: never; Returns: number }
-      remove_broken_review_video: {
-        Args: {
-          p_content_id: string
-          p_content_type: string
-          p_mux_upload_id: string
-        }
-        Returns: Json
-      }
       repair_hashtag_relationships: { Args: never; Returns: Json }
       resolve_review_recommendation: {
         Args: {
@@ -5003,10 +4994,6 @@ export type Database = {
         Returns: Json
       }
       review_cover_from_media: { Args: { p_media: Json }; Returns: string }
-      review_media_is_broken_removal: {
-        Args: { p_new: Json; p_old: Json }
-        Returns: boolean
-      }
       review_media_only_trusted_mux_changes: {
         Args: { p_new: Json; p_old: Json; p_owner: string }
         Returns: boolean

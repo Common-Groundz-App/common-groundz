@@ -120,28 +120,54 @@ BEGIN
   SELECT media INTO j FROM public.review_updates WHERE id=UPD;
   IF j->0->>'mux_error'='too_long' AND j->0->>'mux_playback_id' IS NULL THEN ok:=ok+1; res:=res||E'\nPASS over-60s marked too_long, no playback id';
   ELSE bad:=bad+1; res:=res||E'\nFAIL too long '||j::text; END IF;
+  -- Strict one-hour rule: after the hour no author media change, even for a broken video.
   UPDATE public.review_updates SET created_at = now() - interval '3 hours' WHERE id=UPD;
   PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
   EXECUTE 'set local role authenticated';
-  j := public.remove_broken_review_video('review_update', UPD, 't_up_upd');
+  BEGIN
+    EXECUTE 'SELECT public.remove_broken_review_video($1,$2,$3)' USING 'review_update', UPD, 't_up_upd';
+    bad:=bad+1; res:=res||E'\nFAIL removed exception still callable';
+  EXCEPTION WHEN undefined_function THEN ok:=ok+1; res:=res||E'\nPASS broken-video removal action no longer exists'; END;
+  UPDATE public.review_updates SET media='[]'::jsonb WHERE id=UPD;
+  j := public.edit_latest_review_update(R, UPD, 3, 'u', '[]'::jsonb, NULL);
+  v := j->>'status';
+  j := public.edit_latest_review_update(R, UPD, 3, 'u', jsonb_build_array(vid || '{"mux_upload_id":"t_up_upd2"}'), NULL);
   EXECUTE 'reset role';
   PERFORM set_config('request.jwt.claims', '', true);
   SELECT * INTO r_row FROM public.review_updates WHERE id=UPD;
-  IF j->>'status'='ok' AND jsonb_array_length(r_row.media)=0 AND r_row.comment='u' AND r_row.rating=3 THEN
-    ok:=ok+1; res:=res||E'\nPASS owner removed broken timeline video 3h after posting; text/rating unchanged';
-  ELSE bad:=bad+1; res:=res||E'\nFAIL broken removal '||j::text; END IF;
+  IF jsonb_array_length(r_row.media)=1 AND r_row.media->0->>'mux_upload_id'='t_up_upd' AND v='expired' AND j->>'status'='expired' THEN
+    ok:=ok+1; res:=res||E'\nPASS timeline after hour: direct API removal, Edit removal and video swap all refused';
+  ELSE bad:=bad+1; res:=res||E'\nFAIL timeline expiry '||coalesce(v,'null')||' '||j::text||' '||r_row.media::text; END IF;
+
+  -- Root review after the hour: broken video cannot be removed or swapped.
+  INSERT INTO public.mux_uploads(user_id, upload_id, status, is_test, expires_at) VALUES (U, 't_up_broken', 'waiting', true, now()+interval '1h');
+  UPDATE public.reviews SET media = jsonb_build_array(vid || '{"mux_upload_id":"t_up_broken"}', photo) WHERE id=R;
+  UPDATE public.mux_uploads SET status='errored' WHERE upload_id='t_up_broken';
+  SELECT id INTO M FROM public.mux_upload_mappings WHERE mux_upload_id='t_up_broken';
+  SELECT updated_at INTO upd_before FROM public.reviews WHERE id=R;
+  v := public.patch_content_media_from_mux(M);
+  SELECT media, updated_at INTO r_row FROM public.reviews WHERE id=R;
+  IF r_row.media->0->>'mux_status'='errored' AND r_row.media->0->>'mux_playback_id' IS NULL AND r_row.updated_at=upd_before THEN
+    ok:=ok+1; res:=res||E'\nPASS system marks root video failed after hour, edit time unchanged ('||v||')';
+  ELSE bad:=bad+1; res:=res||E'\nFAIL root failed patch '||v||' '||r_row.media::text; END IF;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
+  EXECUTE 'set local role authenticated';
+  BEGIN
+    UPDATE public.reviews SET media = jsonb_build_array(photo) WHERE id=R;
+    bad:=bad+1; res:=res||E'\nFAIL root broken video removed after hour';
+  EXCEPTION WHEN others THEN ok:=ok+1; res:=res||E'\nPASS root: removing only the broken video after hour refused ('||SQLERRM||')'; END;
+  BEGIN
+    UPDATE public.reviews SET media = jsonb_build_array(vid || '{"mux_upload_id":"t_up_long"}', photo) WHERE id=R;
+    bad:=bad+1; res:=res||E'\nFAIL root video swapped after hour';
+  EXCEPTION WHEN others THEN ok:=ok+1; res:=res||E'\nPASS root: swapping the video after hour refused ('||SQLERRM||')'; END;
+  EXECUTE 'reset role';
+  PERFORM set_config('request.jwt.claims', '', true);
+  UPDATE public.reviews SET media = jsonb_build_array(photo) WHERE id=R;  -- fixture reset (system, no user)
 
   UPDATE public.review_updates SET media = jsonb_build_array(vid || '{"mux_upload_id":"t_up_upd2"}') WHERE id=UPD;
   UPDATE public.mux_uploads SET status='asset_created', asset_id='a3' WHERE upload_id='t_up_upd2';
   UPDATE public.mux_uploads SET status='ready', playback_id='PB3', duration=10 WHERE upload_id='t_up_upd2';
   SELECT id INTO M FROM public.mux_upload_mappings WHERE mux_upload_id='t_up_upd2';
-  PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
-  EXECUTE 'set local role authenticated';
-  j := public.remove_broken_review_video('review_update', UPD, 't_up_upd2');
-  EXECUTE 'reset role';
-  PERFORM set_config('request.jwt.claims', '', true);
-  IF j->>'status'='not_broken' THEN ok:=ok+1; res:=res||E'\nPASS removal refused for healthy video'; ELSE bad:=bad+1; res:=res||E'\nFAIL healthy removal '||j::text; END IF;
-
   v := public.patch_content_media_from_mux(M);
   SELECT media INTO j FROM public.review_updates WHERE id=UPD;
   IF v='patched' AND j->0->>'mux_playback_id'='PB3' THEN ok:=ok+1; res:=res||E'\nPASS timeline update patched to ready';
@@ -189,6 +215,57 @@ BEGIN
 
   INSERT INTO public.review_updates(review_id, user_id, rating, comment, media) VALUES (R, U, 4, 'p', jsonb_build_array(photo));
   ok:=ok+1; res:=res||E'\nPASS photo-only timeline update saves (regression)';
+
+  -- Within the hour, normal Edit can remove or replace a video.
+  SELECT id INTO UPD FROM public.review_updates WHERE review_id=R ORDER BY created_at DESC, id DESC LIMIT 1;
+  INSERT INTO public.mux_uploads(user_id, upload_id, status, is_test, expires_at)
+  VALUES (U, 't_up_w1', 'waiting', true, now()+interval '1h'), (U, 't_up_w2', 'waiting', true, now()+interval '1h');
+  PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
+  EXECUTE 'set local role authenticated';
+  j := public.edit_latest_review_update(R, UPD, 4, 'p', jsonb_build_array(vid || '{"mux_upload_id":"t_up_w1"}'), NULL);
+  v := j->>'status';
+  j := public.edit_latest_review_update(R, UPD, 4, 'p', jsonb_build_array(vid || '{"mux_upload_id":"t_up_w2"}'), NULL);
+  EXECUTE 'reset role';
+  PERFORM set_config('request.jwt.claims', '', true);
+  IF v='ok' AND j->>'status'='ok'
+     AND (SELECT status FROM public.mux_upload_mappings WHERE mux_upload_id='t_up_w1')='removed'
+     AND (SELECT media->0->>'mux_upload_id' FROM public.review_updates WHERE id=UPD)='t_up_w2' THEN
+    ok:=ok+1; res:=res||E'\nPASS within hour: Edit replaces video, old link marked removed';
+  ELSE bad:=bad+1; res:=res||E'\nFAIL within-hour replace '||coalesce(v,'null')||' '||j::text; END IF;
+
+  -- After the hour, deleting a whole timeline update that has a failed video still works.
+  UPDATE public.mux_uploads SET status='errored' WHERE upload_id='t_up_w2';
+  PERFORM public.patch_content_media_from_mux((SELECT id FROM public.mux_upload_mappings WHERE mux_upload_id='t_up_w2'));
+  UPDATE public.review_updates SET created_at = now() - interval '2 hours' WHERE id=UPD;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
+  EXECUTE 'set local role authenticated';
+  j := public.delete_latest_review_update(R, UPD);
+  EXECUTE 'reset role';
+  PERFORM set_config('request.jwt.claims', '', true);
+  IF j->>'status'='ok' AND NOT EXISTS (SELECT 1 FROM public.review_updates WHERE id=UPD)
+     AND (SELECT status FROM public.mux_upload_mappings WHERE mux_upload_id='t_up_w2')='removed' THEN
+    ok:=ok+1; res:=res||E'\nPASS after hour: whole timeline update with failed video deleted, link marked removed';
+  ELSE bad:=bad+1; res:=res||E'\nFAIL delete update '||j::text; END IF;
+
+  -- Regression guard: author-callable privileged functions that write review media.
+  SELECT string_agg(p.proname, ',' ORDER BY p.proname) INTO v
+    FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='public' AND p.prosecdef
+     AND has_function_privilege('authenticated', p.oid, 'execute')
+     AND p.prosrc ~* 'update\s+public\.(reviews|review_updates)\s+(\w+\s+)?set[^;]*\mmedia\M';
+  IF v = 'edit_latest_review_update' THEN ok:=ok+1; res:=res||E'\nPASS guard: only Edit (window-checked) can write review media';
+  ELSE bad:=bad+1; res:=res||E'\nFAIL guard: unexpected media writers '||coalesce(v,'none'); END IF;
+
+  -- After the hour, deleting the whole review thread still works; video links marked removed.
+  PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
+  EXECUTE 'set local role authenticated';
+  PERFORM public.delete_review_thread(R);
+  EXECUTE 'reset role';
+  PERFORM set_config('request.jwt.claims', '', true);
+  IF NOT EXISTS (SELECT 1 FROM public.reviews WHERE id=R)
+     AND NOT EXISTS (SELECT 1 FROM public.mux_upload_mappings WHERE content_id=R AND status NOT IN ('removed','unlinked')) THEN
+    ok:=ok+1; res:=res||E'\nPASS after hour: whole review deleted, its video links marked removed';
+  ELSE bad:=bad+1; res:=res||E'\nFAIL delete thread'; END IF;
 
   RAISE EXCEPTION 'TEST REPORT: % passed, % failed%', ok, bad, res;
 END
