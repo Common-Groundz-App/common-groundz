@@ -86,10 +86,12 @@ Posts, legacy forms, rollout switch, photo cleanup, notifications, existing unli
 
 - Ownership: `reviews.user_id` and `review_updates.user_id` both exist; trigger requires `mux_uploads.user_id = NEW.user_id` and, for updates, the parent review owner too. Client-supplied `mux_playback_id`/`mux_status` are overwritten from `mux_uploads`, never trusted.
 - Trigger on insert/update/delete of `media` upserts `mux_upload_mappings` (`review` | `review_update`); removed → `unlinked` with `unlinked_at`; rows never deleted. Conflicts reject the save.
-- Visibility: validation trigger rejects any video in `reviews.media` / child `review_updates.media` unless parent `visibility = 'public'`; also rejects visibility change while videos are present.
-- Bypass: `patch_content_media_from_mux` (SECURITY DEFINER, EXECUTE revoked from anon/authenticated) sets a transaction-local setting; edit-window and D2 triggers skip only when that setting is set AND `current_user` is the function owner, AND the diff is limited to the mux fields of the mapped slot (trigger re-verifies).
+- Visibility: both the `review_updates` media trigger and the `reviews` visibility trigger take `SELECT ... FOR UPDATE` on the parent `reviews` row first, so concurrent visibility change and timeline-video save serialize; reject video unless parent public; reject non-public visibility while root or any child update has a `type='video'` item.
+- Bypass: `patch_content_media_from_mux` (SECURITY DEFINER, EXECUTE revoked from anon/authenticated) sets a transaction-local setting; edit-window and D2 triggers skip only when that setting is set AND `current_user` is the function owner, AND the diff is limited to the mux fields of the mapped slot plus `reviews.image_url` (trigger re-verifies).
 - Duration: when `mux_uploads.duration > 60`, patch writes `mux_status='errored'`, `mux_error='too_long'`, no playback id.
-- Size: `mux-create-upload` accepts `declared_size`, rejects > 100 MB; Mux upload settings remain unchanged for posts.
+- Size: `mux-create-upload` accepts `declared_size`, rejects > 100 MB. Client-declared, not authoritative; documented limitation (also true for posts).
+- Remove broken video: owner-only SECURITY DEFINER RPC `remove_errored_review_video(content_type, content_id, mux_upload_id)` removes only a slot whose mux_status is errored, allowed past the edit window, unlinks the mapping; no other field may change.
+- Cover: one SQL helper `review_cover_from_media(media)` used by the save trigger and the patch; returns Mux thumbnail for a ready first video, else first photo, else NULL.
 - `allowVideo` only in `ReviewComposerScreen` and `TimelineComposerScreen`; legacy photo-only tests kept.
 - Shared player extracted from `FeedVideo`; `useVideoViewTracker` stays in post wrapper; `YelpStyleMediaPreview` uses it.
-- `reviews.image_url` set to Mux thumbnail when first item is video; D2 only matches storage photo paths, so Mux posters are never queued (verified in tests).
+- D2 only matches storage photo paths, so Mux posters are never queued; tests run with cleanup processing on and off.
