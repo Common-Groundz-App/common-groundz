@@ -57,7 +57,7 @@ The cover is recalculated by the server on every save and when a video becomes r
 | Edit save fails | Old video stays linked and shown |
 | Review or update deleted | Links unlinked; video kept |
 | Mux processing fails | Video shows "Couldn't process this video" to the author; others see nothing for that slot |
-| "Too long" or failure arrives after the 1-hour edit window | Author gets a "Remove video" button on that item. It removes only the broken video (allowed after the hour, nothing else can change). Other people never see a broken video |
+| "Too long" or failure arrives after the 1-hour edit window | (Revised 2026-10-11: strict one-hour rule.) The entry stays locked. The author sees the failed state and can delete the whole review/update or add a new timeline update. Other people never see a broken video |
 
 ## Internal "video ready" update
 
@@ -95,7 +95,7 @@ Posts, legacy forms, rollout switch, photo cleanup, notifications, existing unli
 - Bypass: `patch_content_media_from_mux` (SECURITY DEFINER, EXECUTE revoked from anon/authenticated) sets a transaction-local setting; edit-window and D2 triggers skip only when that setting is set AND `current_user` is the function owner, AND the diff is limited to the mux fields of the mapped slot plus `reviews.image_url` (trigger re-verifies).
 - Duration: when `mux_uploads.duration > 60`, patch writes `mux_status='errored'`, `mux_error='too_long'`, no playback id.
 - Size: `mux-create-upload` accepts `declared_size`, rejects > 100 MB. Client-declared, not authoritative; documented limitation (also true for posts).
-- Remove broken video: owner-only SECURITY DEFINER RPC `remove_errored_review_video(content_type, content_id, mux_upload_id)` removes only a slot whose mux_status is errored, allowed past the edit window, unlinks the mapping; no other field may change.
+- (Revised 2026-10-11) No post-hour broken-video removal. The interim `remove_broken_review_video` RPC and its edit-window shortcut were dropped.
 - Cover: one SQL helper `review_cover_from_media(media)` used by the save trigger and the patch; returns Mux thumbnail for a ready first video, else first photo, else NULL.
 - `allowVideo` only in `ReviewComposerScreen` and `TimelineComposerScreen`; legacy photo-only tests kept.
 - Shared player extracted from `FeedVideo`; `useVideoViewTracker` stays in post wrapper; `YelpStyleMediaPreview` uses it.
