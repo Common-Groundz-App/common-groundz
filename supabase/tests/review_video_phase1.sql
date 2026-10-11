@@ -128,7 +128,10 @@ BEGIN
     EXECUTE 'SELECT public.remove_broken_review_video($1,$2,$3)' USING 'review_update', UPD, 't_up_upd';
     bad:=bad+1; res:=res||E'\nFAIL removed exception still callable';
   EXCEPTION WHEN undefined_function THEN ok:=ok+1; res:=res||E'\nPASS broken-video removal action no longer exists'; END;
-  UPDATE public.review_updates SET media='[]'::jsonb WHERE id=UPD;
+  BEGIN
+    UPDATE public.review_updates SET media='[]'::jsonb WHERE id=UPD;
+    bad:=bad+1; res:=res||E'\nFAIL direct timeline media update allowed';
+  EXCEPTION WHEN insufficient_privilege THEN ok:=ok+1; res:=res||E'\nPASS direct timeline media change refused (no update permission)'; END;
   j := public.edit_latest_review_update(R, UPD, 3, 'u', '[]'::jsonb, NULL);
   v := j->>'status';
   j := public.edit_latest_review_update(R, UPD, 3, 'u', jsonb_build_array(vid || '{"mux_upload_id":"t_up_upd2"}'), NULL);
