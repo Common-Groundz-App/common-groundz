@@ -34,19 +34,24 @@ Re-run the full Phase 1 suite, adjusted:
 
 **No `dblink` and no other add-on will be installed.**
 
-**Where:** this project has only one database (your live one); there is no separate test copy I can use. So the tests run on the live database, limited to a designated test account and a few throwaway test records created just for the test. Before I run anything I'll show you the exact helper code for approval.
+**Where:** this project has only one database (your live one); there is no separate test copy I can use. So the tests run on the live database, limited to a designated test account and a few throwaway test records created just for the test.
 
-**Test account:** I need you to name one test account to use (not a real person's account). I won't pick or sign in as anyone else.
+**Two-step approval.** Approving this plan covers sections 1, 2, 4 and 5 only. For section 3 I will first stop and show you the exact helper code, the fixed list of test records, and the cleanup steps. Nothing for section 3 is created on the live database until you approve that separately.
+
+**Test account:** a brand-new throwaway account you create and name to me (not Hana Li or any account you use for normal testing). I won't pick or sign in as anyone else.
+
+**No real videos:** test records use made-up Mux details. No real uploads are made to Mux and no Mux files are created.
 
 **Temporary helper rules** (all signed-in users share one database role, so "only the test user" has to be checked inside the helper):
 - fixed safe `search_path`;
 - checks the signed-in user is exactly the test account's ID, and the target record is one of the fixed throwaway records; rejects everything else;
-- does only the one operation being tested, through the **normal save path**, so the same rules and permissions we're testing still apply (it does not skip them);
+- does only the one operation being tested, through the **normal save path**, so the same rules and permissions we're testing still apply. It runs with the test user's own permissions where possible; if it ever has to use raised permissions, I'll show a check proving the normal rules still blocked what they should;
 - then holds its open transaction for a few seconds so the second request has to wait.
+- Owner-permission tests (who may change what) keep using the real save paths, never this helper.
 
 **Proving the race really happened:** while the first request is holding, I'll check that the second one is actually waiting on that lock (the database shows this), and record timings. Two requests sent at the same time isn't treated as proof by itself.
 
-**Cleanup:** the helper and test records are removed afterwards even if a test fails, and I'll confirm they're gone.
+**Cleanup:** the helper and test records are removed afterwards even if a test fails, and I'll confirm they're gone. Cleanup also covers what deleting test records creates elsewhere: their video link records and any photo-cleanup queue entries. Only rows tied to the fixed test records are touched; other cleanup history is left alone.
 
 Cases:
 1. Making a review private vs saving a timeline update with a video: exactly one succeeds; a private review never ends up with a video.
@@ -62,12 +67,13 @@ I'll report three things separately:
 
 ## 5. Report and stop
 
-Update the Phase 1 verification note, roadmap and project notes with results, then stop. Phase 2 needs your separate approval.
+Update the Phase 1 verification note, roadmap and project notes with results listed as passed, failed or blocked, then stop with video still off on every review screen. Phase 2 needs your separate approval.
 
 ## My additions
 
-- Add a lasting automated check that fails if any author-callable function can change review media after the hour, so the exception can't quietly come back.
+- Add a lasting automated check that flags any new author-callable function that can change review media. This is an early warning only; the real protection stays the database rules, and the behaviour tests on the real save paths remain.
 - After removing the function, re-run the security scan and confirm the earlier warning about it is gone.
+- Before section 3, take a count of review, timeline, video-link and cleanup-queue rows; after cleanup, confirm the counts match again.
 
 ## Not touched
 
