@@ -16,7 +16,7 @@ Reuse the existing post video system. No second system. Built in 4 phases, serve
 - Applies only to the new Review page and the new Timeline page (create and edit), and the places that show review media.
 - Old popup and old inline timeline form stay frozen and photo-only.
 - Max 4 items, max 1 video, mixing allowed.
-- **Video only on public reviews.** On "Only me" or "Circle" reviews, the video button is off with a note: "Videos are available on public reviews." Changing a review with a video from public to private or Circle is blocked until the video is removed. The server enforces this too. Private video playback is future work.
+- **Video only on public reviews.** On "Only me" or "Circle" reviews, the video button is off with a note: "Videos are available on public reviews." Changing a review from public to private or Circle is blocked while the review **or any of its timeline updates** has a video. The server enforces this too, and a visibility change and a new timeline video saved at the same moment cannot both get through. Private video playback is future work.
 - Removing a saved video: it disappears, its link is marked unlinked, the Mux video is not deleted. The link record is kept as history.
 - Existing unlinked Mux videos are left alone. Mux cleanup is a separate later phase.
 
@@ -25,9 +25,21 @@ Reuse the existing post video system. No second system. Built in 4 phases, serve
 | Limit | On screen | On server |
 |---|---|---|
 | 4 items, 1 video | Yes | Save is rejected |
-| Public only | Yes | Save is rejected |
-| 60 seconds | Yes, before upload | After processing, a longer video is marked "too long" and never plays; the author sees "Video too long — replace it" |
-| 100 MB | Yes, before upload | The upload slot is created with the declared size and the server refuses requests over 100 MB. The 60-second check is the real backstop, because Mux does not report file size |
+| Public only (whole thread) | Yes | Save or visibility change is rejected |
+| 60 seconds | Yes, before upload | Checked from Mux's own measurement after processing. Too long: marked "too long", never plays |
+| 100 MB | Yes, before upload | Partial only. The server refuses upload requests that declare more than 100 MB, but the browser tells us the size, so a modified app could lie. Mux does not report the uploaded file's byte size. Same as posts today. Recorded as a known limitation |
+
+## Cover picture
+
+The review's cover always follows its current first item:
+
+- first item is a video: the video's Mux poster (once ready; until then the next photo, or none);
+- first item is a photo: that photo;
+- items removed or reordered: recomputed from the new first item;
+- no items: cleared, the normal fallback shows;
+- a removed video's poster is never left behind.
+
+The cover is recalculated by the server on every save and when a video becomes ready. The "video ready" step may only set the cover when its video is still the first item.
 
 ## Save and upload states
 
@@ -44,16 +56,18 @@ Reuse the existing post video system. No second system. Built in 4 phases, serve
 | Mux finishes before the save | Save links it and marks it ready immediately |
 | Edit save fails | Old video stays linked and shown |
 | Review or update deleted | Links unlinked; video kept |
+| Mux processing fails | Video shows "Couldn't process this video" to the author; others see nothing for that slot |
+| "Too long" or failure arrives after the 1-hour edit window | Author gets a "Remove video" button on that item. It removes only the broken video (allowed after the hour, nothing else can change). Other people never see a broken video |
 
 ## Internal "video ready" update
 
 - Only the server's Mux process can do it. Normal users can never trigger it.
-- It changes only the playback fields of the one matching, still-linked video. Never text, rating, recommending, other photos, owner, or times.
-- It works after the 1-hour edit window and never triggers photo cleanup.
+- It changes only the playback fields of the one matching, still-linked video, plus the cover when that video is first. Never text, rating, recommending, other photos, owner, or times.
+- It works after the 1-hour edit window and never triggers photo cleanup, with photo cleanup switched on or off.
 
 ## Phases
 
-1. Server foundation and tests (no screen changes). Tests prove: users cannot use the internal update; it works after the edit hour; removed or deleted videos ignore late messages; repeated and out-of-order messages are safe; no photo is queued for cleanup; other media untouched; someone else's upload cannot be attached; private and over-limit saves are rejected; posts unchanged.
+1. Server foundation and tests (no screen changes). Tests prove: users cannot use the internal update; it works after the edit hour; removed or deleted videos ignore late messages; repeated and out-of-order messages are safe; no photo is queued for cleanup (cleanup on and off); other media untouched; cover rules above; someone else's upload cannot be attached; private and over-limit saves are rejected; visibility blocked by a timeline video, including two saves at the same moment; "Remove video" works after the hour and removes nothing else; posts unchanged.
 2. New Review and Timeline pages (create and edit): video picker, upload stages, poster, "Processing" chip, compatibility hint, public-only rule.
 3. Final check of every place review media is drawn (including cover images), then one shared video player from the feed: streaming, processing/error/too-long poster, autoplay in view, one playing at a time, hover pre-load, shared mute, lightbox resume at the same second. Post view tracking stays with posts.
 4. Integration and browser checks, then your signed-in checklist.
