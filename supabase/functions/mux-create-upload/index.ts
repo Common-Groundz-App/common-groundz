@@ -130,6 +130,26 @@ Deno.serve(async (req) => {
     return json({ error: 'MUX_DISABLED', code: 'MUX_DISABLED' }, 503, cors)
   }
 
+  // Optional declared file size (review composers send it). Client-reported, so
+  // this is a guard, not proof of the uploaded byte size. Posts may omit it.
+  const MAX_DECLARED_BYTES = 100 * 1024 * 1024
+  try {
+    const raw = await req.text()
+    if (raw) {
+      const declared = (JSON.parse(raw) as Record<string, unknown>)?.declared_size
+      if (declared !== undefined) {
+        if (typeof declared !== 'number' || !Number.isFinite(declared) || declared <= 0) {
+          return json({ error: 'invalid_declared_size' }, 400, cors)
+        }
+        if (declared > MAX_DECLARED_BYTES) {
+          return json({ error: 'file_too_large', max_bytes: MAX_DECLARED_BYTES }, 413, cors)
+        }
+      }
+    }
+  } catch {
+    return json({ error: 'invalid_json' }, 400, cors)
+  }
+
   // Mux config
   const muxId = Deno.env.get('MUX_TOKEN_ID')
   const muxSecret = Deno.env.get('MUX_TOKEN_SECRET')

@@ -408,6 +408,13 @@ cross-read between them.
 - [x] Review/timeline forms photo-only (existing videos kept, not removable)
 - [x] Read-only Mux check: 3 non-test hosted videos linked nowhere (origin unknown)
 - [x] D2 server cleanup of removed review/timeline photos — built and verified end-to-end (processing OFF, unscheduled)
-- [ ] Later: Mux for reviews/updates (own phase, after 3D)
+- [ ] Review video (Mux) — plan .lovable/plan/review-video-mux-final-plan-2026-10-11.md
+  - [x] Phase 1 server foundation: applied, 31/31 database tests (docs/verification/review-video-phase-1.md)
+  - [ ] Phase 1 two-connection concurrency tests (needs dblink extension — awaiting your OK)
+  - [ ] Phase 2 composers (create/edit) — waiting on your approval
+  - [ ] Phase 3 shared player + display
+  - [ ] Phase 4 integration + your signed-in checklist
+- [ ] Later: Mux asset cleanup (abandoned /create uploads, removed/deleted videos, historical unlinked assets)
+- [ ] Later: private / Circle review video playback (signed Mux playback)
 - [x] 3D — cutover of entry points: complete and verified by the owner's signed-in ON/OFF test (all 8 checklist steps passed: write from home and entity page, text-only and photo-removal edits, add/edit timeline update, read-only viewer, `?compose=update` owner vs non-owner, mid-draft switch-off, inline undo/delete, popup restored when OFF). Switch left ON. Evidence: docs/verification/review-composer-3d.md
 - [ ] 3E — remove the legacy popup, the rollout switch and `?compose=update` compatibility: DEFERRED until the next round of new-review-page changes is stable. Until then the legacy popup form (`ReviewForm`) and the legacy inline timeline form in `ReviewTimelineViewer` are FROZEN — rollback path only; no new features or product changes there; all review/timeline work targets the new page composer only; the switch stays available for emergency rollback
