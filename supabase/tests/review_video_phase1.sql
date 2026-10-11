@@ -29,7 +29,7 @@ BEGIN
 
   -- 1. save with video: linked, client fields overwritten
   INSERT INTO public.reviews(user_id, entity_id, title, category, rating, visibility, media)
-  VALUES (U, E, 't', 'movie', 4, 'public', jsonb_build_array(vid, photo)) RETURNING id INTO R;
+  VALUES (U, E, 't', 'brand', 4, 'public', jsonb_build_array(vid, photo)) RETURNING id INTO R;
   SELECT media INTO j FROM public.reviews WHERE id = R;
   IF j->0->>'mux_status' = 'preparing' AND j->0->>'mux_playback_id' IS NULL THEN ok:=ok+1; res:=res||E'\nPASS forged playback fields replaced by trusted state';
   ELSE bad:=bad+1; res:=res||E'\nFAIL forged fields '||j::text; END IF;
