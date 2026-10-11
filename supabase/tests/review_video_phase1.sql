@@ -164,6 +164,10 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '', true);
   UPDATE public.reviews SET media = jsonb_build_array(photo) WHERE id=R;  -- fixture reset (system, no user)
 
+  UPDATE public.review_updates SET media = jsonb_build_array(vid || '{"mux_upload_id":"t_up_upd2"}') WHERE id=UPD;
+  UPDATE public.mux_uploads SET status='asset_created', asset_id='a3' WHERE upload_id='t_up_upd2';
+  UPDATE public.mux_uploads SET status='ready', playback_id='PB3', duration=10 WHERE upload_id='t_up_upd2';
+  SELECT id INTO M FROM public.mux_upload_mappings WHERE mux_upload_id='t_up_upd2';
   v := public.patch_content_media_from_mux(M);
   SELECT media INTO j FROM public.review_updates WHERE id=UPD;
   IF v='patched' AND j->0->>'mux_playback_id'='PB3' THEN ok:=ok+1; res:=res||E'\nPASS timeline update patched to ready';
