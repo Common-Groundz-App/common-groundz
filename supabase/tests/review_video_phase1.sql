@@ -245,7 +245,7 @@ BEGIN
   j := public.delete_latest_review_update(R, UPD);
   EXECUTE 'reset role';
   PERFORM set_config('request.jwt.claims', '', true);
-  IF j->>'status'='ok' AND NOT EXISTS (SELECT 1 FROM public.review_updates WHERE id=UPD)
+  IF j->>'status'='deleted' AND NOT EXISTS (SELECT 1 FROM public.review_updates WHERE id=UPD)
      AND (SELECT status FROM public.mux_upload_mappings WHERE mux_upload_id='t_up_w2')='removed' THEN
     ok:=ok+1; res:=res||E'\nPASS after hour: whole timeline update with failed video deleted, link marked removed';
   ELSE bad:=bad+1; res:=res||E'\nFAIL delete update '||j::text; END IF;
