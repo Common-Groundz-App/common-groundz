@@ -1,63 +1,60 @@
-# Review video (Mux) — explanation and plan
+# Review video (Mux) — revised plan
 
-Scope: only the new review page, the new timeline page, and their edit pages, plus every place review media is displayed. The old popups and inline forms stay frozen and photo-only.
+Direction approved: reuse the existing post video system, no second system. This revision adds the agreed rules and the lifecycle details.
 
-## 1. How Mux video works today (posts only)
+## Confirmed facts
 
-```text
-/create picks a video
-  -> app asks the server for a private Mux upload slot  (mux-create-upload)
-  -> browser uploads the file straight to Mux; the "Processing" chip watches live status
-  -> when the post is saved, each video slot is linked to the post  (mux-register-mappings)
-  -> Mux finishes encoding and tells our server  (mux-webhook)
-  -> server writes the playback id + "ready" into that slot of the post's media
-  -> feed shows: poster while processing -> streaming playback when ready
-```
+- Home feed has no review cards. It shows posts whose type is "review" — those already support video. Removed from scope.
+- No review notifications exist. Nothing in the database creates a notification for a review or timeline update, and the notification opener treats "review" as unsupported. Notifications are out of scope.
+- Posts already use: 4 items max, 1 video max, 100 MB, 60 seconds. Reviews reuse these exact limits.
+- Post videos use public playback links (anyone with the link can watch). Reviews get the same in this phase; private and Circle-only review videos are hidden by the app, not by Mux. Recorded as a known limitation.
 
-Display pieces used on /home: autoplay when in view, hover pre-loading, adaptive streaming, "Processing" poster, error poster, lightbox that continues at the same second with the same mute state, and view tracking.
+## Rules
 
-What is post-only today:
-- Linking a video to its content only accepts posts (server refuses anything else).
-- The "video is ready" step only updates posts.
-- Edit reconciliation only exists for posts.
-- Review composers hard-block video (photo-only picker and drop).
+- Applies only to: new Review page (create + edit), new Timeline page (create + edit), and the places that show review media.
+- Old popup and old inline timeline form stay frozen and photo-only.
+- Max 4 items, max 1 video per review or update, mix allowed (1 video + 3 photos). Enforced on screen and on the server.
+- Removing a saved video: it disappears from the review, its link is marked unlinked, the Mux video is NOT deleted. Mux cleanup is a later, separate phase.
+- Existing unlinked Mux videos (unposted /create uploads, deleted posts) are left alone and listed for that later phase.
 
-## 2. Where review media is shown
+## Lifecycle — what happens in each case
 
-| Place | Video today |
+| Case | Result |
 |---|---|
-| Review cards in the home feed | Lightbox plays video; small tile does not stream properly |
-| Review cards on profile | Same tiles + lightbox |
-| Entity page review and timeline cards | Same tiles + lightbox |
-| Read-only timeline viewer | Same tiles + lightbox |
-| New review / timeline pages (create + edit) | Photo-only |
-| Notification thumbnails | Posts only |
-| Collapsed timeline preview | Text only, no media |
+| Upload finishes, user cancels | Nothing saved; video stays unlinked in Mux (later cleanup) |
+| Upload finishes, Save fails | Review not saved; draft and video kept on screen so Save can be retried |
+| Video removed or replaced before Save | Never linked; unlinked in Mux |
+| Still processing when Save pressed | Save allowed (same as posts); shows "Processing" until ready |
+| Save succeeds, linking unclear | Not possible: linking happens inside the same save on the server (see below) |
+| Edit save fails after media changes | Nothing changes; old video stays linked and shown |
+| Review or update deleted | Its links marked unlinked; video kept |
 
-So the lightbox already understands Mux; the small tiles only show the "processing" poster and do not autoplay, stream, pre-load, or hand off to the lightbox like the feed does.
+Improvement over posts: posts link videos in a second step after saving, so a failed second step can leave a video stuck on "Processing". For reviews, the server links videos in the same save, so a saved review always has its video linked. Posts are not changed.
 
-## 3. Recommendation: reuse, do not copy
+## Phases
 
-Do not duplicate the post code. Make the existing pipeline accept two more content kinds (review, timeline update) and reuse the same feed video player for review tiles. One system, one set of fixes. Copying would create a second video stack that drifts.
+1. Server foundation (no screen changes)
+   - Link videos automatically when a review or update is saved or edited, only if the uploader is the author. Nobody can attach someone else's upload.
+   - "Video ready" step updates the review or update without counting as an author edit: no change to edit window, created/updated times, or stored text.
+   - Safe with repeated, late or out-of-order Mux messages; ignores removed videos and deleted content.
+   - Server limit: 4 items, 1 video.
+   - Tests for all of the above, and posts unchanged.
+2. Composers: turn video on in the new Review and Timeline pages (create + edit) with the same upload stages, poster, "Processing" chip and compatibility hint as /create. Save button follows the table above.
+3. Display: one shared video player taken from the feed (streaming, processing/error poster, autoplay in view, one video playing at a time, hover pre-load, shared mute, lightbox resume at same second). Post-only view tracking stays with posts. Used on profile review cards, entity page review and timeline cards, the read-only timeline viewer, and the lightbox.
+4. Integration tests, browser checks, then your signed-in checklist.
 
-Same product rules as posts: up to 4 media items total, at most 1 video per review or update (confirm below), same size/length limits.
+Before phase 3 code changes, a final check of every place review media is drawn, including cover images.
 
-## 4. Steps
+## Not touched
 
-1. Server: allow linking uploads to reviews and timeline updates, with owner checks; "ready" step updates those rows; add edit reconciliation for both.
-2. New review page + edit: allow video in the picker, show the same upload stages, poster, "Processing" chip, and compatibility hint as /create; link videos on save.
-3. New timeline page + edit: same as step 2.
-4. Display: replace the review tile's plain video with the feed's video player (autoplay in view, hover pre-load, streaming, lightbox resume) on feed, profile, entity page and timeline viewer cards.
-5. Notifications: show video poster thumbnails for review and update notifications.
-6. Removed videos on edit: unlink them and record them as "unlinked" (kept, like your earlier 3 kept videos). No automatic Mux deletion in this phase; photo cleanup stays unchanged.
-7. Tests + browser checks; then your signed-in checklist.
-
-Not touched: old popups, inline forms, rollout switch, photo cleanup rules, posts behaviour.
+Old popups and inline forms, rollout switch, posts behaviour, photo cleanup (it only handles photo files in our storage; Mux posters live on Mux, so it can never delete them), existing unlinked Mux videos, notifications.
 
 ## Technical details
 
-- Extend `mux-register-mappings` and `patch_content_media_from_mux` for `content_type in ('review','review_update')`; add a sync function mirroring `sync_mux_post_mappings`.
-- Optional server backstop: trigger rejecting more than 1 video per row in `reviews.media` / `review_updates.media`.
-- `allowVideo` on in `ReviewComposerScreen` and `TimelineComposerScreen` only; `photoOnlyReviews.test.tsx` updated so legacy forms remain photo-only.
-- Reuse `FeedVideo`/`renderBranching`/`hlsAttach`/`prewarmMuxHls`/handoff inside `YelpStyleMediaPreview` (or a shared tile) instead of plain `<video src>`.
-- `notificationThumbnail.ts` target types extended.
+- Trigger on `reviews` / `review_updates` (insert/update of `media`) upserts `mux_upload_mappings` (`content_type` 'review' | 'review_update') for items with `mux_upload_id`, checking `mux_uploads.user_id = NEW.user_id`; removed items set mapping status 'unlinked'; delete marks all unlinked. Conflicts (upload mapped elsewhere) reject the save.
+- `patch_content_media_from_mux` extended with review branches; it sets only the slot's mux fields, runs with a session flag that `enforce_review_edit_window` and media-change triggers (D2 queue) skip, and does not touch `updated_at`.
+- Validation trigger: max 4 items, max 1 `type='video'`.
+- `mux-register-mappings` stays post-only (not needed for reviews). Catch-up: if the upload is already ready at save time, the trigger calls the patch.
+- `allowVideo` on only in `ReviewComposerScreen` and `TimelineComposerScreen`; `photoOnlyReviews.test.tsx` keeps legacy forms photo-only.
+- Extract shared player from `FeedVideo` (`renderBranching`, `hlsAttach`, `prewarmMuxHls`, `useVideoMute`, handoff); `useVideoViewTracker` stays in the post wrapper. `YelpStyleMediaPreview` plain `<video>` replaced by it.
+- Inventory doc: `docs/verification/review-video.md`. Roadmap gets a separate future item: Mux asset cleanup.
