@@ -67,10 +67,15 @@ The cover is recalculated by the server on every save and when a video becomes r
 
 ## Phases
 
-1. Server foundation and tests (no screen changes). Tests prove: users cannot use the internal update; it works after the edit hour; removed or deleted videos ignore late messages; repeated and out-of-order messages are safe; no photo is queued for cleanup (cleanup on and off); other media untouched; cover rules above; someone else's upload cannot be attached; private and over-limit saves are rejected; visibility blocked by a timeline video, including two saves at the same moment; "Remove video" works after the hour and removes nothing else; posts unchanged.
+Built one phase at a time. **This approval covers Phase 1 only.** I stop after Phase 1 and report what changed plus real test results; video stays switched off on every review screen until you approve Phase 2.
+
+1. Server foundation and tests (no screen changes). Tests prove: users cannot use the internal update; it works after the edit hour without changing edit times; removed or deleted videos ignore late messages; repeated and out-of-order messages are safe; no photo is queued for cleanup (cleanup on and off); other media untouched; cover rules above; someone else's upload cannot be attached; private and over-limit saves are rejected; "Remove video" works after the hour, only for a video Mux itself marked as failed, removes nothing else and recalculates the cover; posts unchanged.
+   Real database tests with two connections at the same moment (not simulated): visibility change vs timeline video save; video ready vs video removal; video ready vs reordering.
 2. New Review and Timeline pages (create and edit): video picker, upload stages, poster, "Processing" chip, compatibility hint, public-only rule.
-3. Final check of every place review media is drawn (including cover images), then one shared video player from the feed: streaming, processing/error/too-long poster, autoplay in view, one playing at a time, hover pre-load, shared mute, lightbox resume at the same second. Post view tracking stays with posts.
-4. Integration and browser checks, then your signed-in checklist.
+3. Final check of every place review media is drawn (including cover images), then one shared video player from the feed: streaming, processing/error/too-long poster, autoplay in view, one playing at a time, hover pre-load, shared mute, lightbox resume at the same second. Processing and failed videos keep their space in the layout (a neutral placeholder), and the author always sees how to fix it. Post view tracking stays with posts.
+4. Integration and browser checks, then your signed-in checklist: create/edit, processing, privacy and playback.
+
+Accepted temporary limitations: 100 MB is checked from the size the browser reports; unlinked Mux videos are kept until the later Mux cleanup phase.
 
 ## Extra suggestions
 
