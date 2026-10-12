@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Filter, Trash2, Edit3, MoreVertical, SortAsc, SortDesc, ChevronDown, X, Plus, FileImage } from 'lucide-react';
 import { isMuxPreparing } from '@/utils/muxMedia';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
+import { GalleryVideoThumb } from '@/components/media/GalleryVideoThumb';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -549,12 +550,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                   isMuxPreparing(photo) ? (
                     <MuxPreparingPoster item={photo} className="w-full h-full" objectFit="cover" hideBadge />
                   ) : (
-                    <video
-                      src={photo.url}
-                      className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
-                      muted
-                      playsInline
-                    />
+                    <GalleryVideoThumb item={photo} className="transition-transform duration-200 group-hover:scale-105" />
                   )
                 ) : (
                   <img

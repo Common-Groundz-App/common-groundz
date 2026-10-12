@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Camera, ChevronRight, Play, Plus, MoreVertical, Edit3, Trash2, Flag } from 'lucide-react';
 import { isMuxPreparing } from '@/utils/muxMedia';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
+import { GalleryVideoThumb } from '@/components/media/GalleryVideoThumb';
 import { Button } from '@/components/ui/button';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoGalleryModal } from '@/components/ui/photo-gallery-modal';
@@ -295,13 +296,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                 isMuxPreparing(mainPhoto) ? (
                   <MuxPreparingPoster item={mainPhoto} className="w-full h-full" objectFit="cover" />
                 ) : (
-                  <video
-                    src={mainPhoto.url}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    onClick={() => handlePhotoClick(0)}
-                    muted
-                    playsInline
-                  />
+                  <GalleryVideoThumb item={mainPhoto} className="group-hover:scale-105 transition-transform duration-300" />
                 )
               ) : (
                 <img
@@ -390,12 +385,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                     isMuxPreparing(photo) ? (
                       <MuxPreparingPoster item={photo} className="w-full h-full" objectFit="cover" hideBadge />
                     ) : (
-                      <video
-                        src={photo.url}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        muted
-                        playsInline
-                      />
+                      <GalleryVideoThumb item={photo} className="group-hover:scale-105 transition-transform duration-300" />
                     )
                   ) : (
                     <img

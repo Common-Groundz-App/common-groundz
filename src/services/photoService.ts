@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
+import { isGalleryVisible } from '@/utils/reviewMediaDisplay';
 import { cachedPhotoService, type PhotoQuality as CachedPhotoQuality } from './cachedPhotoService';
 
 export interface PhotoWithMetadata extends MediaItem {
@@ -395,12 +396,13 @@ export const fetchEntityReviewMedia = async (entityId: string): Promise<PhotoWit
         
         if (review.media && Array.isArray(review.media)) {
           review.media.forEach((media: MediaItem, index: number) => {
-            if ((media.type === 'image' || media.type === 'video') && media.url) {
+            if (isGalleryVisible(media)) {
               const userProfile = profileMap.get(review.user_id);
               
               photos.push({
                 ...media,
-                id: `review-${review.id}-${index}`,
+                id: `review-${review.id}-${media.mux_upload_id || media.id || index}`,
+                reviewUpdateId: undefined,
                 source: 'user_review',
                 reviewId: review.id,
                 reviewTitle: review.title,
@@ -422,12 +424,13 @@ export const fetchEntityReviewMedia = async (entityId: string): Promise<PhotoWit
         
         if (update.media && Array.isArray(update.media)) {
           update.media.forEach((media: MediaItem, index: number) => {
-            if ((media.type === 'image' || media.type === 'video') && media.url) {
+            if (isGalleryVisible(media)) {
               const userProfile = profileMap.get(update.user_id);
               
               photos.push({
                 ...media,
-                id: `review-update-${update.id}-${index}`,
+                id: `review-update-${update.id}-${media.mux_upload_id || media.id || index}`,
+                reviewUpdateId: update.id,
                 source: 'user_review',
                 reviewId: update.review_id,
                 reviewTitle: update.reviews?.title || 'Timeline Update',

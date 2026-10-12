@@ -23,6 +23,7 @@ import { ReviewEditTooltipContent } from '@/components/reviews/ReviewEditTooltip
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import {
   canEditTimelineUpdate,
+  canEditReview,
   UPDATE_DELETE_DESCRIPTION,
   UPDATE_DELETE_TITLE,
 } from '@/utils/reviewEditPolicy';
