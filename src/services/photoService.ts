@@ -8,6 +8,8 @@ export interface PhotoWithMetadata extends MediaItem {
   source: 'google_places' | 'user_review' | 'entity_photo';
   originalReference?: string;
   reviewId?: string;
+  /** Set when the item came from a timeline update (Phase 3 provenance). */
+  reviewUpdateId?: string;
   reviewTitle?: string;
   username?: string;
   createdAt?: string;

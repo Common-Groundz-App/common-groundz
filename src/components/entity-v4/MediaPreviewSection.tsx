@@ -296,7 +296,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                 isMuxPreparing(mainPhoto) ? (
                   <MuxPreparingPoster item={mainPhoto} className="w-full h-full" objectFit="cover" />
                 ) : (
-                  <GalleryVideoThumb item={mainPhoto} className="group-hover:scale-105 transition-transform duration-300" />
+                  <div className="w-full h-full" onClick={() => handlePhotoClick(0)}><GalleryVideoThumb item={mainPhoto} className="group-hover:scale-105 transition-transform duration-300" /></div>
                 )
               ) : (
                 <img
