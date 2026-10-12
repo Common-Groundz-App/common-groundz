@@ -11,7 +11,6 @@ DECLARE
   res text := ''; ok int := 0; bad int := 0;
   j jsonb; j2 jsonb; v text; st text;
   photo jsonb := '{"type":"image","url":"https://example.com/p2-a.jpg","order":0}';
-  up_before jsonb; up_after jsonb;
 BEGIN
   INSERT INTO public.mux_uploads(user_id, upload_id, status, is_test, expires_at, asset_id, playback_id, duration)
   VALUES (U, 'p2_ready', 'ready', true, now()+interval '1h', 'a_ready', 'PB_READY', 10),
