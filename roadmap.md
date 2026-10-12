@@ -413,8 +413,9 @@ cross-read between them.
   - [x] Phase 1 close-out: strict one-hour rule (broken-video exception removed), 39/39 database tests, outage check
   - [x] Phase 1 concurrency races — closed: functional behaviour passed; true overlap unverified (SQL Editor runs one query at a time)
   - [x] Phase 1 complete (2026-10-12)
-  - [ ] Phase 2 — on hold until its plan is approved
-  - [ ] Phase 2 composers (create/edit) — waiting on your approval
+  - [x] Phase 2 composers (create/edit, review + timeline) — built behind "Review videos" setting (OFF); unit 1026/1026 suite + 8/8 rolled-back DB tests (docs/verification/review-video-phase-2.md)
+  - [ ] Phase 2 browser checks of the four modes — blocked: no signed-in test session available in this environment; needs your separately authorised signed-in run
+  - [ ] Phase 2 public activation — waits on the signed-in checks (setting stays OFF)
   - [ ] Phase 3 shared player + display
   - [ ] Phase 4 integration + your signed-in checklist
 - [ ] Later: Mux asset cleanup (abandoned /create uploads, removed/deleted videos, historical unlinked assets)
