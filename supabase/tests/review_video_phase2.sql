@@ -1,3 +1,4 @@
+-- Mapping reads switch back to the database owner briefly (links are service-only).
 -- Phase 2 review-video save-path tests (one statement; ends with RAISE so every
 -- fixture is rolled back — the error message is the report). Made-up Mux
 -- details only; nothing is sent to Mux. Payloads mirror what the new composer
@@ -32,15 +33,21 @@ BEGIN
   -- 1. Unrelated text edit, kept ready video round-trips unchanged.
   UPDATE public.reviews SET description = 'edited once', media = j WHERE id = R;
   SELECT media INTO j2 FROM public.reviews WHERE id = R;
+  EXECUTE 'reset role';
   SELECT status INTO st FROM public.mux_upload_mappings WHERE mux_upload_id = 'p2_ready';
+  EXECUTE 'set local role authenticated';
   IF j2 = j AND j2->1->>'mux_playback_id' = 'PB_READY' THEN ok:=ok+1; res:=res||E'\nPASS ready video kept through text edit (mapping '||coalesce(st,'none')||')';
   ELSE bad:=bad+1; res:=res||E'\nFAIL ready kept '||j2::text; END IF;
 
   -- 2. Replace within the hour: old link removed, new linked.
   UPDATE public.reviews SET media = jsonb_build_array(photo,
     '{"type":"video","provider":"mux","url":"https://example.com/p2-poster2.jpg","order":1,"mux_upload_id":"p2_proc"}'::jsonb) WHERE id = R;
+  EXECUTE 'reset role';
   SELECT status INTO st FROM public.mux_upload_mappings WHERE mux_upload_id = 'p2_ready';
+  EXECUTE 'set local role authenticated';
+  EXECUTE 'reset role';
   SELECT status INTO v FROM public.mux_upload_mappings WHERE mux_upload_id = 'p2_proc';
+  EXECUTE 'set local role authenticated';
   IF st = 'removed' AND v = 'pending' THEN ok:=ok+1; res:=res||E'\nPASS replacement: old link removed, new link pending';
   ELSE bad:=bad+1; res:=res||E'\nFAIL replacement old='||coalesce(st,'none')||' new='||coalesce(v,'none'); END IF;
 
@@ -48,13 +55,17 @@ BEGIN
   SELECT media INTO j FROM public.reviews WHERE id = R;
   UPDATE public.reviews SET rating = 3, media = j WHERE id = R;
   SELECT media INTO j2 FROM public.reviews WHERE id = R;
+  EXECUTE 'reset role';
   SELECT status INTO v FROM public.mux_upload_mappings WHERE mux_upload_id = 'p2_proc';
+  EXECUTE 'set local role authenticated';
   IF j2 = j AND v = 'pending' THEN ok:=ok+1; res:=res||E'\nPASS processing video kept through rating edit';
   ELSE bad:=bad+1; res:=res||E'\nFAIL processing kept '||coalesce(v,'none'); END IF;
 
   -- 4. Removal within the hour.
   UPDATE public.reviews SET media = jsonb_build_array(photo) WHERE id = R;
+  EXECUTE 'reset role';
   SELECT status INTO v FROM public.mux_upload_mappings WHERE mux_upload_id = 'p2_proc';
+  EXECUTE 'set local role authenticated';
   IF v = 'removed' THEN ok:=ok+1; res:=res||E'\nPASS removal marks link removed';
   ELSE bad:=bad+1; res:=res||E'\nFAIL removal '||coalesce(v,'none'); END IF;
 
@@ -88,7 +99,9 @@ BEGIN
 
   -- 7. Timeline: removal via the real RPC marks the link removed.
   SELECT (public.edit_latest_review_update(R, UPD, NULL, 'tl edited', '[]'::jsonb, NULL))::text INTO v;
+  EXECUTE 'reset role';
   SELECT status INTO st FROM public.mux_upload_mappings WHERE mux_upload_id = 'p2_tl';
+  EXECUTE 'set local role authenticated';
   IF st = 'removed' THEN ok:=ok+1; res:=res||E'\nPASS timeline removal marks link removed';
   ELSE bad:=bad+1; res:=res||E'\nFAIL timeline removal '||coalesce(st,'none')||' rpc='||coalesce(v,'null'); END IF;
 
