@@ -94,8 +94,8 @@ describe('stable identity', () => {
     expect(idA).toBe(idB);
   });
   it('same upload under different entries never shares identity', () => {
-    expect(stableReviewMediaId('review', 'r1', { mux_upload_id: 'u' }))
-      .not.toBe(stableReviewMediaId('review_update', 'r1', { mux_upload_id: 'u' }));
+    expect(stableReviewMediaId('review', 'r1', { mux_upload_id: 'u', url: '' }))
+      .not.toBe(stableReviewMediaId('review_update', 'r1', { mux_upload_id: 'u', url: '' }));
   });
   it('filtering keeps order and drops hidden items for others', () => {
     const media = [photo('a', 0), { ...mockMuxPreparingMediaItem, order: 1 }, photo('b', 2)];
