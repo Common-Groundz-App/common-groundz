@@ -21,13 +21,21 @@ Phase 1's three concurrency races stay recorded as "overlap unverified". Phase 2
 | Uploading (file still transferring, or upload not yet created) | Blocked: "Wait for your video to finish uploading" | Stops the transfer, releases the slot once |
 | Processing (Mux has the file) | Allowed | Removes it from the draft; nothing deleted from Mux |
 | Ready | Allowed | Same |
-| Failed / too long | Blocked until removed | Same |
+| Failed / too long, new and never saved | Blocked until removed | Same |
+| Failed / too long, already saved (failed after saving while Processing) | Allowed: the owner can edit text/rating and leave it as is | Can be removed or replaced within the hour; locked with the rest after the hour |
 
+- The open page follows Mux live: a video moves from Processing to Ready or Failed without reloading, including one that finishes before Save (existing status hook from /create).
 - Leave-page protection includes an active transfer.
 - Late callbacks from a cancelled upload or an earlier session are ignored (existing session id check), and slots stay correctly counted.
 - Videos only go through Mux. If Mux is unavailable or its upload setting is off, video picking is disabled or shows a retry error; review screens never fall back to storing a video as a plain file (posts keep their current fallback).
-- The screen never writes the video-link records itself. It saves the review/update with the minimal video entry (type, upload id, order), and the Phase 1 save rules link, unlink and fill trusted Mux details in the same save.
-- Media order is preserved, and an unchanged existing video is sent back exactly as loaded so it round-trips untouched.
+- The screen never writes the video-link records itself; the Phase 1 save rules link, unlink and fill trusted Mux details in the same save.
+
+## New vs saved videos when saving
+
+- Newly attached video: the screen sends only type, upload id and order (plus the address only if the existing format needs it). Playback, status, error and asset details always come from the server.
+- Saved video the author did not change: sent back exactly as loaded, never rebuilt from a smaller object, so no trusted detail is dropped. Today's save always sends the full media list, so round-tripping is the path used; the Phase 1 rules re-check it.
+- The screen never invents Mux details, and no longer computes the cover itself when a video is involved — the server already recomputes it.
+- Media order is preserved.
 - Saved-result checks compare the author's fields only and tolerate Mux details the server fills in during processing.
 
 ## Turning the "Review videos" setting off
@@ -41,12 +49,13 @@ Phase 1's three concurrency races stay recorded as "overlap unverified". Phase 2
 
 - Unit: limits, thread-wide visibility lock both ways, parent-private timeline block, save contract table, slot accounting, late/cancelled callbacks, no plain-file fallback, error messages, setting OFF keeps saved videos, legacy forms still photo-only.
 - Database (rolled back, made-up Mux details, no real uploads):
-  - an existing ready video survives an unrelated text/rating edit with trusted state intact (review and timeline);
+  - an unrelated text/rating edit keeps an existing ready, processing, or failed/too-long video and its link exactly as they were (review and timeline);
   - removal within the hour marks its link removed;
   - replacement within the hour marks the old link removed and links the new upload;
   - nothing is deleted from Mux;
   - saving with the setting OFF cannot strip a saved video.
-- Browser checks with mocked uploads and saves for all four modes: Review create, Review edit, Timeline create, Timeline edit. Covers public + video, photo + video, save while processing, remove/replace within the hour, Private/Circle blocking, parent-private timeline blocking, setting OFF regression.
+- Browser checks with mocked uploads and saves for all four modes: Review create, Review edit, Timeline create, Timeline edit. Covers public + video, photo + video, save while processing, live Processing → Ready/Failed without reload, saved failed video kept through a text edit, remove/replace within the hour, Private/Circle blocking, parent-private timeline blocking, setting OFF regression, and switching the setting OFF during an active transfer (the transfer finishes, new picks are disabled).
+- Database fixtures are rolled back; no real Mux uploads or deletions. The "Review videos" setting stays OFF after the work.
 - Signed-in real checks only after you authorize them separately. I report results and stop before Phase 3.
 
 ## Technical details
