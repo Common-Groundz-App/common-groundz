@@ -48,9 +48,7 @@ function matches(record: object, attempt: Record<string, unknown> | undefined): 
   return Object.keys(attempt).every((k) =>
     k === 'media'
       ? valuesEqual(canonicalMedia(r[k]), canonicalMedia(attempt[k]))
-      : k === 'image_url'
-        ? true // the server owns the cover when a video is involved
-        : valuesEqual(r[k] ?? null, attempt[k] ?? null),
+      : valuesEqual(r[k] ?? null, attempt[k] ?? null),
   );
 }
 
