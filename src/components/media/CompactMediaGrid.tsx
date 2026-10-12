@@ -19,6 +19,8 @@ interface CompactMediaGridProps {
   onOpenLightbox?: (index: number) => void;
   primaryMediaUrl?: string | null;
   onSetPrimary?: (url: string) => void;
+  /** Optional per-tile overlay (e.g. live video status chip). */
+  overlayForItem?: (media: MediaItem) => React.ReactNode;
 }
 
 export function CompactMediaGrid({
@@ -29,7 +31,8 @@ export function CompactMediaGrid({
   maxVisible = 4,
   onOpenLightbox,
   primaryMediaUrl,
-  onSetPrimary
+  onSetPrimary,
+  overlayForItem
 }: CompactMediaGridProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -94,6 +97,8 @@ export function CompactMediaGrid({
               />
             )}
             
+            {overlayForItem?.(item)}
+
             {/* Primary badge */}
             {primaryMediaUrl === item.url && (
               <div className="absolute top-1 left-1 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded flex items-center gap-1 z-10">
