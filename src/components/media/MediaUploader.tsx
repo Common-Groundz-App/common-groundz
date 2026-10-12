@@ -465,6 +465,8 @@ export function MediaUploader({
       }, videoMuxOnly ? { videoMuxOnly: true } : undefined).then((mediaItem) => {
         if (videoMuxOnly && cancelledFilesRef.current.has(file)) {
           // Cancelled while transferring: never added; slot released once.
+          // Only the preview image is removed; the Mux video itself is kept.
+          if (mediaItem?.url) void deleteMedia(mediaItem.url).catch(() => undefined);
           release(file);
           return;
         }
