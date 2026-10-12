@@ -31,5 +31,13 @@ New: removal action no longer exists; timeline after hour — direct change refu
 - From the database: 0 timeline updates saved in that window (and none at all since 2026-10-08).
 - Unknown: how many saves were attempted and failed. Server request logs for that window returned no data, so this can't be established. Missing rows are not taken as evidence either way.
 
-## Not yet done
-- Real two-connection concurrency tests (visibility vs timeline video, ready vs removal, ready vs reorder). Waiting on: a throwaway test account from the owner, then approval of the exact helper code, test records and cleanup steps. No database add-on will be installed.
+## Phase 1 closed (2026-10-12)
+- Database tests (single connection, rolled back): **39/39 passed**, including the strict one-hour rule for reviews and timeline updates.
+- Race 1 — private vs timeline video: **functional behaviour passed**. Live run 2026-10-12 with the throwaway test account (John Carter): the timeline video was refused with `review_video_public_only`. Reverse case covered by the suite (`review_video_visibility_locked`).
+- Race 2 — Mux "ready" vs removing the video: **functional outcome passed** in the suite (late event ignored, video not restored, cover recomputed).
+- Race 3 — Mux "ready" vs reordering: **functional outcome passed** in the suite (cover follows the first item in every case).
+- True simultaneous overlap / lock proof for Races 1–3: **unverified**. The Supabase SQL Editor would not run a second query while the first was still running, even across separate browser sessions, so two connections could not be observed.
+- Locking design is in place: review row locks, a per-review timeline advisory lock, and the Mux patch locking the content row before its link. It could not be watched directly with two connections in this environment.
+- Deliberately not used: dblink or other extensions, temporary helpers, new permissions, local database credentials.
+- Test cleanup: exact IDs only; all test-specific counts back to 0 (confirmed by the owner and re-checked).
+- Optional follow-up: re-run the three races if a two-connection test environment becomes available.
