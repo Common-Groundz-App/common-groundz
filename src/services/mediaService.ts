@@ -151,11 +151,23 @@ export function __resetMuxConfigCache(): void {
 /** @deprecated Use resolveMuxConfig() — kept for any synchronous callers. */
 export const isMuxEnabled = (): boolean => ENV_FALLBACK_ENABLED;
 
+export const VIDEO_UPLOADS_UNAVAILABLE = 'Video uploads are unavailable right now. Try again later.';
+
+export interface UploadMediaOptions {
+  /**
+   * Review composers: videos must go to Mux. No storage fallback; a disabled
+   * or failing Mux surfaces as an error. Sends the browser-reported size
+   * (non-authoritative) so the server can refuse > 100 MB early.
+   */
+  videoMuxOnly?: boolean;
+}
+
 export const uploadMedia = async (
   file: File,
   userId: string,
   sessionId: string,
-  onProgress?: (progress: number, stage?: UploadStage) => void
+  onProgress?: (progress: number, stage?: UploadStage) => void,
+  options: UploadMediaOptions = {}
 ): Promise<MediaItem | null> => {
   try {
     onProgress?.(0, 'preparing');
@@ -167,6 +179,13 @@ export const uploadMedia = async (
 
     const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
     const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+
+    // ===== Review composers: Mux-only videos, never the storage fallback =====
+    if (isVideo && options.videoMuxOnly) {
+      const cfg = await resolveMuxConfig();
+      if (!cfg.uploadsEnabled) throw new Error(VIDEO_UPLOADS_UNAVAILABLE);
+      return await uploadVideoViaMux(file, userId, sessionId, onProgress, file.size);
+    }
 
     // ===== Mux upload branch (videos only, runtime-flag gated) =====
     if (isVideo) {
@@ -370,7 +389,8 @@ async function uploadVideoViaMux(
   file: File,
   userId: string,
   sessionId: string,
-  onProgress?: (progress: number, stage?: UploadStage) => void
+  onProgress?: (progress: number, stage?: UploadStage) => void,
+  declaredSize?: number
 ): Promise<MediaItem> {
   analytics.trackMuxUploadAttempt({ size: file.size, format: file.type });
 
@@ -419,7 +439,7 @@ async function uploadVideoViaMux(
   try {
     const { data, error } = await supabase.functions.invoke<MuxCreateUploadResponse>(
       'mux-create-upload',
-      { body: {} }
+      { body: typeof declaredSize === 'number' ? { declared_size: declaredSize } : {} }
     );
     if (error) throw error;
     if (!data?.upload_id || !data?.upload_url) {
