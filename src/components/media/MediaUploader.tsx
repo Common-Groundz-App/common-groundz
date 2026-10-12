@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Image as ImageIcon, Film, Upload, X } from 'lucide-react';
 import {
   uploadMedia,
+  deleteMedia,
   ALLOWED_MEDIA_TYPES,
   ALLOWED_IMAGE_TYPES,
   validateMediaFile,
