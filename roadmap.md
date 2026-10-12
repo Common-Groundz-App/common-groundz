@@ -416,7 +416,7 @@ cross-read between them.
   - [x] Phase 2 composers (create/edit, review + timeline) — built behind "Review videos" setting (OFF); unit 1026/1026 suite + 8/8 rolled-back DB tests (docs/verification/review-video-phase-2.md)
   - [ ] Phase 2 browser checks of the four modes — blocked: no signed-in test session available in this environment; needs your separately authorised signed-in run
   - [ ] Phase 2 public activation — waits on the signed-in checks (setting stays OFF)
-  - [ ] Phase 3 shared player + display
+  - [x] Phase 3 shared player + display — built; 1,060 app tests; browser/signed-in checks moved to Phase 4 (docs/verification/review-video-phase-3.md)
   - [ ] Phase 4 integration + your signed-in checklist
 - [ ] Later: Mux asset cleanup (abandoned /create uploads, removed/deleted videos, historical unlinked assets)
 - [ ] Later: private / Circle review video playback (signed Mux playback)
