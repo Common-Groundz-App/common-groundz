@@ -67,3 +67,10 @@ Posts, home feed, legacy popup and inline form, photo cleanup, notifications, se
 - `YelpStyleMediaPreview`: ready videos render via `ReviewVideo` (wrapping `FeedVideo`, `source='review'`); `onTap` forwards handoff to `LightboxPreview` `initialVideoState` / `onExitHandoff`.
 - `ReviewCard`, `TimelineReviewCard`, profile `ReviewCard`, `ReviewTimelineViewer` display block: use `visibleReviewMedia`; keep Mux fields in the mapped items (today `ReviewCard` drops them).
 - `photoService`: replace `media.url` requirement with "image with url, or playable video (`isMuxPlayable` or legacy url)"; keep `source`, review/update id.
+
+## Implementation checks (from final review)
+- Stable media identity: every review/timeline item gets `owner type + review/update id + (mux_upload_id or id or url)`, used for the player slot, pause/resume memory, grid selection and lightbox start. Never array position. Tests: reordering, filtering, and a video turning ready do not move the selection or hand playback time to another video.
+- Timeline edit eligibility comes from the update's own creation time and whether it is the latest update — not the parent review's window. Recovery messages offer only actions actually allowed.
+- Gallery privacy tested through its real query path, including cached results, with a private and a Circle review.
+- Run the full test suite and typecheck; build must be clean. Setting stays OFF; stop before Phase 4.
+- Carried forward: Phase 2 browser checks, Phase 1 overlap unverified, Mux asset cleanup and private video playback (separate work).
