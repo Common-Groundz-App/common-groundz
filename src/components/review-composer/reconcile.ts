@@ -11,6 +11,7 @@
 import type { ComposerMode } from './modes';
 import type { StoredReviewRecord, StoredTimelineUpdateRecord } from './values';
 import { valuesEqual } from './values';
+import { canonicalMedia } from './reviewVideo';
 
 export type EvidenceStrength = 'strong' | 'compare' | 'weak';
 
@@ -44,7 +45,13 @@ export interface ReconcileContext {
 function matches(record: object, attempt: Record<string, unknown> | undefined): boolean | undefined {
   if (!attempt) return undefined;
   const r = record as Record<string, unknown>;
-  return Object.keys(attempt).every((k) => valuesEqual(r[k] ?? null, attempt[k] ?? null));
+  return Object.keys(attempt).every((k) =>
+    k === 'media'
+      ? valuesEqual(canonicalMedia(r[k]), canonicalMedia(attempt[k]))
+      : k === 'image_url'
+        ? true // the server owns the cover when a video is involved
+        : valuesEqual(r[k] ?? null, attempt[k] ?? null),
+  );
 }
 
 export async function gatherAmbiguousSaveEvidence(
