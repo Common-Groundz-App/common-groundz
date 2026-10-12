@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Image as ImageIcon, Film, Upload, X } from 'lucide-react';
 import {
   uploadMedia,
+  deleteMedia,
   ALLOWED_MEDIA_TYPES,
   ALLOWED_IMAGE_TYPES,
   validateMediaFile,
@@ -57,6 +58,14 @@ interface MediaUploaderProps {
    * slot is reserved or upload starts. Default true (posts unchanged).
    */
   allowVideo?: boolean;
+  /** Optional: message shown when a video is refused because allowVideo is false. */
+  videoRefusedMessage?: string;
+  /**
+   * Optional (review composers): videos go to Mux only, never the storage
+   * fallback, and a cancelled upload's late result is dropped (slot released,
+   * never added). Default false (posts unchanged).
+   */
+  videoMuxOnly?: boolean;
 }
 
 /**
@@ -254,7 +263,10 @@ export function MediaUploader({
   reserveSlots,
   releaseSlot,
   allowVideo = true,
+  videoRefusedMessage,
+  videoMuxOnly = false,
 }: MediaUploaderProps) {
+  const cancelledFilesRef = useRef<WeakSet<File>>(new WeakSet());
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploads, setUploads] = useState<MediaUploadState[]>([]);
@@ -311,7 +323,7 @@ export function MediaUploader({
       if (photos.length < files.length) {
         toast({
           title: 'Photos only',
-          description: 'Videos can\'t be added here yet. Please add photos instead.',
+          description: videoRefusedMessage ?? 'Videos can\'t be added here yet. Please add photos instead.',
           variant: 'destructive',
         });
       }
@@ -451,7 +463,14 @@ export function MediaUploader({
               : u
           )
         );
-      }).then((mediaItem) => {
+      }, videoMuxOnly ? { videoMuxOnly: true } : undefined).then((mediaItem) => {
+        if (videoMuxOnly && cancelledFilesRef.current.has(file)) {
+          // Cancelled while transferring: never added; slot released once.
+          // Only the preview image is removed; the Mux video itself is kept.
+          if (mediaItem?.url) void deleteMedia(mediaItem.url).catch(() => undefined);
+          release(file);
+          return;
+        }
         if (mediaItem) {
           onMediaUploaded(mediaItem, file);
           release(file);
@@ -503,6 +522,7 @@ export function MediaUploader({
   };
 
   const cancelUpload = (uploadToCancel: MediaUploadState) => {
+    if (videoMuxOnly && uploadToCancel.status === 'uploading') cancelledFilesRef.current.add(uploadToCancel.file);
     revokePoster(uploadToCancel.localPosterUrl);
     setUploads((prev) => prev.filter((u) => u !== uploadToCancel));
   };

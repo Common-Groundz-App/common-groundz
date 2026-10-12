@@ -12,13 +12,14 @@ export interface PublicFlags {
   };
   reviews: {
     composer_page_enabled: boolean;
+    video_enabled: boolean;
   };
 }
 
 const DEFAULTS: PublicFlags = {
   mux: { uploads_enabled: true, prewarm_enabled: true, mode: 'live' },
   notifications: { realtime_enabled: true },
-  reviews: { composer_page_enabled: false },
+  reviews: { composer_page_enabled: false, video_enabled: false },
 };
 
 export function parsePublicFlags(data: unknown): PublicFlags {
@@ -38,6 +39,8 @@ export function parsePublicFlags(data: unknown): PublicFlags {
     reviews: {
       // Fail closed: only an explicit `true` turns it on.
       composer_page_enabled: reviewsRaw.composer_page_enabled === true,
+      // Fail closed: new review video picks only on an explicit `true`.
+      video_enabled: reviewsRaw.video_enabled === true,
     },
   };
 }
@@ -75,4 +78,18 @@ export function useNotificationsRealtimeEnabled(): boolean {
   const { data, status, isPlaceholderData } = useAppConfig();
   if (status !== 'success' || isPlaceholderData) return false;
   return data?.notifications?.realtime_enabled === true;
+}
+
+/**
+ * Review video picking (Phase 2), resolved fail-closed: until flags have
+ * really loaded, both are false so no new video can be picked. Saved videos
+ * are never affected by these values.
+ */
+export function useReviewVideoFlags(): { settingOn: boolean; muxUploadsOn: boolean } {
+  const { data, status, isPlaceholderData } = useAppConfig();
+  if (status !== 'success' || isPlaceholderData) return { settingOn: false, muxUploadsOn: false };
+  return {
+    settingOn: data?.reviews?.video_enabled === true,
+    muxUploadsOn: data?.mux?.uploads_enabled === true,
+  };
 }

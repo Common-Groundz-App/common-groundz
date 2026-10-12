@@ -41,6 +41,11 @@ import { parseEntityTypeAtBoundary } from '@/services/entityType';
 import { createReview, updateReview } from '@/services/review/core';
 import { findOwnReviewForEntity } from '@/services/review/ownReview';
 import { deleteMedia } from '@/services/mediaService';
+import { supabase } from '@/integrations/supabase/client';
+import { useReviewVideoFlags } from '@/hooks/useAppConfig';
+import { useMuxStatus } from '@/hooks/useMuxStatus';
+import { MuxUploadChip } from '@/components/feed/composer/MuxUploadChip';
+import { hasVideo, muxUploadIds, videoPickPolicy, videoSaveBlocker, visibilityLockReason } from '../reviewVideo';
 import { getCapabilities } from '../modes';
 import { getQuestionnaireContext, sectionAvailability } from '../sections';
 import {
@@ -51,7 +56,7 @@ import {
 } from '../store';
 import { nextStep, stepCount, validateForSubmit } from '../stepEngine';
 import { buildCreateReviewPayload, buildEditReviewPayload } from '../saveBuilders';
-import { fromCreateReviewError, fromUpdateReviewError, MEDIA_RETIRED_TOAST } from '../serverErrors';
+import { fromCreateReviewError, fromUpdateReviewError, MEDIA_RETIRED_TOAST, reviewVideoErrorMessage } from '../serverErrors';
 import { gatherAmbiguousSaveEvidence } from '../reconcile';
 import { useUploadSession } from '../useUploadSession';
 import type { SectionId } from '../values';
@@ -128,6 +133,37 @@ export function ReviewComposerScreen(props: Props) {
     dispatch({ type: 'HYDRATED', sessionKey, record: { review: props.loaded.record } });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey, state.status]);
+
+  /* ---------------- review video (Phase 2) ---------------- */
+  const videoFlags = useReviewVideoFlags();
+  const storedMedia = useMemo(() => state.stored?.media ?? [], [state.stored?.media]);
+  const videoIds = useMemo(() => muxUploadIds(state.values.media), [state.values.media]);
+  const muxStatuses = useMuxStatus(videoIds);
+  // Videos in this review's timeline updates also keep it public (Phase 1 rule).
+  const [updatesHaveVideo, setUpdatesHaveVideo] = useState(false);
+  const storedReviewId = isEdit ? state.stored?.id ?? null : null;
+  useEffect(() => {
+    if (!storedReviewId) return;
+    let live = true;
+    void supabase
+      .from('review_updates')
+      .select('media')
+      .eq('review_id', storedReviewId)
+      .then(({ data }) => {
+        if (!live || !data) return;
+        setUpdatesHaveVideo(data.some((r) => hasVideo(Array.isArray(r.media) ? (r.media as unknown as MediaItem[]) : [])));
+      });
+    return () => {
+      live = false;
+    };
+  }, [storedReviewId]);
+  const videoPolicy = videoPickPolicy({ ...videoFlags, visibility: state.values.visibility });
+  const visibilityLocked = visibilityLockReason(state.values.media, updatesHaveVideo);
+  const videoBlocker = videoSaveBlocker(state.values.media, storedMedia, muxStatuses);
+  const videoOverlay = (m: MediaItem) => {
+    const id = m.type === 'video' ? m.mux_upload_id : undefined;
+    return id ? <MuxUploadChip uploadId={id} status={muxStatuses[id]?.ui_status} /> : null;
+  };
 
   const ctx = sectionContextOf(state);
   const subjectId = isEdit ? state.stored?.entity_id ?? null : state.values.subject?.id ?? null;
@@ -371,7 +407,10 @@ export function ReviewComposerScreen(props: Props) {
       dispatch({ type: 'SAVE_RESULT', sessionKey, result });
       if (result.status === 'existing_review' && subjectId) runExistingCheck(subjectId);
       if (result.status === 'media_retired') toast(MEDIA_RETIRED_TOAST);
-      if (result.status === 'error') {
+      const videoMsg = result.status === 'error' ? reviewVideoErrorMessage(error) : null;
+      if (videoMsg) {
+        toast({ title: "Couldn't save your review", description: videoMsg, variant: 'destructive' });
+      } else if (result.status === 'error') {
         const reason = (error as { code?: string } | null)?.code;
         toast({ title: "Couldn't save your review", description: reason ? `Please try again. (Reason: ${reason})` : 'Please try again.', variant: 'destructive' });
       }
@@ -570,17 +609,24 @@ export function ReviewComposerScreen(props: Props) {
                   <span>Your media ({state.values.media.length}/4)</span>
                 </Label>
                 <CompactMediaGrid
-                canRemove={(m) => m.type !== 'video'} media={state.values.media} onRemove={handleMediaRemove} maxVisible={4} className="group" />
+                  media={state.values.media}
+                  onRemove={handleMediaRemove}
+                  overlayForItem={videoOverlay}
+                  maxVisible={4}
+                  className="group"
+                />
               </div>
             )}
 
             <div className="space-y-2">
               <Label className="mb-1 flex items-center gap-2 font-medium">
                 <span className="text-lg">📸</span>
-                <span>Add photos</span>
+                <span>{videoPolicy.allowVideo ? 'Add photos or a short video' : 'Add photos'}</span>
               </Label>
               <MediaUploader
-                allowVideo={false}
+                allowVideo={videoPolicy.allowVideo}
+                videoMuxOnly
+                videoRefusedMessage={videoPolicy.reason ?? undefined}
                 sessionId={uploads.sessionId}
                 onMediaUploaded={handleMediaAdded}
                 initialMedia={state.values.media}
@@ -595,6 +641,12 @@ export function ReviewComposerScreen(props: Props) {
                   ? `${state.values.media.length}/4 media items added - Add photos to make your review stand out`
                   : 'Add photos to make your review stand out'}
               </p>
+              {videoPolicy.reason && (
+                <p className="text-xs text-muted-foreground" data-testid="review-video-reason">{videoPolicy.reason}</p>
+              )}
+              {videoBlocker && (
+                <p role="alert" className="text-xs text-destructive">{videoBlocker}</p>
+              )}
             </div>
             {err('media') && <FieldError message={err('media')!} />}
           </div>
@@ -633,6 +685,7 @@ export function ReviewComposerScreen(props: Props) {
               onExperienceDateChange={(d) => setValue('experienceDate', d.toISOString())}
               visibility={state.values.visibility}
               onVisibilityChange={(v) => setValue('visibility', v)}
+              nonPublicLockedReason={visibilityLocked}
             />
             {err('visibility') && <FieldError message={err('visibility')!} />}
           </div>
@@ -644,7 +697,7 @@ export function ReviewComposerScreen(props: Props) {
           Back
         </Button>
         {isLast ? (
-          <Button type="button" onClick={handleSave} disabled={!canSubmit(state) || isUploading || subjectBlocked}>
+          <Button type="button" onClick={handleSave} disabled={!canSubmit(state) || isUploading || subjectBlocked || !!videoBlocker}>
             {state.status === 'saving' ? 'Saving…' : caps.submitLabel}
           </Button>
         ) : (

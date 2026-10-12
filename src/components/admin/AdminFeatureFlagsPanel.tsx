@@ -42,6 +42,7 @@ type PendingChange =
   | { key: 'entity_extraction.search_brand_logo_lookup_enabled'; nextEnabled: boolean }
   | { key: 'notifications.realtime_enabled'; nextEnabled: boolean }
   | { key: 'reviews.composer_page_enabled'; nextEnabled: boolean }
+  | { key: 'reviews.video_enabled'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
@@ -131,6 +132,9 @@ export function AdminFeatureFlagsPanel() {
   // Step 3B — review composer page rollout. Default OFF.
   const composerPageRow = rows.data?.find((r) => r.key === 'reviews.composer_page_enabled');
   const composerPageEnabled: boolean = composerPageRow?.value?.enabled === true;
+  // Review video Phase 2 — new video picks on the new review pages. Default OFF.
+  const reviewVideoRow = rows.data?.find((r) => r.key === 'reviews.video_enabled');
+  const reviewVideoEnabled: boolean = reviewVideoRow?.value?.enabled === true;
 
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
@@ -173,6 +177,10 @@ export function AdminFeatureFlagsPanel() {
                         ? pending.nextEnabled
                           ? 'Enable brand logo lookup for Search?'
                           : 'Disable brand logo lookup for Search?'
+                        : pending?.key === 'reviews.video_enabled'
+                          ? pending.nextEnabled
+                            ? 'Turn on review videos?'
+                            : 'Turn off review videos?'
                         : pending?.key === 'reviews.composer_page_enabled'
                           ? pending.nextEnabled
                             ? 'Turn on the new review page?'
@@ -224,6 +232,10 @@ export function AdminFeatureFlagsPanel() {
                           ? pending.nextEnabled
                             ? 'When ON, Search-to-Draft results fetch brand logos in the background using the same Google CSE lookup URL Analysis uses. Admins can test even when OFF. Uses the existing Google CSE daily quota.'
                             : 'Disables background brand logo lookup for Search-to-Draft. Brand chips will show initials instead of logos.'
+                          : pending?.key === 'reviews.video_enabled'
+                            ? pending.nextEnabled
+                              ? 'Authors can add one short video to public reviews and timeline updates on the new review pages.'
+                              : 'Stops new video picks. Saved videos stay exactly as they are, and uploads already in progress finish.'
                           : pending?.key === 'reviews.composer_page_enabled'
                             ? pending.nextEnabled
                               ? 'Signed-in users can open the new review page directly. Review buttons still open the old popup.'
@@ -288,6 +300,12 @@ export function AdminFeatureFlagsPanel() {
       } else if (pending.key === 'entity_extraction.search_image_cse_fallback_enabled') {
         await setFlag.mutateAsync({
           key: 'entity_extraction.search_image_cse_fallback_enabled',
+          value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else if (pending.key === 'reviews.video_enabled') {
+        await setFlag.mutateAsync({
+          key: 'reviews.video_enabled',
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
@@ -910,6 +928,30 @@ export function AdminFeatureFlagsPanel() {
               disabled={rows.isLoading || setFlag.isPending}
               onCheckedChange={(checked) =>
                 setPending({ key: 'reviews.composer_page_enabled', nextEnabled: checked })
+              }
+            />
+          </div>
+          <div className="mt-3 flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="reviews-video" className="text-base">
+                Review videos
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When ON, authors can add one short video to public reviews and timeline updates on the new review pages. OFF only stops new picks; saved videos are never changed.
+              </p>
+              {reviewVideoRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(reviewVideoRow.updated_at), { addSuffix: true })}
+                  {reviewVideoRow.updated_reason ? ` — “${reviewVideoRow.updated_reason}”` : ''}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="reviews-video"
+              checked={reviewVideoEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({ key: 'reviews.video_enabled', nextEnabled: checked })
               }
             />
           </div>

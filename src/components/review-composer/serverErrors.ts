@@ -80,3 +80,7 @@ export function toBlockedReason(result: ComposerServerResult): BlockedReason | n
       return null;
   }
 }
+
+/* ---------------- review video (Phase 2) ---------------- */
+// Text matching lives in utils (like the media-retired helper); the composer only consumes it.
+export { reviewVideoErrorMessage } from '@/utils/reviewVideoErrors';

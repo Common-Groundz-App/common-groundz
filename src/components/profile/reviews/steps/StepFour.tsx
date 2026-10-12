@@ -28,6 +28,8 @@ interface StepFourProps {
   onExperienceDateChange: (date: Date) => void;
   visibility: "public" | "circle_only" | "private";
   onVisibilityChange: (value: "public" | "circle_only" | "private") => void;
+  /** Optional (new composer only): when set, only "Everyone" can be chosen and this reason is shown. */
+  nonPublicLockedReason?: string | null;
 }
 
 const StepFour = ({
@@ -46,7 +48,9 @@ const StepFour = ({
   onExperienceDateChange,
   visibility,
   onVisibilityChange,
+  nonPublicLockedReason,
 }: StepFourProps) => {
+  const locked = !!nonPublicLockedReason;
   return (
     <div className="w-full space-y-8 py-2">
       <h2 className="text-xl font-medium text-center">
@@ -132,7 +136,7 @@ const StepFour = ({
           {/* My Circle Option */}
           <div className="flex flex-col space-y-2 border border-brand-orange/30 p-4 rounded-lg hover:bg-brand-orange/5 transition-colors">
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="circle_only" id="circle" className="text-brand-orange" />
+              <RadioGroupItem value="circle_only" id="circle" className="text-brand-orange" disabled={locked && visibility !== 'circle_only'} />
               <Label htmlFor="circle" className="cursor-pointer font-medium">My Circle</Label>
             </div>
             <p className="text-xs text-muted-foreground pl-6">
@@ -143,7 +147,7 @@ const StepFour = ({
           {/* Just Me Option */}
           <div className="flex flex-col space-y-2 border border-brand-orange/30 p-4 rounded-lg hover:bg-brand-orange/5 transition-colors">
             <div className="flex items-center space-x-2">
-              <RadioGroupItem value="private" id="private" className="text-brand-orange" />
+              <RadioGroupItem value="private" id="private" className="text-brand-orange" disabled={locked && visibility !== 'private'} />
               <Label htmlFor="private" className="cursor-pointer font-medium">Just Me</Label>
             </div>
             <p className="text-xs text-muted-foreground pl-6">
@@ -151,6 +155,11 @@ const StepFour = ({
             </p>
           </div>
         </RadioGroup>
+        {locked && (
+          <p role="status" className="text-xs text-muted-foreground" data-testid="visibility-locked-reason">
+            {nonPublicLockedReason}
+          </p>
+        )}
       </div>
     </div>
   );
