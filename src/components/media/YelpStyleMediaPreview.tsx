@@ -3,17 +3,36 @@ import { MediaItem } from '@/types/media';
 import { cn } from '@/lib/utils';
 import { isMuxPreparing } from '@/utils/muxMedia';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
+import { FeedVideo } from '@/components/media/FeedVideo';
+import type { VideoHandoff, VideoExitHandoff } from '@/types/media';
+import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
+import { isMuxItem, isMuxPlayable, isMuxErroredOrBroken } from '@/utils/muxMedia';
 
 interface YelpStyleMediaPreviewProps {
   media: MediaItem[];
   onImageClick?: (index: number) => void;
   className?: string;
+  /**
+   * Review video Phase 3 — opt-in: playable videos use the shared feed
+   * player (autoplay, mute, one-at-a-time, lightbox handoff). Off by
+   * default so existing callers (legacy frozen forms) are unchanged.
+   */
+  playVideos?: boolean;
+  onVideoTap?: (index: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
+  videoSourceId?: string;
+  videoResume?: { index: number; handoff: VideoExitHandoff } | null;
+  onResumeConsumed?: () => void;
 }
 
 export function YelpStyleMediaPreview({ 
   media, 
   onImageClick, 
-  className 
+  className,
+  playVideos = false,
+  onVideoTap,
+  videoSourceId,
+  videoResume,
+  onResumeConsumed,
 }: YelpStyleMediaPreviewProps) {
   if (!media || media.length === 0) {
     return null;
@@ -25,6 +44,31 @@ export function YelpStyleMediaPreview({
   const renderMedia = (item: MediaItem, index: number) => {
     const isVideo = item.type === 'video';
     const src = item.thumbnail_url || item.url;
+    const usePlayer = playVideos && isVideo && (isMuxItem(item) ? isMuxPlayable(item) : !!item.url);
+    const showErrorBadge = playVideos && isVideo && isMuxErroredOrBroken(item);
+
+    if (usePlayer) {
+      return (
+        <div
+          key={item.id || index}
+          className="relative overflow-hidden rounded-md bg-muted"
+          style={getMediaStyle(sortedMedia.length, index)}
+          data-testid="review-video-tile"
+        >
+          <FeedVideo
+            item={item}
+            className="h-full w-full"
+            objectFit="cover"
+            showBadge={false}
+            source="review"
+            sourceId={videoSourceId}
+            onTap={(handoff, extras) => onVideoTap?.(index, handoff, extras)}
+            resumeState={videoResume?.index === index ? videoResume.handoff : undefined}
+            onResumeConsumed={onResumeConsumed}
+          />
+        </div>
+      );
+    }
 
     return (
       <div
@@ -34,8 +78,11 @@ export function YelpStyleMediaPreview({
         style={getMediaStyle(sortedMedia.length, index)}
       >
         {isVideo ? (
+          showErrorBadge ? (
+            <MuxPreparingPoster item={item} className="h-full w-full" objectFit="cover" />
+          ) : 
           isMuxPreparing(item) ? (
-            <MuxPreparingPoster item={item} className="h-full w-full" objectFit="cover" hideBadge />
+            <MuxPreparingPoster item={item} className="h-full w-full" objectFit="cover" hideBadge={!playVideos} />
           ) : (
             <video
               src={item.url}
@@ -53,7 +100,7 @@ export function YelpStyleMediaPreview({
           />
         )}
         
-        {isVideo && (
+        {isVideo && !showErrorBadge && !(playVideos && isMuxPreparing(item)) && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="rounded-full bg-black/50 p-2">
               <svg
