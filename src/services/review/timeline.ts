@@ -121,7 +121,7 @@ export const addReviewUpdate = async (
    * as `null` (the author cleared their answer) instead of being omitted.
    * Existing callers don't pass it and behave exactly as before.
    */
-  options?: { sendExplicitNull?: boolean },
+  options?: { sendExplicitNull?: boolean; onError?: (error: unknown) => void },
 ): Promise<boolean> => {
   try {
     // Shaped to match the generated `review_updates` Insert row: `rating` is
@@ -159,6 +159,7 @@ export const addReviewUpdate = async (
 
     if (error) {
       console.error('Error adding review update:', error);
+      options?.onError?.(error);
       return false;
     }
 
@@ -228,6 +229,8 @@ export const editLatestReviewUpdate = async (
   comment: string,
   media: MediaItem[],
   wouldRecommend: 'yes' | 'maybe' | 'no' | 'auto' | null,
+  /** Additive: receives the raw server error (review composers map video errors). */
+  onError?: (error: unknown) => void,
 ): Promise<EditUpdateResult> => {
   try {
     const { data, error } = await supabase.rpc('edit_latest_review_update', {
@@ -240,6 +243,7 @@ export const editLatestReviewUpdate = async (
     });
     if (error) {
       console.error('Error editing timeline update:', error);
+      onError?.(error);
       if (isMediaRetiredError(error)) return 'media_retired';
       return 'error';
     }
