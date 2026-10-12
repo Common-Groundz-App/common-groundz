@@ -1,43 +1,27 @@
-# Phase 1: what to do now that the SQL Editor runs one query at a time
+# Close Phase 1 (review video server foundation)
 
-## Agreed record for Race 1A
-- Functional rule: **passed**. A timeline video can't be saved once the review is private (`review_video_public_only`).
-- Real overlap / lock proof: **unverified**. Tab B only started after Tab A finished.
+I checked the cleanup myself: John Carter has 0 reviews, and no test uploads or video links from the run remain.
 
-## Options that meet your conditions
-No dblink, no permanent helpers or permissions, no credentials shared with me.
+## What gets recorded
 
-| Option | Safety | Effort | Proves overlap? |
-|---|---|---|---|
-| **A. Two separate browser sessions of the SQL Editor** (one normal window and one private/incognito window, or two different browsers), both signed into your Supabase dashboard yourself | Same as before. Nothing new is installed or granted. You sign in yourself | Low: one quick try | Only if the dashboard lets two sessions run at once. The watch query will show it either way |
-| **B. Two terminal windows on your own computer using `psql`**, connected with your own database password, which never leaves your machine | Safe, but it means installing a database tool and handling your database password locally | Medium to high | Yes, reliably |
-| **C. Close Phase 1 with the three races marked "overlap unverified"** | Safest; nothing more runs | None | No |
+**Verification note** (`docs/verification/review-video-phase-1.md`), new "Phase 1 closed" section:
+- Database tests (single connection, rolled back): **39/39 passed**, including the strict one-hour rule for reviews and timeline updates.
+- Race 1, private vs timeline video: **functional behaviour passed**. Live run on 2026-10-12 with the throwaway test account; the timeline video was refused with `review_video_public_only`. The reverse case is covered by the test suite (`review_video_visibility_locked`).
+- Race 2, Mux "ready" vs removing the video: **functional outcome passed** in the test suite (late event ignored, video not restored, cover recomputed).
+- Race 3, Mux "ready" vs reordering: **functional outcome passed** in the test suite (cover follows the first item in every case).
+- True simultaneous overlap / lock proof for Races 1–3: **unverified**. The Supabase SQL Editor wouldn't run a second query while the first was still running, even in separate browser sessions.
+- The locking design is in place: row locks on the review, a per-review timeline lock, and the Mux update locking the content before its link. It just couldn't be watched directly with two connections in this environment.
+- Deliberately not used: dblink or other extensions, temporary helpers, new permissions, local database credentials.
+- Test cleanup: exact IDs only, all test-specific counts back to 0 (confirmed by you and re-checked by me).
+- Follow-up (optional): re-run the three races if a two-connection test setup becomes available.
 
-### My recommendation
-1. **Try Option A once, with Race 1A only.**
-   - If the watch query shows two different `pid`s, with B waiting on A's lock, we run the remaining races the same way.
-   - If B still won't start until A finishes, stop there.
-2. **If A doesn't work, take Option C.** I don't recommend Option B. Handling the database password on your computer adds risk, just to test locks we already designed carefully. And changing how production works just to test it would be wrong.
+**Roadmap** (review video section):
+- Mark "Phase 1 two-connection concurrency tests" as closed: functional behaviour passed, overlap unverified because of the SQL Editor limitation.
+- Mark Phase 1 complete.
+- Leave Phase 2 open and on hold until you approve its plan.
 
-Why closing with "unverified" is reasonable:
-- The locking rules themselves are in place.
-- The single-connection tests (39/39) prove every rule's outcome.
-- Race 1A's outcome has also been confirmed live.
-- What stays unproven is only the timing guarantee under true simultaneous saves.
-
-## Clean up first, whatever you choose
-After Race 1A the test review is still in the database and set to **private**. Run the exact-ID **Cleanup** script and then the **Cleanup check** from the previous package (unchanged; every value must be 0). For Option A, run Step 1 setup again before retrying Race 1A.
-
-## If we close Phase 1 (Option C, or A fails)
-I'll update the Phase 1 verification note and roadmap to say:
-- **Race 1** (private vs timeline video): rule passed in both directions on one connection; 1A also confirmed live. Overlap unverified.
-- **Race 2** (Mux ready vs removing the video): outcome passed on one connection. Overlap unverified.
-- **Race 3** (Mux ready vs reordering): outcome passed on one connection. Overlap unverified.
-- Why it's unverified: the Supabase SQL Editor runs one query at a time; dblink was declined; no other two-connection method was available without handling credentials.
-- Risk note: the database is built to make these cases wait for each other (row locks plus a per-review lock). The tests just couldn't watch it happen.
-- **Follow-up:** re-run the three races if a two-connection test setup becomes available, for example a separate test database.
-
-Then Phase 1 is closed. Video uploads stay off and Phase 2 stays on hold until you approve it separately.
+## Then stop
+Video uploads stay off on every review screen. After this, I'll write the Phase 2 plan (video on the new Review and Timeline pages) for your approval before building anything.
 
 ## Not touched
-Production rules, permissions, posts, photo cleanup, legacy forms, review screens.
+Database rules, permissions, posts, photo cleanup, legacy forms, review screens.
