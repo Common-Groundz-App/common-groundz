@@ -21,6 +21,8 @@ import ReviewForm from './ReviewForm';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { MediaItem } from '@/types/media';
+import { visibleReviewMedia } from '@/utils/reviewMediaDisplay';
+import { canEditReview } from '@/utils/reviewEditPolicy';
 import { EntityCardFallbackImage } from '@/components/cards/EntityCardFallbackImage';
 import {
   getAuthorMediaItems,
@@ -81,9 +83,14 @@ const ReviewCard = ({
   // Group 3B: author-authored media only. The subject (entity) image is no
   // longer merged in here, so a broken subject image can reach the shared
   // fallback contract instead of failing silently inside PostMediaDisplay.
+  // Review video Phase 3: the shared display rule hides processing/failed
+  // videos from non-authors and gives every item a stable identity.
   const mediaItems = React.useMemo<MediaItem[]>(
-    () => getAuthorMediaItems({ id: review.id, media: review.media, image_url: review.image_url }),
-    [review.id, review.media, review.image_url],
+    () => visibleReviewMedia(
+      getAuthorMediaItems({ id: review.id, media: review.media, image_url: review.image_url }),
+      { kind: 'review', ownerId: review.id, isOwner, canEdit: canEditReview(review as any, user?.id) },
+    ).items,
+    [review, isOwner, user?.id],
   );
 
   // Determine if media should be shown based on hideEntityFallbacks setting
@@ -299,6 +306,8 @@ const ReviewCard = ({
                   objectFit="contain"
                   enableBackground={true}
                   thumbnailDisplay="none"
+                  source="review"
+                  sourceId={review.id}
                 />
               </div>
             )}
@@ -514,6 +523,8 @@ const ReviewCard = ({
                 objectFit="contain"
                 enableBackground={true}
                 thumbnailDisplay="none"
+                  source="review"
+                  sourceId={review.id}
               />
             </div>
           )}

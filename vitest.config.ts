@@ -68,6 +68,7 @@ const nodeIncludes = [
   'src/components/review-composer/__tests__/composerPage3b.test.ts',
   'src/components/review-composer/__tests__/composer3bCloseout.test.ts',
   'src/components/review-composer/__tests__/composer3cTimeline.test.ts',
+  'src/components/review-composer/__tests__/reviewVideoPhase2.test.ts',
 ];
 
 
@@ -128,6 +129,8 @@ export default defineConfig({
             'src/components/reviews/ReviewOwnerMenu.test.tsx',
             'src/components/profile/reviews/__tests__/ReviewFormSubjectReset.test.tsx',
   'src/components/profile/reviews/__tests__/ReviewFormExistingReview.test.tsx',
+  'src/components/media/__tests__/reviewVideoPhase3.test.tsx',
+  'src/hooks/__tests__/useVideoViewTracker.phase3.test.tsx',
           ],
         },
       },

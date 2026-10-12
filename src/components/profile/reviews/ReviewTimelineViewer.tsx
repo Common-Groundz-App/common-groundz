@@ -23,6 +23,7 @@ import { ReviewEditTooltipContent } from '@/components/reviews/ReviewEditTooltip
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import {
   canEditTimelineUpdate,
+  canEditReview,
   UPDATE_DELETE_DESCRIPTION,
   UPDATE_DELETE_TITLE,
 } from '@/utils/reviewEditPolicy';
@@ -48,6 +49,7 @@ import { AISummaryCard } from '@/components/ui/ai-summary-card';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
+import { ReviewMediaBlock } from '@/components/media/ReviewMediaBlock';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
@@ -579,10 +581,13 @@ export const ReviewTimelineViewer = ({
                       const initialMedia = getInitialReviewMedia();
                       return initialMedia.length > 0 && (
                         <div className="mt-3">
-                          <YelpStyleMediaPreview
+                          <ReviewMediaBlock
                             media={initialMedia}
-                            onImageClick={handleInitialReviewMediaClick}
-                            className="max-w-md"
+                            kind="review"
+                            ownerId={reviewId}
+                            isOwner={isOwner}
+                            canEdit={canEditReview(reviewData as any, user?.id)}
+                            gridClassName="max-w-md"
                           />
                         </div>
                       );
@@ -710,10 +715,13 @@ export const ReviewTimelineViewer = ({
                       {/* Display media if present */}
                       {update.media && update.media.length > 0 && (
                         <div className="mt-3">
-                          <YelpStyleMediaPreview
+                          <ReviewMediaBlock
                             media={update.media}
-                            onImageClick={(index) => handleTimelineUpdateMediaClick(update.media, index)}
-                            className="max-w-md"
+                            kind="review_update"
+                            ownerId={update.id}
+                            isOwner={isOwner}
+                            canEdit={canEditThis}
+                            gridClassName="max-w-md"
                           />
                         </div>
                       )}

@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ReviewWithUser } from '@/types/entities';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
-import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
-import { LightboxPreview } from '@/components/media/LightboxPreview';
+import { ReviewMediaBlock } from '@/components/media/ReviewMediaBlock';
+import { canEditReview } from '@/utils/reviewEditPolicy';
 import { MediaItem } from '@/types/media';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import UsernameLink from '@/components/common/UsernameLink';
@@ -37,35 +37,20 @@ interface ReviewCardProps {
 const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimelineClick, onDeleted }) => {
   const { user } = useAuth();
   const isOwner = 'user' in review && !!user && user.id === review.user_id;
-  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 
   // Using shared getInitialsFromName from profileUtils
 
   // Filter and sort media
-  const validMedia: MediaItem[] = (review.media || [])
-    .filter(item => !(item as any).is_deleted)
-    .map(item => ({
-      id: (item as any).id || '',
-      url: (item as any).url || '',
-      type: (item as any).type || 'image',
-      thumbnail_url: (item as any).thumbnail_url,
-      order: (item as any).order || 0,
-      caption: (item as any).caption,
-      alt: (item as any).alt,
-      is_deleted: (item as any).is_deleted,
-      session_id: (item as any).session_id,
-      width: (item as any).width,
-      height: (item as any).height,
-      orientation: (item as any).orientation,
-      source: (item as any).source
-    }))
-    .sort((a, b) => (a.order || 0) - (b.order || 0));
-
-  const handleMediaClick = (index: number) => {
-    setSelectedMediaIndex(index);
-    setIsLightboxOpen(true);
-  };
+  // Review video Phase 3: keep every field (incl. Mux) so the shared
+  // display rule and player see the real item.
+  const validMedia: MediaItem[] = ((review.media || []) as any[]).map(item => ({
+    ...item,
+    id: item.id || '',
+    url: item.url || '',
+    type: item.type || 'image',
+    order: item.order || 0,
+  }));
+  const canEditThis = 'user' in review && canEditReview(review as any, user?.id);
 
   // Transform ReviewWithUser to match the expected UI format
   const transformedReview = 'user' in review ? {
@@ -155,24 +140,18 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimel
           
           {/* Media Display */}
           {validMedia.length > 0 && (
-            <div className="mt-3">
-              <YelpStyleMediaPreview
-                media={validMedia}
-                onImageClick={handleMediaClick}
-              />
-            </div>
+            <ReviewMediaBlock
+              className="mt-3"
+              media={validMedia}
+              kind="review"
+              ownerId={String(review.id)}
+              isOwner={isOwner}
+              canEdit={canEditThis}
+            />
           )}
         </div>
       </div>
 
-      {/* Lightbox */}
-      {isLightboxOpen && validMedia.length > 0 && (
-        <LightboxPreview
-          media={validMedia}
-          initialIndex={selectedMediaIndex}
-          onClose={() => setIsLightboxOpen(false)}
-        />
-      )}
     </div>
   );
 };

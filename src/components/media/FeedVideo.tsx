@@ -300,6 +300,8 @@ function FeedVideoPlayer({
     sourceId,
     mediaPath: extractMediaPath(item.url),
     autoplayRef,
+    // Review video Phase 3: review videos never record views; posts/entity unchanged.
+    enabled: source !== 'review',
   });
 
   // Register the <video> element with the manager (and on unmount).

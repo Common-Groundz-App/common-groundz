@@ -23,6 +23,8 @@ interface Options {
   sourceId?: string;
   mediaPath: string;
   autoplayRef: RefObject<boolean>;
+  /** When false the hook is a no-op (review videos never record views). */
+  enabled?: boolean;
 }
 
 /**
@@ -36,8 +38,10 @@ export function useVideoViewTracker({
   sourceId,
   mediaPath,
   autoplayRef,
+  enabled = true,
 }: Options) {
   useEffect(() => {
+    if (!enabled) return;
     const el = videoRef.current;
     if (!el || !sourceId || !mediaPath) return;
     if (typeof IntersectionObserver === 'undefined') return;
@@ -131,5 +135,5 @@ export function useVideoViewTracker({
       el.removeEventListener('ended', onPause);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [videoRef, source, sourceId, mediaPath, autoplayRef]);
+  }, [videoRef, source, sourceId, mediaPath, autoplayRef, enabled]);
 }
