@@ -411,7 +411,9 @@ cross-read between them.
 - [ ] Review video (Mux) — plan .lovable/plan/review-video-mux-final-plan-2026-10-11.md
   - [x] Phase 1 server foundation: applied (docs/verification/review-video-phase-1.md)
   - [x] Phase 1 close-out: strict one-hour rule (broken-video exception removed), 39/39 database tests, outage check
-  - [ ] Phase 1 two-connection concurrency tests — blocked: needs a throwaway test account from you, then approval of the exact helper code (no dblink)
+  - [x] Phase 1 concurrency races — closed: functional behaviour passed; true overlap unverified (SQL Editor runs one query at a time)
+  - [x] Phase 1 complete (2026-10-12)
+  - [ ] Phase 2 — on hold until its plan is approved
   - [ ] Phase 2 composers (create/edit) — waiting on your approval
   - [ ] Phase 3 shared player + display
   - [ ] Phase 4 integration + your signed-in checklist
