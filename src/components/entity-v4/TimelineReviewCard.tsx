@@ -12,8 +12,8 @@ import { transformReviewForUI } from '@/utils/reviewDataUtils';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
-import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
-import { LightboxPreview } from '@/components/media/LightboxPreview';
+import { ReviewMediaBlock } from '@/components/media/ReviewMediaBlock';
+import { canEditReview, canEditTimelineUpdate } from '@/utils/reviewEditPolicy';
 import { MediaItem } from '@/types/media';
 import { ReviewOwnerMenu } from '@/components/reviews/ReviewOwnerMenu';
 import type { Review } from '@/services/reviewService';
@@ -36,6 +36,10 @@ interface TimelineEntry {
   isLatest?: boolean;
   date: string;
   media?: MediaItem[];
+  /** Review video Phase 3 — identity + entry-specific edit eligibility. */
+  mediaKind: 'review' | 'review_update';
+  mediaOwnerId: string;
+  canEditMedia: boolean;
 }
 
 export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
@@ -47,8 +51,6 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
 }) => {
   const [timelineData, setTimelineData] = useState<ReviewUpdate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   
   const { user } = useAuth();
   
@@ -57,29 +59,11 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   // Using shared getInitialsFromName from profileUtils
 
   // Filter and sort media
-  const validMedia: MediaItem[] = (review.media || [])
-    .filter(item => !(item as any).is_deleted)
-    .map(item => ({
-      id: item.id || '',
-      url: item.url,
-      type: item.type,
-      thumbnail_url: item.thumbnail_url,
-      order: (item as any).order || 0,
-      caption: (item as any).caption,
-      alt: (item as any).alt,
-      is_deleted: (item as any).is_deleted,
-      session_id: (item as any).session_id,
-      width: (item as any).width,
-      height: (item as any).height,
-      orientation: (item as any).orientation,
-      source: (item as any).source
-    }))
-    .sort((a, b) => (a.order || 0) - (b.order || 0));
-
-  const handleMediaClick = (index: number) => {
-    setSelectedMediaIndex(index);
-    setIsLightboxOpen(true);
-  };
+  // Review video Phase 3: keep every field (incl. Mux) for the shared display rule.
+  const validMedia: MediaItem[] = ((review.media || []) as any[]).map(item => ({
+    ...item,
+    order: item.order || 0,
+  }));
 
   useEffect(() => {
     const loadTimelineData = async () => {
@@ -112,12 +96,21 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
       rating: review.rating,
       isLatest: false,
       date: review.created_at,
-      media: validMedia
+      media: validMedia,
+      mediaKind: 'review',
+      mediaOwnerId: review.id,
+      canEditMedia: canEditReview(review as any, user?.id),
     });
 
     // Add timeline updates
+    const latestUpdateId = [...timelineData]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.id;
     timelineData.forEach((update) => {
       entries.push({
+        mediaKind: 'review_update',
+        mediaOwnerId: update.id,
+        // Update's own hour + latest-update rule, never the parent review's window.
+        canEditMedia: canEditTimelineUpdate(update as any, user?.id, update.id === latestUpdateId),
         period: formatRelativeDate(update.created_at),
         content: update.comment,
         rating: update.rating || undefined,
@@ -273,10 +266,13 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
                    {/* Media for this timeline entry */}
                    {entry.media && entry.media.length > 0 && (
                      <div className="mt-2">
-                       <YelpStyleMediaPreview
+                       <ReviewMediaBlock
                          media={entry.media}
-                         onImageClick={handleMediaClick}
-                         className="max-w-xs"
+                         kind={entry.mediaKind}
+                         ownerId={entry.mediaOwnerId}
+                         isOwner={isOwner}
+                         canEdit={entry.canEditMedia}
+                         gridClassName="max-w-xs"
                        />
                      </div>
                    )}
@@ -293,13 +289,6 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
         </div>
 
         {/* Lightbox */}
-        {isLightboxOpen && (
-          <LightboxPreview
-            media={validMedia}
-            initialIndex={selectedMediaIndex}
-            onClose={() => setIsLightboxOpen(false)}
-          />
-        )}
 
       </CardContent>
     </Card>
