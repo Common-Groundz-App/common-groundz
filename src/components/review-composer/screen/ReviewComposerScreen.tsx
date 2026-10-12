@@ -45,7 +45,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useReviewVideoFlags } from '@/hooks/useAppConfig';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
 import { MuxUploadChip } from '@/components/feed/composer/MuxUploadChip';
-import { REVIEW_VIDEO_COPY, hasVideo, muxUploadIds, videoPickPolicy, videoSaveBlocker, visibilityLockReason } from '../reviewVideo';
+import { hasVideo, muxUploadIds, videoPickPolicy, videoSaveBlocker, visibilityLockReason } from '../reviewVideo';
 import { getCapabilities } from '../modes';
 import { getQuestionnaireContext, sectionAvailability } from '../sections';
 import {
