@@ -49,12 +49,13 @@ Phase 1's three concurrency races stay recorded as "overlap unverified". Phase 2
 
 - Unit: limits, thread-wide visibility lock both ways, parent-private timeline block, save contract table, slot accounting, late/cancelled callbacks, no plain-file fallback, error messages, setting OFF keeps saved videos, legacy forms still photo-only.
 - Database (rolled back, made-up Mux details, no real uploads):
-  - an existing ready video survives an unrelated text/rating edit with trusted state intact (review and timeline);
+  - an unrelated text/rating edit keeps an existing ready, processing, or failed/too-long video and its link exactly as they were (review and timeline);
   - removal within the hour marks its link removed;
   - replacement within the hour marks the old link removed and links the new upload;
   - nothing is deleted from Mux;
   - saving with the setting OFF cannot strip a saved video.
-- Browser checks with mocked uploads and saves for all four modes: Review create, Review edit, Timeline create, Timeline edit. Covers public + video, photo + video, save while processing, remove/replace within the hour, Private/Circle blocking, parent-private timeline blocking, setting OFF regression.
+- Browser checks with mocked uploads and saves for all four modes: Review create, Review edit, Timeline create, Timeline edit. Covers public + video, photo + video, save while processing, live Processing → Ready/Failed without reload, saved failed video kept through a text edit, remove/replace within the hour, Private/Circle blocking, parent-private timeline blocking, setting OFF regression, and switching the setting OFF during an active transfer (the transfer finishes, new picks are disabled).
+- Database fixtures are rolled back; no real Mux uploads or deletions. The "Review videos" setting stays OFF after the work.
 - Signed-in real checks only after you authorize them separately. I report results and stop before Phase 3.
 
 ## Technical details
