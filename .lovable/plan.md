@@ -21,13 +21,21 @@ Phase 1's three concurrency races stay recorded as "overlap unverified". Phase 2
 | Uploading (file still transferring, or upload not yet created) | Blocked: "Wait for your video to finish uploading" | Stops the transfer, releases the slot once |
 | Processing (Mux has the file) | Allowed | Removes it from the draft; nothing deleted from Mux |
 | Ready | Allowed | Same |
-| Failed / too long | Blocked until removed | Same |
+| Failed / too long, new and never saved | Blocked until removed | Same |
+| Failed / too long, already saved (failed after saving while Processing) | Allowed: the owner can edit text/rating and leave it as is | Can be removed or replaced within the hour; locked with the rest after the hour |
 
+- The open page follows Mux live: a video moves from Processing to Ready or Failed without reloading, including one that finishes before Save (existing status hook from /create).
 - Leave-page protection includes an active transfer.
 - Late callbacks from a cancelled upload or an earlier session are ignored (existing session id check), and slots stay correctly counted.
 - Videos only go through Mux. If Mux is unavailable or its upload setting is off, video picking is disabled or shows a retry error; review screens never fall back to storing a video as a plain file (posts keep their current fallback).
-- The screen never writes the video-link records itself. It saves the review/update with the minimal video entry (type, upload id, order), and the Phase 1 save rules link, unlink and fill trusted Mux details in the same save.
-- Media order is preserved, and an unchanged existing video is sent back exactly as loaded so it round-trips untouched.
+- The screen never writes the video-link records itself; the Phase 1 save rules link, unlink and fill trusted Mux details in the same save.
+
+## New vs saved videos when saving
+
+- Newly attached video: the screen sends only type, upload id and order (plus the address only if the existing format needs it). Playback, status, error and asset details always come from the server.
+- Saved video the author did not change: sent back exactly as loaded, never rebuilt from a smaller object, so no trusted detail is dropped. Today's save always sends the full media list, so round-tripping is the path used; the Phase 1 rules re-check it.
+- The screen never invents Mux details, and no longer computes the cover itself when a video is involved — the server already recomputes it.
+- Media order is preserved.
 - Saved-result checks compare the author's fields only and tolerate Mux details the server fills in during processing.
 
 ## Turning the "Review videos" setting off
