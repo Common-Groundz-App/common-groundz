@@ -19,6 +19,7 @@ import { resolveReviewIdentity } from '@/components/profile/reviews/questionnair
 import { parseEntityTypeAtBoundary } from '@/services/entityType';
 import { toTimelineRecommendationValue, type WouldRecommendValue } from '@/services/review/timeline';
 import { MODES } from './modes';
+import { hasVideo, serializeMediaForSave } from './reviewVideo';
 import { getQuestionnaireContext, sectionAvailability, type SectionContext } from './sections';
 import type { ReviewComposerValues, ReviewVisibility, StoredReviewRecord } from './values';
 
@@ -33,7 +34,8 @@ export interface CreateReviewPayload {
   subtitle: string;
   description: string;
   rating: number;
-  image_url: string | null;
+  /** Omitted when the media holds a video: the server owns the cover then. */
+  image_url?: string | null;
   media: MediaItem[];
   visibility: ReviewVisibility;
   experience_date: string | null;
@@ -46,7 +48,7 @@ export type EditReviewPayload = Omit<
     subtitle: string;
     description: string;
     rating: number;
-    image_url: string | null;
+    image_url?: string | null;
     media: MediaItem[];
     visibility: ReviewVisibility;
     experience_date: string | null;
@@ -74,7 +76,11 @@ export interface EditTimelinePayload {
 }
 
 const coverImage = (media: MediaItem[]): string | null => media[0]?.url ?? null;
-const copyMedia = (media: MediaItem[]): MediaItem[] => media.map((m) => ({ ...m }));
+/** Photo-only media keeps today's client cover; with a video the server recomputes it. */
+const coverField = (media: MediaItem[]): { image_url?: string | null } =>
+  hasVideo(media) ? {} : { image_url: coverImage(media) };
+const copyMedia = (media: MediaItem[], stored: readonly MediaItem[] = []): MediaItem[] =>
+  serializeMediaForSave(media, stored);
 
 function metadataFor(
   ctx: SectionContext,
@@ -137,7 +143,7 @@ export function buildCreateReviewPayload(input: {
       subtitle: values.headline,
       description: values.text,
       rating: values.rating ?? 0,
-      image_url: coverImage(values.media),
+      ...coverField(values.media),
       media: copyMedia(values.media),
       visibility: values.visibility,
       experience_date: values.experienceDate,
@@ -165,8 +171,8 @@ export function buildEditReviewPayload(input: {
       subtitle: values.headline,
       description: values.text,
       rating: values.rating ?? 0,
-      image_url: coverImage(values.media),
-      media: copyMedia(values.media),
+      ...coverField(values.media),
+      media: copyMedia(values.media, stored.media ?? []),
       visibility: values.visibility,
       experience_date: values.experienceDate,
       metadata: metadata ?? undefined,
@@ -198,8 +204,10 @@ export function buildEditTimelinePayload(input: {
   values: ReviewComposerValues;
   reviewId: string;
   updateId: string;
+  /** Media as saved on the update; kept videos round-trip from here. */
+  storedMedia?: readonly MediaItem[];
 }): BuildResult<EditTimelinePayload> {
-  const { values, reviewId, updateId } = input;
+  const { values, reviewId, updateId, storedMedia } = input;
   return {
     ok: true,
     payload: {
@@ -207,7 +215,7 @@ export function buildEditTimelinePayload(input: {
       update_id: updateId,
       rating: values.rating !== null && values.rating > 0 ? values.rating : null,
       comment: values.text.trim(),
-      media: copyMedia(values.media),
+      media: copyMedia(values.media, storedMedia ?? []),
       would_recommend: toTimelineRecommendationValue(
         values.recommendation.baseOnRating,
         values.recommendation.choice,
