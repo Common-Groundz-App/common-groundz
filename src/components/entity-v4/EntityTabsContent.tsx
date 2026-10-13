@@ -17,7 +17,6 @@ import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { getEntityStats } from '@/services/entityService';
 import PostFeedItem from '@/components/feed/PostFeedItem';
 import { useEntityPosts } from '@/hooks/use-entity-posts';
-import { FeedVideoManagerProvider } from '@/hooks/useFeedVideoManager';
 
 /**
  * EntityTabsContent - Controlled tab system for entity details (V4 only).
@@ -333,13 +332,11 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
               </p>
             </div>
           ) : (
-            <FeedVideoManagerProvider>
-              <div className="space-y-4">
-                {posts.map((p) => (
-                  <PostFeedItem key={p.id} post={p} />
-                ))}
-              </div>
-            </FeedVideoManagerProvider>
+            <div className="space-y-4">
+              {posts.map((p) => (
+                <PostFeedItem key={p.id} post={p} />
+              ))}
+            </div>
           )}
           <div className="flex justify-center pt-2">
             {hasMore && (
