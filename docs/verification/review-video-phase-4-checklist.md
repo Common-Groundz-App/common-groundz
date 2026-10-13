@@ -113,7 +113,12 @@ Test 1 pass: 5th item refused (only 4 taken); 2nd video refused with one-video m
 Retained test assets added: qA2QwJTc…, lnTcd18B…. Nothing deleted in Mux.
 Still untested (accepted): exact wait-for-upload message; save while Processing; save blocked on failed new video; server too-long on unknown length; real Mux event after the hour; Phase 1 overlap (separate rollout decision).
 
-### Final acceptance smoke test (2026-10-13 12:30 UTC)
+### Final acceptance smoke test (2026-10-13 12:30 UTC) — COMPLETE
 Automated: full suite 1066 passed / 3 skipped; typecheck clean; build OK.
 DB: reviews.video_enabled OFF (confirmed); review video links match test history (review: 1 patched + 1 removed; updates: 2 patched + 3 removed); no unexpected links; Mux assets retained, nothing deleted.
-Browser pass: pending owner run (see checklist below).
+Browser pass: COMPLETE — owner confirmed home feed video behaviour, entity-page media and a post video all working and looking normal (2026-10-13 12:33 UTC). Setting re-confirmed OFF in the database (reviews.video_enabled = false, last changed 12:19:14 UTC).
+
+## REVIEW VIDEO: COMPLETE (2026-10-13)
+Phases 1–4 delivered and verified; the final acceptance smoke test passed on both the automated and the owner-run side.
+Accepted-untested items (recorded above, none blocking): exact wait-for-upload message; save while Processing; save blocked on a failed new video; server too-long on an unknown-length file; a real Mux event arriving after the hour; Phase 1 true overlap.
+Open decisions, deliberately left to the owner: turning reviews.video_enabled ON for everyone; Phase 1 overlap rollout; posts' unknown-length gap; Circle reviews as a read rule; signed Mux playback for private/Circle; the Mux asset-cleanup project.
