@@ -65,7 +65,20 @@ const orientationFor = (w: number, h: number): 'portrait' | 'landscape' | 'squar
   return 'square';
 };
 
-export const validateMediaFile = async (file: File): Promise<{ valid: boolean; error?: string }> => {
+/**
+ * Review video Phase 4: `unknownDurationAllowed` (review composers only) makes
+ * an unreadable / non-finite length an explicit, allowed state — the server's
+ * own Mux measurement then decides (over 60 s becomes "too long"). Without the
+ * option (posts) behaviour is unchanged.
+ */
+export interface ValidateMediaOptions {
+  unknownDurationAllowed?: boolean;
+}
+
+export const validateMediaFile = async (
+  file: File,
+  opts: ValidateMediaOptions = {},
+): Promise<{ valid: boolean; error?: string; durationUnknown?: boolean }> => {
   const isVideo = file.type.startsWith('video/');
 
   if (!ALLOWED_MEDIA_TYPES.includes(file.type)) {
@@ -94,6 +107,9 @@ export const validateMediaFile = async (file: File): Promise<{ valid: boolean; e
   if (isVideo) {
     try {
       const duration = await getVideoDuration(file);
+      if (opts.unknownDurationAllowed && !Number.isFinite(duration)) {
+        return { valid: true, durationUnknown: true };
+      }
       if (duration > MAX_VIDEO_DURATION) {
         return {
           valid: false,
@@ -172,7 +188,7 @@ export const uploadMedia = async (
   try {
     onProgress?.(0, 'preparing');
 
-    const { valid, error } = await validateMediaFile(file);
+    const { valid, error } = await validateMediaFile(file, { unknownDurationAllowed: !!options.videoMuxOnly });
     if (!valid) {
       throw new Error(error);
     }

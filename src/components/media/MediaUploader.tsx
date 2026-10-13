@@ -83,7 +83,8 @@ export function UploadRow({
   const isVideo = upload.file.type.startsWith('video/');
   const serverPoster = upload.item?.thumbnail_url;
   const localPoster = upload.localPosterUrl;
-  const duration = upload.item?.duration ?? upload.localDuration;
+  const rawDuration = upload.item?.duration ?? upload.localDuration;
+  const duration = Number.isFinite(rawDuration) ? rawDuration : undefined;
   const ext =
     upload.file.name.split('.').pop()?.toUpperCase() || (isVideo ? 'VIDEO' : 'IMAGE');
 
@@ -182,6 +183,11 @@ export function UploadRow({
           {ext} · {formatBytes(upload.file.size)}
           {duration ? ` · ${formatDuration(duration)}` : ''}
         </p>
+        {upload.durationUnknown ? (
+          <p className="text-[11px] mt-1 leading-none text-muted-foreground" data-testid="duration-unknown-note">
+            Length will be checked after upload
+          </p>
+        ) : null}
         {isVideo && upload.compatibility ? (
           <div className="mt-1">
             <MediaCompatibilityBadge
@@ -395,7 +401,7 @@ export function MediaUploader({
         continue;
       }
 
-      const { valid, error } = await validateMediaFile(file);
+      const { valid, error, durationUnknown } = await validateMediaFile(file, { unknownDurationAllowed: videoMuxOnly });
       if (!valid) {
         toast({ title: 'Invalid file', description: error, variant: 'destructive' });
         release(file);
@@ -412,6 +418,7 @@ export function MediaUploader({
         status: 'uploading',
         stage: 'preparing',
         compatibility: isVideo ? 'checking' : undefined,
+        durationUnknown: isVideo && durationUnknown ? true : undefined,
       };
       setUploads((prev) => [...prev, newUpload]);
 
