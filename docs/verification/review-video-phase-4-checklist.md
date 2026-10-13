@@ -18,6 +18,13 @@ Actual access rule: a review is readable only if public or by its author; update
 ## Run record (filled in as we go)
 | Kind | ID | Mux upload | Mux asset | Playback | Final state |
 |---|---|---|---|---|---|
+| Review (CHANEL, public) | 0cc9ed7c-8415-4b2c-9fa0-b8f0c7d5ee2d | iHLxrq1e3xp00OcusTaRMoJBulAZ73VyIykqCQ0101He8g | UkBVjFzhnVXgN3m7o00ttxXPUgUUdAt01wYG3iWVKt0284 | b3yGQRsjqlfV7c02Eq2xLCH5jNCZFPw00IRyD6KkyHctM | removed in step 8 (asset retained) |
+| Cancelled upload (step 7) | — | l2S02bWJ5QB8028t0151OoTt6y0001cIU9WqS5umzJlCW4Vk | — | yes | never linked (asset retained) |
+| Cancelled upload (step 7) | — | GCXLSzbQA01caZ2jGOTW4QjqttmFX701tUC2GE3I4VvIc | — | yes | never linked (asset retained) |
+| Review video, replacement (step 8) | 0cc9ed7c-… | 4wduhbzDqgxyrTp9ccE02aligNeENf5KNvNysZI00YiYc | — | yes | linked, slot 1 |
+
+## Block 2 results so far
+0 ON pass · 1 pass · 2 pass (Next blocked; exact message untested) · 3 save-while-processing untested (Mux ready in 6 s) · Ready without reload pass · 4 pass · 5 pass · 6 not applicable (no reordering in the app, by product decision) · 7 pass · 8 pass (old link removed, new link active, cover = first item = photo).
 
 Retained Mux test assets are kept on purpose for the later Mux-cleanup work.
 
