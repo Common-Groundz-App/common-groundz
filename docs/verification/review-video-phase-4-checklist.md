@@ -101,3 +101,14 @@ Block 2 result: COMPLETE (approved by owner 2026-10-13 11:50 UTC) — pass, with
 
 ### Block 3 (started 2026-10-13; setting ON 11:52 UTC / 17:22 IST)
 Test 1 pass: 5th item refused (only 4 taken); 2nd video refused with one-video message; >100 MB refused before upload; normal-65s refused before upload. DB: exactly one new upload (NNsiSPUZpwOkDQmu31Bfrt4SQ1Ftde617F02OWH1yLYg, the ok-8s clip from 1b, never linked, asset retained); none from the refused files; no update saved.
+
+### Final condensed session (2026-10-13, setting OFF 12:19 UTC / 17:49 IST) — Phase 4 COMPLETE
+1 Broken video pass: update 4669ddf6-68ec-488d-ab28-397f5a398199, upload qA2QwJTcK8IgpyTqq6NsUNjXQKrORWEpIWtTVQM7Yus → errored ("input file was corrupt"), no playback ID; owner sees "Couldn't process this video. Edit to remove or replace it."; other users see nothing. Cover unchanged (photo). Save-blocked-while-failed untested (Mux failed after save).
+2 No-length video: browser read the length and refused it client-side ("too long"). Server-side too-long result UNTESTED by hand; covered by Phase 1 DB tests.
+3 Update's own video pass: update 5a0fee6d-ba45-438c-ba00-8fd72f2c352c, upload lnTcd18BVWbQXt02gcM7wA6pErYD6kBiA72LjLYfzVA00 ready, link patched. Closes the Block 2 carry-over.
+4 Player coordination pass (one at a time, full screen hand-off, nothing behind).
+5 One-hour lock pass (natural, review created 10:57 UTC): no Edit; Delete + Add update shown.
+6 Privacy pass: signed-out, Pixi "Only me" review hidden.
+7 Post video regression pass. Setting confirmed OFF in DB.
+Retained test assets added: qA2QwJTc…, lnTcd18B…. Nothing deleted in Mux.
+Still untested (accepted): exact wait-for-upload message; save while Processing; save blocked on failed new video; server too-long on unknown length; real Mux event after the hour; Phase 1 overlap (separate rollout decision).
