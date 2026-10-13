@@ -24,7 +24,8 @@ Actual access rule: a review is readable only if public or by its author; update
 | Review video, replacement (step 8) | 0cc9ed7c-… | 4wduhbzDqgxyrTp9ccE02aligNeENf5KNvNysZI00YiYc | — | yes | linked, slot 1 |
 
 ## Block 2 results so far
-0 ON pass · 1 pass · 2 pass (Next blocked; exact message untested) · 3 save-while-processing untested (Mux ready in 6 s) · Ready without reload pass · 4 pass · 5 pass · 6 not applicable (no reordering in the app, by product decision) · 7 pass · 8 pass (old link removed, new link active, cover = first item = photo).
+0 ON pass · 1 pass · 2 pass (Next blocked; exact message untested) · 3 save-while-processing untested (Mux ready in 6 s) · Ready without reload pass · 4 pass · 5 pass · 6 not applicable (no reordering in the app, by product decision) · 7 pass · 8 pass (old link removed, new link active, cover = first item = photo) · 9 pass (update 05b47d37-a4cb-4b5c-842c-bef1a709b8b0; save-while-processing still untested, Mux ready in 3 s) · 10 pass · 11 pass (link s01yCk… removed, qm6EH1… active, slot 1).
+Note: saving or editing a timeline update moves the parent review's edit time (`updated_at`); the review's one-hour window is from its creation time, so this is recorded, not a fail.
 
 Retained Mux test assets are kept on purpose for the later Mux-cleanup work.
 
