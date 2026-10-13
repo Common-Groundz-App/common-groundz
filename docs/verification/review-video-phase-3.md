@@ -1,6 +1,8 @@
 # Review video — Phase 3 (display surfaces)
 
-Date: 2026-10-12. `reviews.video_enabled` still **OFF**.
+Date: 2026-10-12. Closed 2026-10-13. `reviews.video_enabled` still **OFF**.
+
+**Status: complete.** Real-browser checks (off-screen stop, one-at-a-time with posts, hover pre-load, scroll restore, no playback behind the viewer, failed poster never a cover) and the timeline-viewer coordination fix moved to Phase 4.
 
 ## Built
 - One display rule (`src/utils/reviewMediaDisplay.ts`) used by every review media surface: entity review card, entity timeline card (review + each update), profile/My Stuff review card, review timeline viewer (display part), entity Photos tab and media preview.

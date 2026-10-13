@@ -27,7 +27,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCircleReviews } from '@/hooks/useCircleReviews';
 import { SiblingCarousel } from '@/components/entity/SiblingCarousel';
 import { Entity } from '@/services/recommendation/types';
-import { FeedVideoManagerProvider } from '@/hooks/useFeedVideoManager';
 
 interface ReviewsSectionProps {
   reviews: ReviewWithUser[];
@@ -239,7 +238,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   };
 
   return (
-    <FeedVideoManagerProvider>
+    <>
       <Card className="mb-8 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
         <CardContent className="p-6 relative">
           <Badge 
@@ -641,6 +640,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           }}
         />
       )}
-    </FeedVideoManagerProvider>
+    </>
   );
 };

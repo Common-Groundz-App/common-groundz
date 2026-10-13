@@ -43,6 +43,7 @@ import { EntityModerationBanner } from '@/components/entity/EntityModerationBann
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
+import { FeedVideoManagerProvider } from '@/hooks/useFeedVideoManager';
 
 const EntityV4 = () => {
   const { slug, parentSlug, childSlug } = useParams<{ 
@@ -605,7 +606,9 @@ const EntityV4 = () => {
     }
   });
 
-  return <TooltipProvider delayDuration={0}>
+  // Review video Phase 4: one video manager for the whole entity page (reviews,
+  // posts and the timeline viewer pop-up) so only one video plays at a time.
+  return <TooltipProvider delayDuration={0}><FeedVideoManagerProvider>
     <div className="min-h-screen flex flex-col bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0">
       <SEOHead
         title={entity ? `${entity.name} — Common Groundz` : 'Common Groundz'}
@@ -765,7 +768,7 @@ const EntityV4 = () => {
       {/* Bottom Navigation */}
       {user && <BottomNavigation />}
     </div>
-  </TooltipProvider>;
+  </FeedVideoManagerProvider></TooltipProvider>;
 };
 
 export default EntityV4;

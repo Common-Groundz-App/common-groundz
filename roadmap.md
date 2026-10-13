@@ -417,7 +417,13 @@ cross-read between them.
   - [ ] Phase 2 browser checks of the four modes — blocked: no signed-in test session available in this environment; needs your separately authorised signed-in run
   - [ ] Phase 2 public activation — waits on the signed-in checks (setting stays OFF)
   - [x] Phase 3 shared player + display — built; 1,060 app tests; browser/signed-in checks moved to Phase 4 (docs/verification/review-video-phase-3.md)
-  - [ ] Phase 4 integration + your signed-in checklist
+  - [x] Phase 3 complete (2026-10-13); real playback checks carried into Phase 4
+  - [x] Phase 4 prep: one video manager per entity page; explicit unknown-length rule for review videos; test files; checklist (docs/verification/review-video-phase-4-checklist.md)
+  - [ ] Phase 4 signed-in run, blocks 1–8 — waits for you to start the session
+  - [ ] Final acceptance smoke test
+  - [ ] Separate decision: Phase 1 overlap unverified
+  - [ ] Later decision: posts' unknown-length gap (NaN passes the 60 s check)
+  - [ ] Later product decision: Circle reviews are author-only today (no Circle read rule)
 - [ ] Later: Mux asset cleanup (abandoned /create uploads, removed/deleted videos, historical unlinked assets)
 - [ ] Later: private / Circle review video playback (signed Mux playback)
 - [x] 3D — cutover of entry points: complete and verified by the owner's signed-in ON/OFF test (all 8 checklist steps passed: write from home and entity page, text-only and photo-removal edits, add/edit timeline update, read-only viewer, `?compose=update` owner vs non-owner, mid-draft switch-off, inline undo/delete, popup restored when OFF). Switch left ON. Evidence: docs/verification/review-composer-3d.md

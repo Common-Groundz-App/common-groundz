@@ -70,6 +70,8 @@ export interface MediaUploadState {
   localPosterUrl?: string;
   /** Client-detected duration (seconds) shown during upload. */
   localDuration?: number;
+  /** Review videos: browser couldn't measure length; server decides. */
+  durationUnknown?: boolean;
   /** Coarse upload stage; drives the staged progress UI. */
   stage?: 'preparing' | 'uploading' | 'finalizing' | 'done';
 }
