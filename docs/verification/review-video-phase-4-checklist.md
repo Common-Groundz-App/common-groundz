@@ -112,3 +112,8 @@ Test 1 pass: 5th item refused (only 4 taken); 2nd video refused with one-video m
 7 Post video regression pass. Setting confirmed OFF in DB.
 Retained test assets added: qA2QwJTc…, lnTcd18B…. Nothing deleted in Mux.
 Still untested (accepted): exact wait-for-upload message; save while Processing; save blocked on failed new video; server too-long on unknown length; real Mux event after the hour; Phase 1 overlap (separate rollout decision).
+
+### Final acceptance smoke test (2026-10-13 12:30 UTC)
+Automated: full suite 1066 passed / 3 skipped; typecheck clean; build OK.
+DB: reviews.video_enabled OFF (confirmed); review video links match test history (review: 1 patched + 1 removed; updates: 2 patched + 3 removed); no unexpected links; Mux assets retained, nothing deleted.
+Browser pass: pending owner run (see checklist below).
