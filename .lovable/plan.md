@@ -1,41 +1,52 @@
-# Phase 4 — Block 1 preflight results (read-only)
+# Phase 4 — Block 1 approved, Block 2 prepared
 
-Nothing was changed. No uploads, no setting changes.
+## Block 1 — closed (pass)
+- Review videos OFF, Mux uploads ON (live), new review page ON, CHANEL entity has 0 reviews/updates.
+- Outsider confirmed: **Anitha Sr** (anithasr@email.com, `c82c9b24-d832-460b-9a3d-97299e92f4ed`) — 0 followers, 0 following, no follow either way with Hana (checked just now; an earlier read at 08:16 showed her following Hana, which no longer exists). She has 1 existing review, not on CHANEL; it is not touched.
+- Connected: Linda Williams (`ff397c4b-…502d3`, follows Hana). Author: Hana Li (`abfcbf43-…8794`).
+- No follow relationships changed.
+- Note: the task list file can't be edited in this review mode; it will be updated with "Block 1 passed, outsider = Anitha" as the first step once you approve.
 
-## Settings
-| Setting | Value | Expected | Result |
-|---|---|---|---|
-| Review videos (`reviews.video_enabled`) | OFF | OFF | pass |
-| Mux uploads (`mux.uploads_enabled`) | ON | ON | pass |
-| Mux mode | live | live | pass (real uploads will create real, retained assets) |
-| New review page (`reviews.composer_page_enabled`) | ON | ON | pass |
-| Photo cleanup processing (`media_cleanup.processing_enabled`) | ON | noted | recorded |
+## Block 2 — composers (you run; nothing starts until you say "ready")
 
-## Photo-cleanup schedule (read only)
-- `process-media-deletions-hourly` — every hour at :40, active.
-- `cleanup-orphan-media-weekly-dryrun` — Sundays 03:00, active, dry run.
-- Effect on testing: removed review photos may be processed at :40 each hour; Block 8 checks the queue rows, not the files.
+**Before you start (me):** read-only snapshot of CHANEL reviews and Hana's upload links, so every new ID is recorded.
 
-## Test subject
-- Entity CHANEL (`027b88ee-18b9-44d5-8c60-46626d707df4`): 0 reviews, 0 timeline updates. pass.
+**Setup (you):** signed in as Hana, test files from Files → phase4-test-files downloaded. Then Admin → Feature flags → Reviews → switch **Review videos ON**. Tell me the time you switched it.
 
-## Accounts
-| Role | Account | ID |
-|---|---|---|
-| Author | Hana Li (@hana.li) | abfcbf43-b985-40dc-933c-201e5448b794 |
-| Connected (follows Hana) | Linda Williams (@linda_williamss) — proposed | ff397c4b-dcb1-4154-8dd5-d3ec573502d3 |
-| Outsider | John Carter | 06261a67-ebd7-43db-afe2-c3218e118473 (0 reviews) |
-| Signed out | private window | — |
+Do the steps in order; after each, tell me pass / fail and anything odd. I check the database after steps 1, 4, 8 and 11.
 
-Other accounts following Hana: Anitha, Harry Potter, Hermione Granger, Rishabh — any can replace Linda.
+### A. Review create (CHANEL page → Write review)
+1. Public review, add **ok-8s.mp4** only. While it transfers, a progress tile shows.
+2. While still transferring, press Save → must be blocked with "Wait for your video to finish uploading".
+3. Remove nothing; wait until the tile shows Processing. Save → allowed. Open the review: author sees "Processing", then Ready plays **without reloading** (wait up to ~2 min).
+4. On the privacy step of that same flow (or via Edit): Private / Circle must be greyed out with a reason.
 
-## Finding to decide before Block 7
-- John Carter is **not a pure outsider**: Hana follows John, and John and Linda follow each other. John does not follow Hana.
-- Under today's actual rule (public or author only) this changes nothing — follows grant no review access. But if you want a truly unconnected outsider, we need another account with no follows to/from Hana. Options: keep John (recorded as "followed by Hana, does not follow her"), or you name another account.
+### B. Review edit (same review, within its first hour)
+5. Edit → add one photo after the video, save → order kept (video, photo); cover = the video's poster.
+6. Edit → drag photo first, save → cover becomes the photo.
+7. Edit → pick a new video, then cancel it mid-transfer → slot frees, you can pick again; cancel again and save without it → saved video unchanged.
+8. Edit → remove the video, save; Edit → add ok-8s.mp4 again, save (replace within the hour).
 
-## Next (needs your approval)
-- Confirm the connected account (Linda or another) and the outsider choice.
-- Then Block 2: you switch Review videos ON, I give the composer checklist, and run the before/after database checks.
+### C. Timeline create (same review → Add update)
+9. Update with **ok-8s.mp4** + one photo; try Save during transfer (blocked), then save once Processing; Ready appears without reload.
+10. Return to the review's Edit → Private / Circle still greyed out (because an update has a video).
+
+### D. Timeline edit (that update, within its hour)
+11. Edit the update → remove video, save; add it again, save.
+
+### E. Private-parent rule
+12. Make a **separate photo-only review as "Only me"** on another entity you choose (tell me which); Add update → video picking is off with a reason. Save a text-only update.
+
+### F. Switch OFF mid-upload
+13. Start a new Edit on the CHANEL review update or a new update, pick ok-8s.mp4, and while it transfers I ask you to switch Review videos **OFF** (from a second tab). Expected: that upload finishes and can be saved; afterwards new picks are disabled; saved videos still show and can be removed within the hour.
+
+**End of Block 2 (you):** confirm Review videos is OFF (I confirm in the database). Do not delete anything yet — these entries are reused in Blocks 4–6.
+
+## After Block 2 (me, read-only)
+- One active upload link per saved video; removed/replaced ones marked removed; no upload rows deleted.
+- Mux status, playback and length set by the server; edit times not moved by Mux.
+- Cover matches the media-order rule.
+- All IDs added to the run record.
 
 ## Technical details
-- Queries run: `app_config` flags; `cron.job` filtered on media; `reviews`/`review_updates` counts for the entity; `profiles` lookup by name/ID; `follows` touching Hana and John.
+- Snapshot/after queries: `reviews`/`review_updates` by `user_id = Hana` and `entity_id = CHANEL`; `mux_upload_mappings` by those content IDs; `mux_uploads` by mapped upload IDs; `image_url` vs `review_cover_from_media(media)`; `app_config` `reviews.video_enabled`.
