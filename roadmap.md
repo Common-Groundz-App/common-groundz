@@ -408,21 +408,21 @@ cross-read between them.
 - [x] Review/timeline forms photo-only (existing videos kept, not removable)
 - [x] Read-only Mux check: 3 non-test hosted videos linked nowhere (origin unknown)
 - [x] D2 server cleanup of removed review/timeline photos — built and verified end-to-end (processing OFF, unscheduled)
-- [ ] Review video (Mux) — plan .lovable/plan/review-video-mux-final-plan-2026-10-11.md
+- [x] Review video (Mux) — COMPLETE (2026-10-13): Phases 1–4 delivered and verified, final acceptance smoke test passed. Setting stays OFF; turning it on for everyone is a separate owner decision. Plan .lovable/plan/review-video-mux-final-plan-2026-10-11.md; evidence docs/verification/review-video-phase-1.md, -phase-2.md, -phase-3.md, -phase-4-checklist.md
   - [x] Phase 1 server foundation: applied (docs/verification/review-video-phase-1.md)
   - [x] Phase 1 close-out: strict one-hour rule (broken-video exception removed), 39/39 database tests, outage check
   - [x] Phase 1 concurrency races — closed: functional behaviour passed; true overlap unverified (SQL Editor runs one query at a time)
   - [x] Phase 1 complete (2026-10-12)
   - [x] Phase 2 composers (create/edit, review + timeline) — built behind "Review videos" setting (OFF); unit 1026/1026 suite + 8/8 rolled-back DB tests (docs/verification/review-video-phase-2.md)
-  - [ ] Phase 2 browser checks of the four modes — blocked: no signed-in test session available in this environment; needs your separately authorised signed-in run
-  - [ ] Phase 2 public activation — waits on the signed-in checks (setting stays OFF)
+  - [x] Phase 2 browser checks of the four modes — done by the owner's signed-in Phase 4 session (review create/edit, timeline create/edit; docs/verification/review-video-phase-4-checklist.md)
+  - [ ] Phase 2 public activation — owner decision only: flip `reviews.video_enabled` ON when ready (all verification is complete)
   - [x] Phase 3 shared player + display — built; 1,060 app tests; browser/signed-in checks moved to Phase 4 (docs/verification/review-video-phase-3.md)
   - [x] Phase 3 complete (2026-10-13); real playback checks carried into Phase 4
   - [x] Phase 4 prep: one video manager per entity page; explicit unknown-length rule for review videos; test files; checklist (docs/verification/review-video-phase-4-checklist.md)
   - [x] Phase 4 Block 1 preflight passed (connected = Linda Williams, outsider = Anitha Sr)
   - [x] Phase 4 Block 2 composers passed (2 items untested, update-video autoplay carried to Block 4)
   - [x] Phase 4 complete (2026-10-13, condensed final session; all 7 checks passed; accepted-untested items listed in the checklist). Review videos OFF
-  - [ ] Final acceptance smoke test
+  - [x] Final acceptance smoke test passed (2026-10-13 12:33 UTC): suite 1066/3 skipped, typecheck and build clean, setting OFF in DB, owner confirmed home feed, entity-page media and post video all normal
   - [ ] Separate decision: Phase 1 overlap unverified
   - [ ] Later decision: posts' unknown-length gap (NaN passes the 60 s check)
   - [ ] Later product decision: Circle reviews are author-only today (no Circle read rule)
