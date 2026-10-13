@@ -6,6 +6,7 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 beforeEach(() => {
   (globalThis as any).URL.createObjectURL = () => 'blob:x';
   (globalThis as any).URL.revokeObjectURL = () => {};
+  (globalThis as any).window = { URL: (globalThis as any).URL };
   (globalThis as any).document = {
     createElement: () => {
       const v: any = {};
