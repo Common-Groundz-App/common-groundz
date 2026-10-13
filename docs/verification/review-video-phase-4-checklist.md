@@ -98,3 +98,6 @@ Setting confirmed OFF in the database. CHANEL update 05b47d37… now has no acti
 Carried to Block 4: in step 9 only the review's video played while the update's own video was on screen. One-at-a-time explains one player, but the update video playing when it is the only one in view is still to be shown (Block 4).
 Untested: exact "Wait for your video to finish uploading" message; saving while Processing (8 s clip ready in 3–6 s).
 Block 2 result: COMPLETE (approved by owner 2026-10-13 11:50 UTC) — pass, with the 2 untested items above; update-video playback carried to Block 4.
+
+### Block 3 (started 2026-10-13; setting ON 11:52 UTC / 17:22 IST)
+Test 1 pass: 5th item refused (only 4 taken); 2nd video refused with one-video message; >100 MB refused before upload; normal-65s refused before upload. DB: exactly one new upload (NNsiSPUZpwOkDQmu31Bfrt4SQ1Ftde617F02OWH1yLYg, the ok-8s clip from 1b, never linked, asset retained); none from the refused files; no update saved.
