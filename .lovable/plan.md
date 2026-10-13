@@ -1,52 +1,38 @@
-# Phase 4 — Final condensed verification session
+# Post videos vs Review videos — gap check
 
-One sitting, about 15 minutes. You do 7 short browser steps as Hana, and I do the database checks myself after you report. Review videos stay ON (you turned them on at 17:22 IST) until step 7.
+Both use the same upload service, Mux processing, video player, one-at-a-time playback, full-screen viewer and cancel handling. The real differences are in the server rules and in who sees a broken video.
 
-Everything not listed here is covered by the Phase 1 database tests (39/39), the Phase 2/3/4 automated tests (1066 passed) and Blocks 1–2. Those items are marked "covered by automated tests", not re-tested by hand.
+## Things Posts are missing (that Reviews have)
 
-## Your checklist (do all in one go, then report)
+Ranked by importance:
 
-**1. Broken video** (CHANEL review → Add update)
-Pick `broken-picture-5s.mp4`, type any text, and wait up to 2 minutes.
-- If the tile shows "Upload failed": press Save. It should be blocked. Then remove the video and close without saving.
-- If it still shows Processing: press Save. Wait 1–2 minutes and check the update. It should show no playable video to you (owner message only), and nothing broken should appear.
-- Report which one happened.
+1. **Broken video badge shows to everyone.** On posts, "Couldn't process video" and "Preparing" show to every viewer. On reviews, only the owner sees them and everyone else sees nothing. This is the gap people will notice most.
+2. **Limits are only checked in the browser.** Posts enforce 4 media and 1 video in the app only. Anyone calling the server directly can skip them. Reviews enforce both on the server.
+3. **No server-side 60-second check.** Posts trust the browser's length check. If a long video gets through (like the no-length file), Mux processes it and it plays. Reviews mark anything over 60 s as "too long" on the server, and it never plays.
+4. **Video state could be faked.** On reviews, only the server can mark a video as ready or set its playback link. On posts, nothing at the row level stops a post edit from writing those fields.
+5. **Two-step save.** Posts save first, then link the video in a second request. If that second request fails, the video can be left stuck on "Preparing". Reviews do both in one save.
+6. **No stable video IDs.** Post videos are keyed by their position in the list. Reviews use a fixed ID for each video, which keeps resume-playback correct after an edit.
 
-**2. No-length video** (same screen, new Add update)
-Pick `no-length-70s.mp4`. You should see "Length will be checked after upload". Save once it allows you. After 1–2 minutes the video should never play, because the server marks it as too long.
+## Things Reviews are missing (that Posts have)
 
-**3. Timeline Update's own video** (same CHANEL review → Add update)
-Add `ok-8s.mp4` only, then save. Open the review's timeline and scroll so that only the update's video is on screen. Expected: that video plays on its own.
+- **View counts and analytics:** turned off for reviews on purpose (decided in Phase 3). Not a gap unless you want review video views counted.
+- Nothing else important. Reviews are the stricter version of the same pipeline.
 
-**4. Page player coordination** (CHANEL page)
-- Scroll the reviews. Only one video plays at a time.
-- Tap a video to open full screen. The page video pauses, and the same video continues from the same moment.
-- Close it. The video resumes in the card with nothing playing behind.
-- Open the timeline pop-up. No other video should play behind it.
+## Already noted for later, not changed here
 
-**5. One-hour lock** (natural, no waiting needed)
-The CHANEL review was created at 16:27 IST, so its edit window has already closed. Open the review's menu. Expected: Edit is no longer offered (or is refused), and Delete and Add update are still available. Don't delete it.
+- Posts' unknown-length gap (already on the roadmap as a separate decision). It's the same thing as item 3.
+- Private playback links (Mux playback stays public for both).
 
-**6. Privacy** (one check, no extra account)
-In a private/incognito window, signed out, open the Pixi Antioxidant Tonic page. Expected: Hana's "Only me" review is not shown.
+## Proposed fix (only if you approve; Posts only, Reviews untouched)
 
-**7. Post video regression, then switch off**
-- On the home feed, scroll to any post with a video. It plays muted on its own, opens full screen and comes back.
-- Then go to Admin → Feature flags → turn **Review videos OFF** and tell me the time.
+- **Step 1 (low risk, visible):** hide "Preparing" and "Couldn't process" on post videos from everyone except the author, using the same rule reviews use.
+- **Step 2 (server):** add the review-style server rules to posts: max 4 / 1 video, over 60 s marked too long, only the server can set video state.
+- **Step 3 (optional):** link post videos in the same save, which removes the second request.
 
-## What I do after your report (no actions from you)
+Each step would be tested against made-up records only, with existing posts and videos left untouched.
 
-- Read-only database checks for steps 1–3: the upload status, failed/too-long state, no playback shown, links, and that the cover is never a failed poster.
-- Confirm the edit lock for step 5 from the stored timestamps.
-- Confirm the Review videos setting is OFF.
-- Add every new upload ID to the retained test assets. Nothing in Mux gets deleted.
-- Fill in the Phase 4 checklist and the roadmap with pass, fail or untested for each item.
-- Mark Phase 4 complete if all items pass. Any failed or untested item stays listed. Then comes the short final acceptance smoke test.
+## Technical details
 
-## Accepted as untested (recorded, not chased)
-
-- The exact "Wait for your video to finish uploading" message.
-- Saving while a video is Processing. Mux finishes in 3–6 seconds.
-- A real Mux event arriving after the hour has passed.
-- True simultaneous-connection overlap from Phase 1. This needs a separate rollout decision.
-- Circle reviews are only visible to the author today. This is a separate product decision.
+- Step 1: `FeedVideo` / `MuxPreparingPoster` need an `isOwner` check for `source="post"`.
+- Step 2: a post-media BEFORE trigger that mirrors `review_media_mux_before` (counts, `is_trusted_server_context` guard on mux fields). Add `duration > 60` → `errored/too_long` in the post branch of `patch_content_media_from_mux`.
+- Step 3: an AFTER trigger calling a mapping sync, replacing `mux-register-mappings` / `mux-sync-post-mappings` calls in `EnhancedCreatePostForm`.
