@@ -420,7 +420,7 @@ cross-read between them.
   - [x] Phase 3 complete (2026-10-13); real playback checks carried into Phase 4
   - [x] Phase 4 prep: one video manager per entity page; explicit unknown-length rule for review videos; test files; checklist (docs/verification/review-video-phase-4-checklist.md)
   - [x] Phase 4 Block 1 preflight passed (connected = Linda Williams, outsider = Anitha Sr)
-  - [ ] Phase 4 Block 2 composers — in progress (user runs as Hana, step by step)
+  - [x] Phase 4 Block 2 composers passed (2 items untested, update-video autoplay carried to Block 4)
   - [ ] Phase 4 Blocks 3–8
   - [ ] Final acceptance smoke test
   - [ ] Separate decision: Phase 1 overlap unverified
