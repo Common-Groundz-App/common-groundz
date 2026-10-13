@@ -97,4 +97,4 @@ Delete test entries by exact ID through the app; list retained assets; confirm s
 Setting confirmed OFF in the database. CHANEL update 05b47d37… now has no active video (3 links, all removed; assets retained).
 Carried to Block 4: in step 9 only the review's video played while the update's own video was on screen. One-at-a-time explains one player, but the update video playing when it is the only one in view is still to be shown (Block 4).
 Untested: exact "Wait for your video to finish uploading" message; saving while Processing (8 s clip ready in 3–6 s).
-Block 2 result: pass, with the untested items above.
+Block 2 result: COMPLETE (approved by owner 2026-10-13 11:50 UTC) — pass, with the 2 untested items above; update-video playback carried to Block 4.
