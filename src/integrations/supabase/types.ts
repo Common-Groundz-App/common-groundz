@@ -1966,6 +1966,7 @@ export type Database = {
           asset_id: string | null
           created_at: string
           duration: number | null
+          duration_rule_applies: boolean
           error: string | null
           expires_at: string
           id: string
@@ -1983,6 +1984,7 @@ export type Database = {
           asset_id?: string | null
           created_at?: string
           duration?: number | null
+          duration_rule_applies?: boolean
           error?: string | null
           expires_at: string
           id?: string
@@ -2000,6 +2002,7 @@ export type Database = {
           asset_id?: string | null
           created_at?: string
           duration?: number | null
+          duration_rule_applies?: boolean
           error?: string | null
           expires_at?: string
           id?: string
@@ -4958,6 +4961,16 @@ export type Database = {
       patch_review_media_from_mux: {
         Args: { p_mapping_id: string }
         Returns: string
+      }
+      post_media_video_count: { Args: { p_media: Json }; Returns: number }
+      post_mux_patch_is_valid: {
+        Args: { p_new: Json; p_old: Json }
+        Returns: boolean
+      }
+      post_mux_strip: { Args: { p_item: Json }; Returns: Json }
+      post_mux_truth_item: {
+        Args: { p_item: Json; p_owner: string }
+        Returns: Json
       }
       preview_hierarchical_migration: {
         Args: never
