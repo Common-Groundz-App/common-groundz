@@ -31,27 +31,52 @@ BEGIN
     INSERT INTO public.posts(user_id,title,content,post_type,visibility,media)
     VALUES (U,'p3_conflict','c','experience','public', jsonb_build_array(base || '{"mux_upload_id":"p3_a"}'));
   EXCEPTION WHEN OTHERS THEN err := SQLERRM; END;
+  EXECUTE 'reset role';
   SELECT count(*) INTO n FROM public.posts WHERE title='p3_conflict' AND user_id=U;
   SELECT count(*) INTO n2 FROM public.mux_upload_mappings WHERE mux_upload_id='p3_a';
-  IF err = 'post_video_already_linked_elsewhere' AND n=0 AND n2=1
+  IF err IN ('post_video_in_use','post_video_already_linked_elsewhere') AND n=0 AND n2=1
      AND EXISTS (SELECT 1 FROM public.mux_upload_mappings WHERE mux_upload_id='p3_a' AND content_id=P1) THEN
-    ok:=ok+1; res:=res||E'\nPASS create conflict refused; no second Post, original mapping kept';
+    ok:=ok+1; res:=res||E'\nPASS create conflict refused ('||err||'); no second Post, original mapping kept';
   ELSE bad:=bad+1; res:=res||format(E'\nFAIL create conflict err=%s posts=%s maps=%s', err, n, n2); END IF;
+  EXECUTE 'set local role authenticated';
 
   -- T2 edit conflict leaves the existing Post and mappings unchanged
   INSERT INTO public.posts(user_id,title,content,post_type,visibility,media)
   VALUES (U,'p3_three','c','experience','public', jsonb_build_array(base || '{"mux_upload_id":"p3_b"}')) RETURNING id INTO P3;
+  EXECUTE 'reset role';
   SELECT media INTO j FROM public.posts WHERE id=P3;
   SELECT jsonb_agg(to_jsonb(m) ORDER BY m.id) INTO j2 FROM public.mux_upload_mappings m WHERE content_type='post' AND content_id IN (P1,P3);
+  EXECUTE 'set local role authenticated';
   err := NULL;
   BEGIN
     UPDATE public.posts SET media = jsonb_build_array(base || '{"mux_upload_id":"p3_a"}') WHERE id=P3;
   EXCEPTION WHEN OTHERS THEN err := SQLERRM; END;
+  EXECUTE 'reset role';
+  IF err IN ('post_video_in_use','post_video_already_linked_elsewhere')
+     AND (SELECT media FROM public.posts WHERE id=P3) = j
+     AND (SELECT jsonb_agg(to_jsonb(m) ORDER BY m.id) FROM public.mux_upload_mappings m WHERE content_type='post' AND content_id IN (P1,P3)) = j2 THEN
+    ok:=ok+1; res:=res||E'\nPASS edit conflict refused ('||err||'); Post media and all mappings unchanged';
+  ELSE bad:=bad+1; res:=res||format(E'\nFAIL edit conflict err=%s', err); END IF;
+
+  -- T2b video removed from P1 (mapping kept as removed) then added to P3:
+  -- earlier guard allows it, required mapping cannot be created -> new atomic error, full rollback
+  EXECUTE 'set local role authenticated';
+  UPDATE public.posts SET media = jsonb_build_array(photo) WHERE id=P1;
+  EXECUTE 'reset role';
+  SELECT media INTO j FROM public.posts WHERE id=P3;
+  SELECT jsonb_agg(to_jsonb(m) ORDER BY m.id) INTO j2 FROM public.mux_upload_mappings m WHERE content_type='post' AND content_id IN (P1,P3);
+  EXECUTE 'set local role authenticated';
+  err := NULL;
+  BEGIN
+    UPDATE public.posts SET media = jsonb_build_array(base || '{"mux_upload_id":"p3_a"}') WHERE id=P3;
+  EXCEPTION WHEN OTHERS THEN err := SQLERRM; END;
+  EXECUTE 'reset role';
   IF err = 'post_video_already_linked_elsewhere'
      AND (SELECT media FROM public.posts WHERE id=P3) = j
      AND (SELECT jsonb_agg(to_jsonb(m) ORDER BY m.id) FROM public.mux_upload_mappings m WHERE content_type='post' AND content_id IN (P1,P3)) = j2 THEN
-    ok:=ok+1; res:=res||E'\nPASS edit conflict refused; Post media and all mappings unchanged';
-  ELSE bad:=bad+1; res:=res||format(E'\nFAIL edit conflict err=%s', err); END IF;
+    ok:=ok+1; res:=res||E'\nPASS mapping-insert conflict on edit: whole save rolled back, Post and mappings unchanged';
+  ELSE bad:=bad+1; res:=res||format(E'\nFAIL mapping-insert conflict err=%s', err); END IF;
+  EXECUTE 'set local role authenticated';
 
   -- T3 save -> reconcile -> save follows persisted media
   INSERT INTO public.posts(user_id,title,content,post_type,visibility,media)
