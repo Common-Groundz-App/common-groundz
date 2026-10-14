@@ -254,8 +254,10 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '', true);
   -- simulate stale playable fields stored before the patch (old-data path)
   ALTER TABLE public.posts DISABLE TRIGGER zz_posts_media_mux_before;
+  ALTER TABLE public.posts DISABLE TRIGGER enforce_post_edit_window_trigger;
   UPDATE public.posts SET media = jsonb_build_array(createv || '{"mux_upload_id":"pp_b","mux_playback_id":"STALE","thumbnail_url":"https://x/t.jpg"}'::jsonb) WHERE id=P2;
   ALTER TABLE public.posts ENABLE TRIGGER zz_posts_media_mux_before;
+  ALTER TABLE public.posts ENABLE TRIGGER enforce_post_edit_window_trigger;
   INSERT INTO public.mux_upload_mappings(mux_upload_id, content_type, content_id, media_index, user_id, status)
   VALUES ('pp_b','post',P2,0,U,'pending') RETURNING id INTO M;
   v := public.patch_content_media_from_mux(M);
