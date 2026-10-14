@@ -67,7 +67,7 @@ export function visibleReviewMedia(
       const state = displayStateFor(m, ctx);
       if (state === 'owner_failed_editable') ownerNotice = 'failed_editable';
       if (state === 'owner_failed_locked' && ownerNotice !== 'failed_editable') ownerNotice = 'failed_locked';
-      return state !== 'hidden';
+      return true;
     })
     .map((m) => ({ ...m, id: stableReviewMediaId(ctx.kind, ctx.ownerId, m) }));
   return { items, ownerNotice };
@@ -82,10 +82,4 @@ export function isGalleryVisible(item: MediaItem): boolean {
   return !!item.url;
 }
 
-export const REVIEW_MEDIA_OWNER_COPY = {
-  failedEditable: "Couldn't process this video. Edit to remove or replace it.",
-  failedLockedReview:
-    "Couldn't process this video. You can delete this review or add a timeline update.",
-  failedLockedUpdate:
-    "Couldn't process this video. You can delete this update or add a new timeline update.",
-} as const;
+export const REVIEW_MEDIA_OWNER_COPY = VIDEO_OWNER_COPY;
