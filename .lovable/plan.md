@@ -24,9 +24,9 @@ This also covers the other points:
 ## What gets built
 
 1. **Max 4 items and 1 video, checked by the server.** A save is refused only when it adds items or videos past the limit. Caption edits, unchanged media and removals always go through.
-2. **Mux details owned by the server.** On every browser save, each Mux video's status, playback ID, asset ID, length, aspect ratio and error are rebuilt from its upload record. Anything else about the item is kept as sent.
+2. **Mux details owned by the server.** On every browser save, each Mux video's provider, status, playback ID, asset ID, playback/poster address, length, aspect ratio and error are rebuilt from its upload record. Anything else about the item (caption, order) is kept as sent.
 3. **The uploader must be the author.** A Mux video whose upload belongs to someone else, or doesn't exist, is refused.
-4. **60 s for new videos only.** Uploads get an "eligible" flag at creation. Only the server sets it, and it can never be changed afterwards. An eligible upload over 60 s becomes "too long" with no playback link, on every path: saving the post, the Mux webhook patch, and the existing linking and catch-up requests. Old uploads stay ineligible and keep playing.
+4. **60 s for new videos only.** Uploads get an "eligible" flag at creation. It can never be changed afterwards by anyone, including webhooks and catch-up jobs. An eligible upload over 60 s becomes "too long" with no playback link, on every path: saving the post, the Mux webhook patch, and the existing linking and catch-up requests. Old uploads stay ineligible and keep playing.
 5. **Old stored-file videos and the two historical posts aren't touched.** Unchanged items pass through as they are, and an old Mux item without an upload record is grandfathered only when it's carried over unchanged.
 6. **No app code changes, and /create stays the same.** The existing linking requests keep working until Phase 3.
 
@@ -44,18 +44,22 @@ SQL tests run as the signed-in author on made-up records and are rolled back. Th
 - an old stored-file video is untouched;
 - a caption edit on a copy of the historical stuck post goes through and doesn't link the video;
 - the existing linking call and the webhook patch still work, with the 60 s rule applied;
-- the trigger order is checked (after the media and edit-window guards).
+- the trigger order is checked (after the media and edit-window guards);
+- removing a photo next to an unchanged historical video goes through even though its position shifts; the video is matched by identity, not repaired or relinked;
+- a forged playback URL or provider on a Mux item is overwritten, so it can't make a video playable;
+- the eligibility flag stays unchanged through the webhook patch, linking and catch-up paths.
 
-Then I run the post composer and media app tests and report.
+Then I run the post composer and media app tests, typecheck and build, and report passed, failed and blocked results. Phase 2 closes these rules only: one-save linking and stable IDs stay open for Phases 3 and 4. Historical assets stay untouched and Review videos stay OFF.
 
-## Extra suggestions
+## After deploy (not part of acceptance)
 
-- **Watch real saves for a day:** a read-only check for any rejected post saves (error codes in the logs), so a hidden /create case shows up fast.
-- **Kill switch:** a `posts.video_rules_enabled` setting (ON) that turns off only the new refusals if something goes wrong, without a deploy. The server-owned overwrite stays on regardless.
+- A read-only check of rejected post saves (error codes in the logs), so a hidden /create case shows up fast.
+- No kill switch for now. If one is added later, it must never switch off the ownership or server-owned Mux protections.
 
 ## Technical details
 
-- `mux_uploads.duration_rule_applies boolean not null default false`. Existing rows keep `false`. A BEFORE INSERT trigger sets it to `true` and ignores any client value, and a BEFORE UPDATE trigger keeps the old value unless the context is trusted (`is_trusted_server_context()`). The column is also left out of client grants where possible.
+- `mux_uploads.duration_rule_applies boolean not null default false`. Existing rows keep `false`. A BEFORE INSERT trigger always sets `true` (ignores any value sent). A BEFORE UPDATE trigger always keeps the old value, for every caller including webhooks and reconcile; changing it later needs a separately authorized migration.
+- For Mux items, `provider`, `url` (poster vs playback), `thumbnail_url` and every `mux_*` field are rebuilt from the upload record, so a client-supplied URL or provider cannot make an unready or foreign video playable.
 - `post_mux_truth_item(item, owner)` is modelled on `review_mux_truth_item`, but the over-60 branch depends on `duration_rule_applies`.
 - `zz_posts_media_mux_before` (BEFORE INSERT/UPDATE OF media): if the media is unchanged, it returns early. Otherwise it compares counts against both the limits and the old counts, then for an untrusted caller maps each Mux item, matched by `mux_upload_id`, through the truth function. Trusted callers (the webhook patch) keep the patch-validity check. Its name sorts after `media_guard` and `enforce_post_edit_window_trigger`, and a test asserts that order through `pg_trigger`.
 - `patch_content_media_from_mux` (post branch) and `sync_mux_post_mappings` / the reconcile path use the same truth function, so the 60 s rule is the same everywhere.
