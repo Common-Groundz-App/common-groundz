@@ -22,7 +22,9 @@ DECLARE
 BEGIN
   INSERT INTO public.mux_uploads(user_id, upload_id, status, is_test, expires_at)
   SELECT U, x, 'waiting', true, now()+interval '1h'
-    FROM unnest(ARRAY['p4_b','p4_c','p4_d','p4_e','p4_f','p4_g']) x;
+    FROM unnest(ARRAY['p4_b','p4_c','p4_d','p4_e','p4_f','p4_g','p4_i']) x;
+  INSERT INTO public.mux_uploads(user_id, upload_id, status, is_test, expires_at, asset_id, playback_id, duration)
+  VALUES (U,'p4_h','ready',true,now()+interval '1h','A_H4','PB_H4',8);
 
   PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
   EXECUTE 'set local role authenticated';
@@ -269,11 +271,14 @@ BEGIN
   IF v='deleted' AND n=0 THEN ok:=ok+1; res:=res||E'\nPASS legacy wrapper on deleted Post: links retired';
   ELSE bad:=bad+1; res:=res||format(E'\nFAIL deleted wrapper %s %s', v, n); END IF;
 
-  -- T23 no new active Post link without media_id from normal paths
+  -- T23 links CREATED in this run (create/edit/catch-up/wrapper) all carry media_id.
+  -- Scope: only this run's new Posts. P5 is excluded on purpose (its link was set
+  -- to NULL to model a historical link). Existing historical NULL-media_id links
+  -- stay supported and are never expected to gain one.
   SELECT count(*) INTO n FROM public.mux_upload_mappings
    WHERE content_type='post' AND content_id IN (P2,P3,P4,P6) AND status IN ('pending','patched','errored') AND media_id IS NULL;
-  IF n=0 THEN ok:=ok+1; res:=res||E'\nPASS create/edit/catch-up/wrapper leave no active link without media_id';
-  ELSE bad:=bad+1; res:=res||E'\nFAIL links without media_id '||n; END IF;
+  IF n=0 THEN ok:=ok+1; res:=res||E'\nPASS links created in this run carry media_id (historical NULL links not in scope)';
+  ELSE bad:=bad+1; res:=res||E'\nFAIL new links without media_id '||n; END IF;
 
   -- T24 lock order in definitions (supporting evidence only)
   v := pg_get_functiondef('public.patch_content_media_from_mux'::regproc);
@@ -294,6 +299,53 @@ BEGIN
       OR NOT has_function_privilege('service_role','public.'||f,'execute');
   IF v IS NULL THEN ok:=ok+1; res:=res||E'\nPASS new and changed helpers are service-role only';
   ELSE bad:=bad+1; res:=res||E'\nFAIL grants '||v; END IF;
+
+  -- T26 old duplicate-ID pair [A,B] resent as [A,A] is refused (copy count kept)
+  j := jsonb_build_array(
+    jsonb_build_object('type','image','url',H||'public/post_media/u/m1.jpg','order',0,'id',A),
+    jsonb_build_object('type','image','url',H||'public/post_media/u/m2.jpg','order',1,'id',A));
+  err := NULL;
+  BEGIN PERFORM public.post_media_assign_ids(j, jsonb_build_array(j->0, j->0 || '{"order":1}'));
+  EXCEPTION WHEN OTHERS THEN err := SQLERRM; END;
+  IF err='post_media_duplicate_id' THEN ok:=ok+1; res:=res||E'\nPASS old duplicate pair [A,B] -> [A,A] refused';
+  ELSE bad:=bad+1; res:=res||E'\nFAIL [A,A] '||coalesce(err,'accepted'); END IF;
+
+  -- T27 old duplicate pair with one copy removed is accepted unchanged
+  j2 := public.post_media_assign_ids(j, jsonb_build_array(j->0));
+  IF j2 = jsonb_build_array(j->0) THEN ok:=ok+1; res:=res||E'\nPASS old duplicate pair with a copy removed accepted unchanged';
+  ELSE bad:=bad+1; res:=res||E'\nFAIL copy removal '||j2::text; END IF;
+
+  -- T28 save-time completion (p_patch=false) refuses a link whose media_id does not match its slot item
+  PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
+  EXECUTE 'set local role authenticated';
+  INSERT INTO public.posts(user_id,title,content,post_type,visibility,media)
+  VALUES (U,'p4h','c','experience','public', jsonb_build_array(vid || '{"mux_upload_id":"p4_h"}')) RETURNING id INTO P;
+  EXECUTE 'reset role';
+  SELECT id, status INTO MID, v2 FROM public.mux_upload_mappings WHERE mux_upload_id='p4_h';
+  UPDATE public.mux_upload_mappings SET status='pending', patched_at=NULL, media_id=gen_random_uuid() WHERE id=MID;
+  PERFORM public.sync_mux_post_mappings_core(P, public.post_mux_link_items(P, (SELECT media FROM public.posts WHERE id=P)), false);
+  SELECT status INTO v FROM public.mux_upload_mappings WHERE id=MID;
+  IF v2='patched' AND v='pending' THEN
+    ok:=ok+1; res:=res||E'\nPASS save-time completion: matching media_id marked done; mismatched media_id left pending';
+  ELSE bad:=bad+1; res:=res||format(E'\nFAIL save-time completion %s %s', v2, v); END IF;
+
+  -- T29 removed historical (NULL media_id) link reactivated on the same Post gains the current media_id
+  PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
+  EXECUTE 'set local role authenticated';
+  INSERT INTO public.posts(user_id,title,content,post_type,visibility,media)
+  VALUES (U,'p4i','c','experience','public', jsonb_build_array(vid || '{"mux_upload_id":"p4_i"}')) RETURNING id INTO P2;
+  UPDATE public.posts SET media = jsonb_build_array(jsonb_build_object('type','image','url',H||'public/post_media/u/r.jpg','order',0)) WHERE id=P2;
+  EXECUTE 'reset role';
+  UPDATE public.mux_upload_mappings SET media_id = NULL WHERE mux_upload_id='p4_i';
+  SELECT id INTO MID FROM public.mux_upload_mappings WHERE mux_upload_id='p4_i';
+  EXECUTE 'set local role authenticated';
+  UPDATE public.posts SET media = jsonb_build_array(vid || jsonb_build_object('mux_upload_id','p4_i','id',D)) WHERE id=P2;
+  EXECUTE 'reset role';
+  SELECT status, media_id::text INTO v, v2 FROM public.mux_upload_mappings WHERE mux_upload_id='p4_i';
+  SELECT count(*) INTO n FROM public.mux_upload_mappings WHERE mux_upload_id='p4_i';
+  IF v='pending' AND v2=D AND n=1 AND (SELECT id FROM public.mux_upload_mappings WHERE mux_upload_id='p4_i')=MID THEN
+    ok:=ok+1; res:=res||E'\nPASS removed NULL-media_id link reused on the same Post and gains current media_id';
+  ELSE bad:=bad+1; res:=res||format(E'\nFAIL reactivation %s %s %s', v, v2, n); END IF;
 
   res := res||E'\nBLOCKED simultaneous save-vs-reconcile / save-vs-webhook races (single connection)';
   RAISE EXCEPTION 'POST_VIDEO_PHASE4 % passed, % failed%', ok, bad, res;
