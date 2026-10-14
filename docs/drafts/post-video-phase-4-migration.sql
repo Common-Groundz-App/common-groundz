@@ -62,17 +62,22 @@ BEGIN
     v_out := v_out || jsonb_build_array(v_item);
   END LOOP;
 
-  -- duplicates by actual ID: allowed only for unchanged grandfathered copies
+  -- duplicates by actual ID (case-insensitive): allowed only as unchanged
+  -- grandfathered copies, counted per copy (order ignored). Removing a copy is
+  -- fine; repeating one copy ([A,B] -> [A,A]) or adding a copy is refused.
   IF EXISTS (
-    SELECT 1 FROM (
-      SELECT lower(e->>'id') AS k, count(*) AS n,
-             bool_and(EXISTS (SELECT 1 FROM jsonb_array_elements(v_old) o
-                               WHERE jsonb_typeof(o) = 'object' AND (o - 'order') = (e - 'order'))) AS unchanged
-        FROM jsonb_array_elements(v_out) e
-       WHERE jsonb_typeof(e) = 'object' AND coalesce(e->>'id','') <> ''
-       GROUP BY 1 HAVING count(*) > 1) d
-     WHERE NOT d.unchanged
-        OR d.n > (SELECT count(*) FROM jsonb_array_elements(v_old) o WHERE lower(o->>'id') = d.k)
+    SELECT 1
+      FROM (SELECT lower(e->>'id') AS k
+              FROM jsonb_array_elements(v_out) e
+             WHERE jsonb_typeof(e) = 'object' AND coalesce(e->>'id','') <> ''
+             GROUP BY 1 HAVING count(*) > 1) d
+      CROSS JOIN LATERAL (
+        SELECT (e - 'order') AS body, count(*) AS n
+          FROM jsonb_array_elements(v_out) e
+         WHERE jsonb_typeof(e) = 'object' AND lower(e->>'id') = d.k
+         GROUP BY 1) nw
+     WHERE nw.n > (SELECT count(*) FROM jsonb_array_elements(v_old) o
+                    WHERE jsonb_typeof(o) = 'object' AND (o - 'order') = nw.body)
   ) THEN
     RAISE EXCEPTION 'post_media_duplicate_id' USING ERRCODE = '22023';
   END IF;
@@ -244,6 +249,7 @@ BEGIN
      WHERE m.content_type='post' AND m.content_id=p_content_id AND m.status='pending'
        AND p.id = p_content_id AND u.upload_id = m.mux_upload_id
        AND (p.media -> m.media_index ->> 'mux_upload_id') = m.mux_upload_id
+       AND (m.media_id IS NULL OR lower(p.media -> m.media_index ->> 'id') = m.media_id::text)   -- NEW (Phase 4)
        AND (p.media -> m.media_index ->> 'mux_status') IN ('ready','errored');
     RETURN jsonb_build_object('results', v_results);
   END IF;
