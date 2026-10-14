@@ -197,15 +197,40 @@ In the migration itself, items 3, 5, 6 and 8 will be written out in full as `CRE
 
 The simultaneous-race checks remain unverified, as before.
 
+## Corrections from review (apply before drafting the full package)
+1. **Helper execution context (confirmed).** The live `posts_media_mux_before()` is `SECURITY DEFINER` with a fixed `search_path`, so it can call the server-only helper while signed-in users still can't. The suite adds tests for both: a signed-in save works, and a direct helper call by a signed-in user fails with a permission error.
+2. **Duplicate detection by actual ID, not group count.** A duplicated ID is allowed only when every item carrying it is unchanged from the saved Post, ignoring order, and it appears no more times than before. Any other repeated ID is refused, even if an unrelated old duplicate disappears in the same save.
+3. **UUID comparison is case-insensitive.** IDs are compared in lowercase (or cast to `uuid`) everywhere: ID matching, the reuse check, duplicate detection and the webhook's lookup by `media_id`. New server IDs are lowercase. Historical IDs are never rewritten, so uppercase ones stay byte-identical.
+4. **Every legitimate path that creates or reactivates a link supplies `media_id`.**
+   - After the migration, Post link creation and reactivation happen only in `sync_mux_post_mappings_core`, which always writes `media_id`. It is called by the save trigger, catch-up and the legacy wrapper.
+   - Old links with an empty `media_id` are never touched, and still patch through the slot plus upload-ID rule.
+   - The suite asserts that normal create, edit, catch-up and wrapper calls leave no new active link without `media_id`.
+5. **Rollout order and mixed versions.**
+   - Run the migration first, then deploy both Edge Functions straight away.
+   - **Old sync function in that window:** safe, because the wrapper now ignores its slot list.
+   - **Old register function in that window:** its direct insert is refused by the new rule. It reports `insert_failed` for that item but still returns success, so the composer carries on. The save itself already created the link with `media_id`, and catch-up patching happens at save time, so publishing is unaffected.
+   - The suite simulates both old-function calls and checks the saved link stays intact.
+   - **Rollback:** redeploying the old functions remains safe for the same reasons.
+6. **No trigger switching on live tables for new fixtures.** Ambiguous-history and duplicate-history cases are tested by calling `post_media_assign_ids()` directly with old and new arrays inside the rolled-back test, not by seeding the `posts` table with triggers off.
+   - Known issue in the existing Phase 2 suite: it switches `posts` and `mux_uploads` triggers off inside its rolled-back transaction. That briefly locks those tables for live saves while it runs.
+   - Phase 4 doesn't change that suite. I'll propose converting it separately.
+7. **Complete executable package.** The migration contains full `CREATE OR REPLACE` definitions of every changed function, with no comment placeholders. It is saved as a review file, alongside the complete test file. Checking function text for lock order is supporting evidence only; true concurrency remains unverified.
+
+**Extra tests added by these corrections:**
+- uppercase UUID kept, and matched by the webhook;
+- a new duplicate refused even while an unrelated old duplicate disappears;
+- a grandfathered duplicate passes untouched;
+- old register and old sync calls during the deployment window;
+- a signed-in user can save but can't call the helper directly.
+
 ## After approval
-1. Write the full migration SQL and the full test file, and show both. Nothing runs yet.
-2. On your go-ahead:
-   - run the migration;
-   - deploy the two Edge Functions;
+1. Write the complete migration file (`docs/drafts/post-video-phase-4-migration.sql`), the complete `supabase/tests/post_video_phase4.sql`, and the two Edge Function changes, and show them. Nothing runs or deploys.
+2. Only on your go-ahead:
+   - run the migration, then deploy the two Edge Functions;
    - run the Phase 4, Phase 2 and Phase 3 suites, the app suite and typecheck;
    - correct the Phase 3 document;
    - report passed, failed and blocked.
-3. Stop before Step 3 (composer and viewer).
+3. Stop before Step 3 (composer and viewer). `/create`, historical media and view counts stay unchanged, and Review videos stay OFF.
 
 ## App change list for Step 3 (for reference, not built now)
 - The lightbox opens and resumes by media ID instead of position (`PostMediaDisplay`, `FeedCollage` `videoResume`, `LightboxPreview` entry and exit handoff).
