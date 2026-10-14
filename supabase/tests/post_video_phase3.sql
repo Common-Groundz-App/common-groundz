@@ -82,7 +82,9 @@ BEGIN
   EXECUTE 'reset role';
   UPDATE public.mux_uploads SET status='ready', asset_id='A_E', playback_id='PB_E', duration=8, aspect_ratio='9:16' WHERE upload_id='p3_e';
   SELECT id INTO MID FROM public.mux_upload_mappings WHERE mux_upload_id='p3_e';
+  PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true);
   v := public.patch_content_media_from_mux(MID);
+  PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
   EXECUTE 'set local role authenticated';
   UPDATE public.posts SET title='p3_five_b',
     media = jsonb_build_array((SELECT media->0 FROM public.posts WHERE id=P5) || '{"mux_playback_id":"FORGED"}') WHERE id=P5;
@@ -103,6 +105,7 @@ BEGIN
   SELECT media INTO j FROM public.posts WHERE id=P6;
   UPDATE public.mux_uploads SET status='ready', asset_id='A_F', playback_id='PB_F', duration=8 WHERE upload_id='p3_f';
   SELECT id INTO MID FROM public.mux_upload_mappings WHERE mux_upload_id='p3_f';
+  PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true);
   v := public.patch_content_media_from_mux(MID);
   IF v='noop_removed' AND (SELECT media FROM public.posts WHERE id=P6) = j THEN
     ok:=ok+1; res:=res||E'\nPASS late webhook after removal: noop_removed, Post unchanged';
