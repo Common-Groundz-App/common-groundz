@@ -433,7 +433,7 @@ cross-read between them.
 
 ## Post and Review video: closing the gaps (approved 2026-10-14)
 - [x] Phase 1: shared "Video processing" / "Video unavailable" tiles for posts, reviews, updates
-- [ ] Phase 2: post server rules (+ read-only old-posts report)
+- [x] Phase 2: post server rules (+ read-only old-posts report) — 31/31 rolled-back DB tests (docs/verification/post-video-phase-2.md)
 - [ ] Phase 3: post linking in one save (/create unchanged)
 - [ ] Phase 4: stable post video IDs
 - [ ] Phase 5: review + timeline-update view counts
