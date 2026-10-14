@@ -1,23 +1,23 @@
 import type { MediaItem } from '@/types/media';
 import { isMuxItem, isMuxPlayable, isMuxPreparing, isMuxErroredOrBroken } from '@/utils/muxMedia';
+import { VIDEO_OWNER_COPY } from '@/utils/videoTileCopy';
 
 /**
- * Review video Phase 3 — one display rule for every place review /
- * timeline-update media is drawn (cards, timeline viewer, gallery).
+ * One display rule for every place review / timeline-update media is drawn.
  *
- * - Photos and legacy stored videos: always shown.
- * - Ready Mux video: shown to everyone.
- * - Processing Mux video: author only; hidden for everyone else.
- * - Failed / too-long Mux video: author only (with a recovery note that
- *   depends on whether that entry's own edit hour is still open); hidden
- *   for everyone else, with no failure details.
+ * - Photos, legacy stored videos, ready Mux video: shown.
+ * - Processing Mux video: author sees processing; others a neutral
+ *   "Video processing" tile (slot kept so the entry never looks empty).
+ * - Failed / too-long Mux video: author gets a recovery note that depends on
+ *   the entry's own edit hour; others a neutral "Video unavailable" tile.
  */
 export type ReviewMediaDisplayState =
   | 'show'
   | 'owner_processing'
   | 'owner_failed_editable'
   | 'owner_failed_locked'
-  | 'hidden';
+  | 'viewer_processing'
+  | 'viewer_unavailable';
 
 export interface ReviewMediaViewerContext {
   isOwner: boolean;
@@ -31,11 +31,11 @@ export function displayStateFor(item: MediaItem, ctx: ReviewMediaViewerContext):
   if (item.type !== 'video' || !isMuxItem(item)) return 'show';
   if (isMuxPlayable(item)) return 'show';
   if (isMuxErroredOrBroken(item)) {
-    if (!ctx.isOwner) return 'hidden';
+    if (!ctx.isOwner) return 'viewer_unavailable';
     return ctx.canEdit ? 'owner_failed_editable' : 'owner_failed_locked';
   }
-  if (isMuxPreparing(item)) return ctx.isOwner ? 'owner_processing' : 'hidden';
-  return 'hidden';
+  if (isMuxPreparing(item)) return ctx.isOwner ? 'owner_processing' : 'viewer_processing';
+  return ctx.isOwner ? (ctx.canEdit ? 'owner_failed_editable' : 'owner_failed_locked') : 'viewer_unavailable';
 }
 
 /** Stable identity: never array position, so filtering/reordering can't swap playback state. */
@@ -67,7 +67,7 @@ export function visibleReviewMedia(
       const state = displayStateFor(m, ctx);
       if (state === 'owner_failed_editable') ownerNotice = 'failed_editable';
       if (state === 'owner_failed_locked' && ownerNotice !== 'failed_editable') ownerNotice = 'failed_locked';
-      return state !== 'hidden';
+      return true;
     })
     .map((m) => ({ ...m, id: stableReviewMediaId(ctx.kind, ctx.ownerId, m) }));
   return { items, ownerNotice };
@@ -82,10 +82,4 @@ export function isGalleryVisible(item: MediaItem): boolean {
   return !!item.url;
 }
 
-export const REVIEW_MEDIA_OWNER_COPY = {
-  failedEditable: "Couldn't process this video. Edit to remove or replace it.",
-  failedLockedReview:
-    "Couldn't process this video. You can delete this review or add a timeline update.",
-  failedLockedUpdate:
-    "Couldn't process this video. You can delete this update or add a new timeline update.",
-} as const;
+export const REVIEW_MEDIA_OWNER_COPY = VIDEO_OWNER_COPY;
