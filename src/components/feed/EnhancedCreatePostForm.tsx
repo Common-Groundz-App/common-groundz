@@ -1392,9 +1392,11 @@ export function EnhancedCreatePostForm({
           <ComposerMediaPreview
             media={preparedComposerMedia(media, postToEdit?.media ?? [], muxStatuses)}
             onRemove={removeMedia}
-            resumeAfterSourceSwap
             previewSrcOverride={(item) =>
-              item.id && (!item.mux_upload_id || composerMuxState(muxStatuses[item.mux_upload_id]) !== 'ready') ? localPreviewUrlsRef.current.get(item.id) : undefined
+              // Newly picked videos keep playing from the local copy even after
+              // Mux is ready — no source swap, so no stall. Saved videos have no
+              // local copy and play from Mux.
+              item.id ? localPreviewUrlsRef.current.get(item.id) : undefined
             }
             overlayForItem={(item) => {
               const id = item.mux_upload_id;
