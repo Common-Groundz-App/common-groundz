@@ -32,6 +32,23 @@
 5. **Review and update view counts.** The post view rules are reused (same watch threshold and duplicate rules). A view isn't counted twice when you open a video full-screen from the card. Each count goes to the right type: post, review or timeline update. Counting a view never changes edit times, reopens the edit window or touches photo cleanup.
 6. **Recheck.** Full automated suite, plus one short signed-in check covering the new tiles, a post video upload and one review view. The earlier Phase 4 results stay valid. Only the checks these changes affect are rerun, and Review video is marked as reopened until this passes.
 
+## Acceptance requirements (from review)
+
+- **/create stays exactly as it is.** Upload progress, the preparing and ready preview, autoplay, mute, cancel and replace before pressing Post must all be unchanged, with no new loading step and no preview reset. These are tested before and after phase 3. If keeping them unchanged turns out to be impossible, I stop and ask you first.
+- **Old posts are protected.** The new rules apply only to media that is added or changed. An old post with unusual media can still have its caption edited, and its media can still be safely removed. Old videos are never rewritten or marked invalid.
+- **The 60-second check is for new videos only.** It applies to videos linked after the rule ships. Existing videos keep playing even if they are over 60 s.
+- **The old linking requests are made harmless.** For one release, they can't create duplicate links or bring back removed ones. After that release, they're removed once the new linking has been confirmed in real use.
+- **Stable IDs come before view counts.** Old posts without the newer fields get a fixed fallback ID that never changes. That ID stays the same through edits, layout changes and opening a video full-screen.
+- **The server checks every view.** Before counting, it confirms the post, review or update exists and the viewer is allowed to see it. Post, review and update views are each tested separately. Placeholders, pre-loading and failed playback never count.
+- **Placeholders don't break the viewer.** Tapping media and moving through the full-screen viewer behave the same when a placeholder tile is present.
+- **Checks after every phase.** Targeted tests run after each phase. The full suite, type check and build run before close-out. Phase 4 checks are rerun wherever behaviour changed, and earlier results are kept only where it didn't.
+
+## Extra suggestions
+
+- **Admin count:** the existing Mux status card also shows a count of post videos stuck processing or failed, so problems are easy to spot.
+- **Old posts report:** the read-only check in phase 2 is saved as a short report: how many old posts break today's limits, have over-60 s videos or have no link record. That way the old-post protection is based on real numbers.
+- **One message set:** all tile and owner wording lives in one place, so posts and reviews always say the same thing.
+
 ## Stays the same
 
 Public playback links, the one-hour rule, no reordering, privacy and Circle rules, legacy forms, Mux asset deletion (the later cleanup project), and Review videos staying off for everyone.
