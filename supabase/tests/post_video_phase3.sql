@@ -6,7 +6,7 @@
 DO $test$
 DECLARE
   U constant uuid := 'abfcbf43-b985-40dc-933c-201e5448b794';
-  P1 uuid; P3 uuid; P4 uuid; P5 uuid; P6 uuid; M uuid;
+  P1 uuid; P3 uuid; P4 uuid; P5 uuid; P6 uuid; MID uuid;
   res text := ''; ok int := 0; bad int := 0;
   j jsonb; j2 jsonb; v text; n int; n2 int; err text;
   photo jsonb := '{"type":"image","url":"https://example.com/p.jpg","order":0}';
@@ -81,8 +81,8 @@ BEGIN
   VALUES (U,'p3_five','c','experience','public', jsonb_build_array(base || '{"mux_upload_id":"p3_e"}')) RETURNING id INTO P5;
   EXECUTE 'reset role';
   UPDATE public.mux_uploads SET status='ready', asset_id='A_E', playback_id='PB_E', duration=8, aspect_ratio='9:16' WHERE upload_id='p3_e';
-  SELECT id INTO M FROM public.mux_upload_mappings WHERE mux_upload_id='p3_e';
-  v := public.patch_content_media_from_mux(M);
+  SELECT id INTO MID FROM public.mux_upload_mappings WHERE mux_upload_id='p3_e';
+  v := public.patch_content_media_from_mux(MID);
   EXECUTE 'set local role authenticated';
   UPDATE public.posts SET title='p3_five_b',
     media = jsonb_build_array((SELECT media->0 FROM public.posts WHERE id=P5) || '{"mux_playback_id":"FORGED"}') WHERE id=P5;
@@ -90,7 +90,7 @@ BEGIN
   SELECT media->0 INTO j FROM public.posts WHERE id=P5;
   SELECT count(*) INTO n FROM public.mux_upload_mappings WHERE mux_upload_id='p3_e';
   IF v='patched' AND j->>'mux_status'='ready' AND j->>'mux_playback_id'='PB_E' AND n=1
-     AND (SELECT status FROM public.mux_upload_mappings WHERE id=M)='patched' THEN
+     AND (SELECT status FROM public.mux_upload_mappings WHERE id=MID)='patched' THEN
     ok:=ok+1; res:=res||E'\nPASS webhook then save: trusted media kept, mapping patched once';
   ELSE bad:=bad+1; res:=res||format(E'\nFAIL webhook then save patch=%s item=%s maps=%s', v, j, n); END IF;
 
@@ -102,8 +102,8 @@ BEGIN
   EXECUTE 'reset role';
   SELECT media INTO j FROM public.posts WHERE id=P6;
   UPDATE public.mux_uploads SET status='ready', asset_id='A_F', playback_id='PB_F', duration=8 WHERE upload_id='p3_f';
-  SELECT id INTO M FROM public.mux_upload_mappings WHERE mux_upload_id='p3_f';
-  v := public.patch_content_media_from_mux(M);
+  SELECT id INTO MID FROM public.mux_upload_mappings WHERE mux_upload_id='p3_f';
+  v := public.patch_content_media_from_mux(MID);
   IF v='noop_removed' AND (SELECT media FROM public.posts WHERE id=P6) = j THEN
     ok:=ok+1; res:=res||E'\nPASS late webhook after removal: noop_removed, Post unchanged';
   ELSE bad:=bad+1; res:=res||E'\nFAIL late webhook '||coalesce(v,'null'); END IF;
