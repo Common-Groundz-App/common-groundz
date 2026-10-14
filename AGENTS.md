@@ -5,3 +5,4 @@
 - Review/timeline media is drawn only through `ReviewMediaBlock` + `visibleReviewMedia` (stable ids, owner/edit-window display rule) and review videos reuse `FeedVideo` with view tracking disabled; one rule keeps grid, viewer and gallery consistent and post analytics separate.
 - The entity page has exactly one `FeedVideoManagerProvider` (top of `EntityV4`) covering reviews, posts and the timeline viewer; nested managers would isolate players and break one-at-a-time playback.
 - Review composers pass `unknownDurationAllowed` to `validateMediaFile`: an unmeasurable length is an explicit allowed state and the server's Mux duration decides; posts keep the old check until a separate decision.
+- Post Mux fields are rebuilt server-side by `post_mux_truth_item` on every save and trusted patch, and unchanged existing videos pass through byte-identical; one rebuild keeps client data out and protects historical posts.
