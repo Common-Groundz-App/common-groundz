@@ -3,7 +3,7 @@
 -- details only; nothing is sent to Mux. Author = Hana (test account).
 -- No table triggers are switched off: ambiguous/duplicate history is tested by
 -- calling post_media_assign_ids() directly.
--- NOT covered (blocked: single-connection SQL tool): true simultaneous races.
+-- 29 checks (T1-T29). NOT covered (blocked: single-connection SQL tool): true simultaneous races.
 DO $test$
 DECLARE
   U  constant uuid := 'abfcbf43-b985-40dc-933c-201e5448b794';
