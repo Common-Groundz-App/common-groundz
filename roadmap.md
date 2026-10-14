@@ -430,3 +430,12 @@ cross-read between them.
 - [ ] Later: private / Circle review video playback (signed Mux playback)
 - [x] 3D — cutover of entry points: complete and verified by the owner's signed-in ON/OFF test (all 8 checklist steps passed: write from home and entity page, text-only and photo-removal edits, add/edit timeline update, read-only viewer, `?compose=update` owner vs non-owner, mid-draft switch-off, inline undo/delete, popup restored when OFF). Switch left ON. Evidence: docs/verification/review-composer-3d.md
 - [ ] 3E — remove the legacy popup, the rollout switch and `?compose=update` compatibility: DEFERRED until the next round of new-review-page changes is stable. Until then the legacy popup form (`ReviewForm`) and the legacy inline timeline form in `ReviewTimelineViewer` are FROZEN — rollback path only; no new features or product changes there; all review/timeline work targets the new page composer only; the switch stays available for emergency rollback
+
+## Post and Review video: closing the gaps (approved 2026-10-14)
+- [x] Phase 1: shared "Video processing" / "Video unavailable" tiles for posts, reviews, updates
+- [ ] Phase 2: post server rules (+ read-only old-posts report)
+- [ ] Phase 3: post linking in one save (/create unchanged)
+- [ ] Phase 4: stable post video IDs
+- [ ] Phase 5: review + timeline-update view counts
+- [ ] Phase 6: recheck (suite + short signed-in check: post, review, update views)
+- Deferred: admin stuck/failed post video count
