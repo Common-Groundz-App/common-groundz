@@ -6,3 +6,4 @@
 - The entity page has exactly one `FeedVideoManagerProvider` (top of `EntityV4`) covering reviews, posts and the timeline viewer; nested managers would isolate players and break one-at-a-time playback.
 - Review composers pass `unknownDurationAllowed` to `validateMediaFile`: an unmeasurable length is an explicit allowed state and the server's Mux duration decides; posts keep the old check until a separate decision.
 - Post Mux fields are rebuilt server-side by `post_mux_truth_item` on every save and trusted patch, and unchanged existing videos pass through byte-identical; one rebuild keeps client data out and protects historical posts.
+- New/replacement Mux videos use shared composer-only readiness rules (owner status plus server duration) before publishing; saved content is reread after existing linking without reinserting on refresh failure, so immediate playback never trusts local previews or weakens server validation.

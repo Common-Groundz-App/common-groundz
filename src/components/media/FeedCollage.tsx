@@ -9,6 +9,8 @@ interface FeedCollageProps {
   onItemClick: (originalIndex: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
   source?: 'post' | 'review' | 'entity';
   sourceId?: string;
+  /** Composer-only review previews retain the saved media order. */
+  preserveMediaOrder?: boolean;
   className?: string;
   /**
    * Optional per-tile overlay rendered absolutely inside each tile wrapper.
@@ -62,6 +64,7 @@ export function FeedCollage({
   onItemClick,
   source = 'post',
   sourceId,
+  preserveMediaOrder = false,
   className,
   renderTileOverlay,
   disableItemClick,
@@ -73,7 +76,7 @@ export function FeedCollage({
 
   // Build display order; promote first video to index 0 for multi-item posts.
   const entries: DisplayEntry[] = media.map((item, originalIndex) => ({ item, originalIndex }));
-  if (entries.length > 1) {
+  if (!preserveMediaOrder && entries.length > 1) {
     const firstVideoIdx = entries.findIndex((e) => e.item.type === 'video');
     if (firstVideoIdx > 0) {
       const [v] = entries.splice(firstVideoIdx, 1);

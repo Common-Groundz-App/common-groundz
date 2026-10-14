@@ -22,5 +22,5 @@ Both unchanged after the migration (media checksums unchanged).
 
 ## Known limitations
 - Posts still fall back to stored files when Mux uploads are off; those videos are length-checked in the browser only.
-- The browser-captured poster is no longer kept on a saved post while processing (the neutral tile shows); the file stays in storage for the later Mux cleanup.
+- The browser-captured poster is no longer kept on a saved post while processing (the neutral tile shows); the file stays in storage for the later Mux cleanup. The approved 2026-10-14 composer gate now waits for verified Ready before new/replacement Mux videos publish; this does not change the server rules or close Phase 3 linking.
 - One-save linking (Phase 3) and stable IDs (Phase 4) still open.

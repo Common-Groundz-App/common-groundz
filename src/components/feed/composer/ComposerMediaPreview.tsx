@@ -20,6 +20,7 @@ interface ComposerMediaPreviewProps {
    * Mux is still preparing the HLS asset. Feed callers never pass this.
    */
   previewSrcOverride?: (item: MediaItem) => string | undefined;
+  preserveMediaOrder?: boolean;
 }
 
 /**
@@ -35,6 +36,7 @@ export function ComposerMediaPreview({
   className,
   overlayForItem,
   previewSrcOverride,
+  preserveMediaOrder,
 }: ComposerMediaPreviewProps) {
   if (media.length === 0) return null;
 
@@ -44,7 +46,8 @@ export function ComposerMediaPreview({
     <div className={cn('mt-3', className)}>
       <FeedCollage
         media={sorted}
-        source="post"
+        source="review"
+        preserveMediaOrder={preserveMediaOrder}
         onItemClick={() => {}}
         disableItemClick
         previewSrcOverride={previewSrcOverride}

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Loader2, Check, AlertTriangle } from 'lucide-react';
+import { Check, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { MuxUiStatus } from '@/hooks/useMuxStatus';
 
@@ -74,8 +74,8 @@ export function MuxUploadChip({ uploadId, status, className }: Props) {
     >
       {status === 'processing' && (
         <>
-          <Loader2 className="h-3 w-3 animate-spin" />
-          <span>Processing</span>
+          <span className="h-2 w-2 rounded-full bg-muted-foreground motion-safe:animate-pulse" aria-hidden="true" />
+          <span>Processing video…</span>
         </>
       )}
       {status === 'ready' && (

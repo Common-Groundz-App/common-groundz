@@ -66,6 +66,8 @@ interface MediaUploaderProps {
    * never added). Default false (posts unchanged).
    */
   videoMuxOnly?: boolean;
+  /** Composer publishing flow: real byte progress and cancel-safe video handoff. */
+  truthfulVideoProgress?: boolean;
 }
 
 /**
@@ -76,11 +78,14 @@ interface MediaUploaderProps {
 export function UploadRow({
   upload,
   onCancel,
+  truthfulVideoProgress = false,
 }: {
   upload: MediaUploadState;
   onCancel: (upload: MediaUploadState) => void;
+  truthfulVideoProgress?: boolean;
 }) {
   const isVideo = upload.file.type.startsWith('video/');
+  const truthful = isVideo && truthfulVideoProgress;
   const serverPoster = upload.item?.thumbnail_url;
   const localPoster = upload.localPosterUrl;
   const rawDuration = upload.item?.duration ?? upload.localDuration;
@@ -101,16 +106,16 @@ export function UploadRow({
 
   // After 10s still in `preparing`, nudge the ceiling up once.
   useEffect(() => {
-    if (stage !== 'preparing') {
+    if (truthful || stage !== 'preparing') {
       setPreparingBoost(false);
       return;
     }
     const t = setTimeout(() => setPreparingBoost(true), 10000);
     return () => clearTimeout(t);
-  }, [stage]);
+  }, [stage, truthful]);
 
   useEffect(() => {
-    if (isError) return; // Freeze on error.
+    if (truthful || isError) return; // Byte progress is reported by the uploader, never animated.
     if (stage === 'done') {
       setDisplay(100);
       return;
@@ -135,7 +140,7 @@ export function UploadRow({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [stage, preparingBoost, isError]);
+  }, [stage, preparingBoost, isError, truthful]);
 
   const stageLabel = isError
     ? 'Upload failed'
@@ -143,13 +148,14 @@ export function UploadRow({
     ? 'Preparing…'
     : stage === 'uploading'
     ? isVideo
-      ? 'Uploading video…'
+      ? truthful ? `Uploading ${Math.round(Math.max(0, Math.min(100, upload.progress)))}%` : 'Uploading video…'
       : 'Uploading…'
     : stage === 'finalizing'
-    ? 'Finalizing…'
+    ? truthful ? 'Finishing upload…' : 'Finalizing…'
     : '';
 
-  const showShimmer = !isError && stage !== 'done';
+  const showShimmer = !isError && stage !== 'done' && (!truthful || stage !== 'uploading');
+  const progressWidth = truthful ? stage === 'uploading' ? Math.max(0, Math.min(100, upload.progress)) : stage === 'done' ? 100 : 0 : display;
 
   return (
     <div className="flex items-center space-x-2 border border-border rounded-md p-2">
@@ -209,7 +215,7 @@ export function UploadRow({
         <div className="relative h-1 mt-1 overflow-hidden rounded-full bg-secondary">
           <div
             className="h-full bg-primary transition-[width] duration-150 ease-out"
-            style={{ width: `${display}%` }}
+            style={{ width: `${progressWidth}%` }}
           />
           {showShimmer ? (
             <div
@@ -271,6 +277,7 @@ export function MediaUploader({
   allowVideo = true,
   videoRefusedMessage,
   videoMuxOnly = false,
+  truthfulVideoProgress = false,
 }: MediaUploaderProps) {
   const cancelledFilesRef = useRef<WeakSet<File>>(new WeakSet());
   const { user } = useAuth();
@@ -471,7 +478,7 @@ export function MediaUploader({
           )
         );
       }, videoMuxOnly ? { videoMuxOnly: true } : undefined).then((mediaItem) => {
-        if (videoMuxOnly && cancelledFilesRef.current.has(file)) {
+        if ((videoMuxOnly || truthfulVideoProgress) && cancelledFilesRef.current.has(file)) {
           // Cancelled while transferring: never added; slot released once.
           // Only the preview image is removed; the Mux video itself is kept.
           if (mediaItem?.url) void deleteMedia(mediaItem.url).catch(() => undefined);
@@ -529,7 +536,7 @@ export function MediaUploader({
   };
 
   const cancelUpload = (uploadToCancel: MediaUploadState) => {
-    if (videoMuxOnly && uploadToCancel.status === 'uploading') cancelledFilesRef.current.add(uploadToCancel.file);
+    if ((videoMuxOnly || truthfulVideoProgress) && uploadToCancel.status === 'uploading') cancelledFilesRef.current.add(uploadToCancel.file);
     revokePoster(uploadToCancel.localPosterUrl);
     setUploads((prev) => prev.filter((u) => u !== uploadToCancel));
   };
@@ -564,7 +571,7 @@ export function MediaUploader({
         {renderUploadsInline && uploads.length > 0 && (
           <div className="space-y-2 mt-2">
             {uploads.map((upload, index) => (
-              <UploadRow key={index} upload={upload} onCancel={cancelUpload} />
+              <UploadRow key={index} upload={upload} onCancel={cancelUpload} truthfulVideoProgress={truthfulVideoProgress} />
             ))}
           </div>
         )}
@@ -627,7 +634,7 @@ export function MediaUploader({
       {uploads.length > 0 && (
         <div className="space-y-2">
           {uploads.map((upload, index) => (
-            <UploadRow key={index} upload={upload} onCancel={cancelUpload} />
+            <UploadRow key={index} upload={upload} onCancel={cancelUpload} truthfulVideoProgress={truthfulVideoProgress} />
           ))}
         </div>
       )}

@@ -31,6 +31,7 @@ import { getInitialsFromName } from '@/utils/profileUtils';
 import { ComposerMediaPreview } from './composer/ComposerMediaPreview';
 import { MuxUploadChip } from './composer/MuxUploadChip';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
+import { composerMuxState, newMuxVideoSaveBlocker, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
@@ -119,6 +120,8 @@ export function EnhancedCreatePostForm({
   const [content, setContent] = useState(postToEdit?.content ?? '');
   const [title, setTitle] = useState(postToEdit?.title ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
+  const savedPostIdRef = useRef<string | null>(null);
   const [media, setMedia] = useState<MediaItem[]>(postToEdit?.media ?? []);
   // Phase 5: live Mux upload status for tiles in this composer session.
   const muxUploadIds = useMemo(
@@ -381,21 +384,18 @@ export function EnhancedCreatePostForm({
     setEmojiPickerVisible(false);
   };
 
-  // Handle keyboard shortcut for posting (Cmd/Ctrl + Enter)
+  // A stable keyboard listener always calls the current guarded submit handler.
+  const keyboardSubmitRef = useRef<() => void>(() => undefined);
   useEffect(() => {
-    const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting;
-    
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && !isPostButtonDisabled) {
-        handleSubmit();
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        keyboardSubmitRef.current();
       }
     };
-    
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [content, media, isSubmitting]);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Handle drag and drop for the entire form
   useEffect(() => {
@@ -550,8 +550,32 @@ export function EnhancedCreatePostForm({
     setEntities(prev => prev.filter(entity => entity.id !== entityId));
   };
 
+  const refreshSavedPostMedia = async (postId: string) => {
+    try {
+      const { data, error } = await supabase.from('posts').select('id,media').eq('id', postId).single();
+      if (error || !data) throw error ?? new Error('Saved experience not readable yet');
+      queryClient.setQueriesData({ queryKey: ['infinite-feed'] }, (old: any) => !old?.pages ? old : ({
+        ...old, pages: old.pages.map((page: any) => ({ ...page,
+          items: page.items.map((item: any) => item.id === postId ? { ...item, media: data.media } : item),
+        })),
+      }));
+      return data.media;
+    } catch {
+      toast({ title: 'Experience saved', description: 'Video status could not be refreshed. Refresh your saved experience to recheck it; do not post again.' });
+      return null;
+    }
+  };
+
   const handleSubmit = async () => {
     if (!requireAuth({ action: 'create_post', surface: 'create_post_form' })) return;
+
+    if (isSubmitting || submitLockRef.current) return;
+    if (savedPostIdRef.current) { await refreshSavedPostMedia(savedPostIdRef.current); onSuccess(); return; }
+    const blocker = newMuxVideoSaveBlocker(media, postToEdit?.media ?? [], muxStatuses);
+    if (blocker || inFlightUploads.some((u) => u.status === 'uploading')) {
+      toast({ title: 'Video is not ready yet', description: blocker ?? 'Wait for your upload to finish.' });
+      return;
+    }
 
     if (!content.trim() && media.length === 0) {
       toast({
@@ -570,6 +594,7 @@ export function EnhancedCreatePostForm({
     }
 
     try {
+      submitLockRef.current = true;
       setIsSubmitting(true);
 
       const dbVisibility = mapVisibilityToDatabase(visibility);
@@ -695,6 +720,7 @@ export function EnhancedCreatePostForm({
           .single();
 
         if (error) throw error;
+        savedPostIdRef.current = updatedPost.id;
 
         // ===== Phase 3C.1: reconcile Mux mappings after a successful edit =====
         // HARD GUARDRAIL: only invoke when this post has Mux media now OR had it
@@ -736,6 +762,8 @@ export function EnhancedCreatePostForm({
           // Non-blocking — edit already succeeded.
           console.error('mux_sync_post_mappings_threw', e);
         }
+
+        if (mediaToSave.some((m) => m.provider === 'mux') || (postToEdit.media ?? []).some((m) => m.provider === 'mux')) await refreshSavedPostMedia(postToEdit.id);
 
         // Replace entity relationships: delete-then-insert
         await supabase
@@ -805,7 +833,7 @@ export function EnhancedCreatePostForm({
           dbPostType !== (postToEdit.post_type ?? 'experience') ||
           hasStructuredChanged;
 
-        if (hasChanged) {
+        if (hasChanged || JSON.stringify(media) !== JSON.stringify(postToEdit.media ?? [])) {
           queryClient.invalidateQueries({ queryKey: ['infinite-feed'], exact: false });
           window.dispatchEvent(new CustomEvent('refresh-feed'));
           window.dispatchEvent(new CustomEvent('refresh-posts', {
@@ -849,6 +877,7 @@ export function EnhancedCreatePostForm({
 
       if (error) throw error;
 
+      savedPostIdRef.current = newPost.id;
       console.log('Post created:', newPost);
 
       if (entities.length > 0 && newPost) {
@@ -909,8 +938,8 @@ export function EnhancedCreatePostForm({
                 error_code: (invokeErr as any)?.context?.status || invokeErr?.name || 'unknown',
               });
               toast({
-                title: 'Video processing pending',
-                description: 'Refresh in a minute to update.',
+                title: 'Experience saved — video sync pending',
+                description: 'Your experience is saved. Refresh to recheck it; do not post again.',
               });
             }
           } catch (e: any) {
@@ -925,14 +954,16 @@ export function EnhancedCreatePostForm({
               error_code: e?.name || 'exception',
             });
             toast({
-              title: 'Video processing pending',
-              description: 'Refresh in a minute to update.',
+              title: 'Experience saved — video sync pending',
+              description: 'Your experience is saved. Refresh to recheck it; do not post again.',
             });
           }
         }
       }
 
 
+
+      const persistedMedia = mediaToSave.some((m) => m.provider === 'mux') ? await refreshSavedPostMedia(newPost.id) : null;
 
       // ===== Hashtag persistence (non-blocking) =====
       const { all: detectedTags, source: hashtagSource } = extractHashtagsDetailed(title, content);
@@ -973,6 +1004,7 @@ export function EnhancedCreatePostForm({
       try {
         const optimisticItem = {
           ...newPost,
+          ...(persistedMedia ? { media: persistedMedia } : {}),
           is_post: true,
           is_optimistic: true,
           username: profileData?.username || null,
@@ -990,7 +1022,11 @@ export function EnhancedCreatePostForm({
         const updateFeedCache = (oldData: any) => {
           if (!oldData?.pages?.[0]?.items) return oldData;
           const firstPage = oldData.pages[0];
-          if (firstPage.items.some((item: any) => item.id === newPost.id)) return oldData;
+          if (firstPage.items.some((item: any) => item.id === newPost.id)) return {
+            ...oldData, pages: oldData.pages.map((page: any) => ({ ...page,
+              items: page.items.map((item: any) => item.id === newPost.id ? { ...item, ...optimisticItem } : item),
+            })),
+          };
           return {
             ...oldData,
             pages: [
@@ -1041,6 +1077,13 @@ export function EnhancedCreatePostForm({
       revokeAllLocalPreviews();
       onSuccess();
     } catch (error) {
+      if (savedPostIdRef.current) {
+        toast({ title: 'Your experience was saved', description: 'Some updates are pending. Recheck this saved experience; do not post it again.' });
+        clearDraft();
+        revokeAllLocalPreviews();
+        onSuccess();
+        return;
+      }
       console.error('Error creating post:', error);
       toast({
         title: 'Error',
@@ -1048,9 +1091,12 @@ export function EnhancedCreatePostForm({
         variant: 'destructive',
       });
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };
+
+  keyboardSubmitRef.current = () => { void handleSubmit(); };
 
   function getVisibilityIcon() {
     switch (visibility) {
@@ -1081,7 +1127,9 @@ export function EnhancedCreatePostForm({
   }
 
   // Computed properties
-  const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting;
+  const videoBlocker = newMuxVideoSaveBlocker(media, postToEdit?.media ?? [], muxStatuses);
+  const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting ||
+    inFlightUploads.some((u) => u.status === 'uploading') || !!videoBlocker;
 
   // Live-detected hashtags for the composer chip row (read-only preview)
   const detectedHashtagsForChips = useMemo(() => {
@@ -1340,23 +1388,21 @@ export function EnhancedCreatePostForm({
         {/* Media preview */}
         {media.length > 0 && (
           <ComposerMediaPreview
-            media={media}
+            media={preparedComposerMedia(media, postToEdit?.media ?? [], muxStatuses)}
             onRemove={removeMedia}
             previewSrcOverride={(item) =>
-              item.id ? localPreviewUrlsRef.current.get(item.id) : undefined
+              item.id && (!item.mux_upload_id || composerMuxState(muxStatuses[item.mux_upload_id]) !== 'ready') ? localPreviewUrlsRef.current.get(item.id) : undefined
             }
             overlayForItem={(item) => {
               const id = item.mux_upload_id;
               if (!id || item.provider !== 'mux') return null;
-              const ui = muxStatuses[id]?.ui_status;
-              // Only surface a chip on actual failure. Processing/ready chips
-              // would be misleading now that the composer plays the local
-              // file directly via previewSrcOverride.
-              if (ui !== 'failed') return null;
+              const ui = composerMuxState(muxStatuses[id]);
               return <MuxUploadChip uploadId={id} status={ui} />;
             }}
           />
         )}
+
+        {videoBlocker && <div className="mt-3 space-y-1"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><Button type="button" size="sm" variant="ghost" onClick={() => window.dispatchEvent(new Event('mux:recheck'))}>Check video status</Button></div>}
 
         {/* Location chip */}
         {location && (
@@ -1404,6 +1450,7 @@ export function EnhancedCreatePostForm({
               <UploadRow
                 key={index}
                 upload={upload}
+                truthfulVideoProgress
                 onCancel={handleCancelInFlight}
               />
             ))}
@@ -1414,6 +1461,7 @@ export function EnhancedCreatePostForm({
         <div className="hidden md:flex items-center justify-between gap-2 border-t border-border pt-3 mt-4">
           <div className="flex items-center gap-1">
             <MediaUploader
+              truthfulVideoProgress
               sessionId={sessionId}
               onMediaUploaded={handleMediaUpload}
               initialMedia={media}

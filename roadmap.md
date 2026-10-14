@@ -432,6 +432,7 @@ cross-read between them.
 - [ ] 3E — remove the legacy popup, the rollout switch and `?compose=update` compatibility: DEFERRED until the next round of new-review-page changes is stable. Until then the legacy popup form (`ReviewForm`) and the legacy inline timeline form in `ReviewTimelineViewer` are FROZEN — rollback path only; no new features or product changes there; all review/timeline work targets the new page composer only; the switch stays available for emergency rollback
 
 ## Post and Review video: closing the gaps (approved 2026-10-14)
+- [ ] Ready-before-publish UX (approved 2026-10-14): Post + new Review/Timeline create/edit gates, truthful stages, processed preview, successful-save refresh/reconciliation; no real uploads or setting changes; stop before Phase 3. Live signed-in Mux round-trip requires separate authorization.
 - [x] Phase 1: shared "Video processing" / "Video unavailable" tiles for posts, reviews, updates
 - [x] Phase 2: post server rules (+ read-only old-posts report) — 31/31 rolled-back DB tests (docs/verification/post-video-phase-2.md)
 - [ ] Phase 3: post linking in one save (/create unchanged)

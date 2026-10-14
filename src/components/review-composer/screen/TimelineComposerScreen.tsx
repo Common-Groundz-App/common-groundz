@@ -7,6 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,8 @@ import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { useToast } from '@/hooks/use-toast';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
+import { ComposerMediaPreview } from '@/components/feed/composer/ComposerMediaPreview';
+import { composerMuxState, isNewMuxVideo, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 import ChoiceChips from '@/components/profile/reviews/questionnaire/ChoiceChips';
 import { BASE_ON_RATING_ACTION_LABEL, RECOMMENDATION_INTENT_OPTIONS } from '@/services/review/recommendationResolver';
@@ -84,6 +87,7 @@ type Props =
 
 export function TimelineComposerScreen(props: Props) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const isEdit = props.mode === 'edit-timeline-update';
   const review = props.loaded.review;
@@ -177,7 +181,7 @@ export function TimelineComposerScreen(props: Props) {
   const videoBlocker = videoSaveBlocker(state.values.media, storedMedia, muxStatuses);
   const videoOverlay = (m: MediaItem) => {
     const id = m.type === 'video' ? m.mux_upload_id : undefined;
-    return id ? <MuxUploadChip uploadId={id} status={muxStatuses[id]?.ui_status} /> : null;
+    return id ? <MuxUploadChip uploadId={id} status={composerMuxState(muxStatuses[id])} /> : null;
   };
   const saveErrorRef = useRef<unknown>(null);
 
@@ -193,6 +197,7 @@ export function TimelineComposerScreen(props: Props) {
 
   /* ---------------- saving ---------------- */
   const attemptRef = useRef<Record<string, unknown> | undefined>(undefined);
+  const savedUpdateIdRef = useRef<string | null>(updateId ?? null);
   const gatherEvidence = useCallback(async () => {
     const evidence = await gatherAmbiguousSaveEvidence(
       { mode: state.mode, reviewId: review.id, updateId: updateId ?? undefined, attempt: attemptRef.current },
@@ -206,14 +211,17 @@ export function TimelineComposerScreen(props: Props) {
     dispatch({ type: 'EVIDENCE', sessionKey, evidence });
   }, [state.mode, review.id, updateId, sessionKey, dispatch]);
 
+  const saveLock = useRef(false);
+  useEffect(() => { if (state.status === 'ready') saveLock.current = false; }, [state.status]);
   const handleSave = async () => {
-    if (!canSubmit(state)) return;
+    if (saveLock.current || !canSubmit(state) || isUploading || videoBlocker) return;
     const v = validateForSubmit(state);
     dispatch({ type: 'VALIDATED', sessionKey, errors: v.errors });
     if (!v.ok) {
       document.getElementById(`composer-section-${v.firstInvalid}`)?.focus();
       return;
     }
+    saveLock.current = true;
     dispatch({ type: 'SAVE_STARTED', sessionKey });
     uploads.send({ type: 'SAVING' });
 
@@ -243,6 +251,7 @@ export function TimelineComposerScreen(props: Props) {
       attemptRef.current = undefined; // add evidence is never compared — the author judges it
       write = addReviewUpdate(p.review_id, props.userId, p.rating ?? null, p.comment, p.media, p.would_recommend, {
         sendExplicitNull: true,
+        ...(videoIds.length ? { onSaved: (id: string) => { savedUpdateIdRef.current = id; } } : {}),
         onError: (e) => {
           saveErrorRef.current = e;
         },
@@ -266,6 +275,15 @@ export function TimelineComposerScreen(props: Props) {
     const result = outcome as ReturnType<typeof fromTimelineStatus>;
     if (result.status === 'ok') {
       uploads.send({ type: 'COMMITTED' });
+      if (videoIds.length > 0) try {
+        const savedId = savedUpdateIdRef.current;
+        if (!savedId || !await loadUpdateById(review.id, savedId)) throw new Error('Saved update not readable yet');
+        await queryClient.invalidateQueries({ queryKey: ['reviews'] });
+        await queryClient.invalidateQueries({ queryKey: ['entity-detail'] });
+      } catch {
+        if (aliveRef.current) toast({ title: 'Update saved', description: 'Refresh this saved update to recheck its video. Do not add it again.' });
+      }
+    if (!aliveRef.current) return;
     // Photos uploaded here but removed before saving are referenced by nothing.
     void Promise.allSettled(
       uploads
@@ -374,6 +392,8 @@ export function TimelineComposerScreen(props: Props) {
         />
       )}
 
+      {videoBlocker && <div className="mb-3 space-y-2"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><Button type="button" variant="ghost" size="sm" onClick={() => window.dispatchEvent(new Event('mux:recheck'))}>Check video status</Button></div>}
+
       <div className="space-y-6">
         <div className="space-y-2" data-testid="timeline-subject">
           {display ? (
@@ -450,13 +470,20 @@ export function TimelineComposerScreen(props: Props) {
                 <span className="text-lg">🖼️</span>
                 <span>Your media ({state.values.media.length}/4)</span>
               </Label>
-              <CompactMediaGrid
+              {state.values.media.some((m) => isNewMuxVideo(m, storedMedia)) ? (
+                  <ComposerMediaPreview
+                    preserveMediaOrder
+                    media={preparedComposerMedia(state.values.media, storedMedia, muxStatuses)}
+                    onRemove={handleMediaRemove}
+                    overlayForItem={videoOverlay}
+                  />
+                ) : (<CompactMediaGrid
                 media={state.values.media}
                 onRemove={handleMediaRemove}
                 overlayForItem={videoOverlay}
                 maxVisible={4}
                 className="group"
-              />
+              />)}
             </div>
           )}
           <div className="space-y-2">
@@ -465,6 +492,7 @@ export function TimelineComposerScreen(props: Props) {
               <span>{videoPolicy.allowVideo ? 'Add photos or a short video' : 'Add photos'}</span>
             </Label>
             <MediaUploader
+                truthfulVideoProgress
               allowVideo={videoPolicy.allowVideo}
               videoMuxOnly
               videoRefusedMessage={videoPolicy.reason ?? undefined}
