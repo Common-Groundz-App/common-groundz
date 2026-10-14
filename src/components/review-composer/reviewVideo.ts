@@ -8,7 +8,7 @@
  *  - decide which video states block Save.
  */
 import type { MediaItem } from '@/types/media';
-import type { MuxUiStatus } from '@/hooks/useMuxStatus';
+import { newMuxVideoSaveBlocker, type ComposerMuxStatuses } from '@/utils/composerVideoReadiness';
 import type { ReviewVisibility } from './values';
 
 export const REVIEW_VIDEO_COPY = {
@@ -103,21 +103,17 @@ export function visibilityLockReason(rootMedia: readonly MediaItem[], updatesHav
 
 /**
  * Save blocker from video state. Uploading is handled by the uploader's
- * in-flight flag. Processing and Ready never block. A failed NEW video blocks;
+ * in-flight flag. New Mux videos must be processed and duration-verified;
  * a saved video that failed later does not block unrelated edits.
  */
 export function videoSaveBlocker(
   media: readonly MediaItem[],
   stored: readonly MediaItem[],
-  statuses: Record<string, { ui_status: MuxUiStatus } | undefined>,
+  statuses: ComposerMuxStatuses,
 ): string | null {
-  for (const m of media) {
-    if (!isNewVideo(m, stored) || !m.mux_upload_id) continue;
-    if (statuses[m.mux_upload_id]?.ui_status === 'failed') return REVIEW_VIDEO_COPY.newVideoFailed;
-  }
-  return null;
+  return newMuxVideoSaveBlocker(media, stored, statuses);
 }
 
 export function muxUploadIds(media: readonly MediaItem[]): string[] {
-  return media.filter((m) => isVideo(m) && m.provider === 'mux' && !!m.mux_upload_id).map((m) => m.mux_upload_id!);
+  return media.flatMap((m) => isVideo(m) && m.provider === 'mux' && m.mux_upload_id ? [m.mux_upload_id] : []);
 }

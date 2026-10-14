@@ -121,7 +121,7 @@ export const addReviewUpdate = async (
    * as `null` (the author cleared their answer) instead of being omitted.
    * Existing callers don't pass it and behave exactly as before.
    */
-  options?: { sendExplicitNull?: boolean; onError?: (error: unknown) => void },
+  options?: { sendExplicitNull?: boolean; onError?: (error: unknown) => void; onSaved?: (updateId: string) => void },
 ): Promise<boolean> => {
   try {
     // Shaped to match the generated `review_updates` Insert row: `rating` is
@@ -153,9 +153,10 @@ export const addReviewUpdate = async (
       insert.would_recommend = null;
     }
 
-    const { error } = await supabase
-      .from('review_updates')
-      .insert(insert);
+    const request = supabase.from('review_updates').insert(insert);
+    // New page composers keep the exact saved identity for readback; legacy
+    // callers retain their existing insert-only request and boolean contract.
+    const { data, error } = options?.onSaved ? await request.select('id').single() : await request;
 
     if (error) {
       console.error('Error adding review update:', error);
@@ -163,6 +164,9 @@ export const addReviewUpdate = async (
       return false;
     }
 
+    if (data && 'id' in data && typeof data.id === 'string') {
+      try { options?.onSaved?.(data.id); } catch { /* insert already succeeded */ }
+    }
     notifyReviewsChanged();
     return true;
   } catch (error) {

@@ -105,6 +105,8 @@ export default defineConfig({
             'src/hooks/__tests__/useTimelineReviews.test.ts',
             'src/components/profile/reviews/__tests__/SubjectSelectStepLocked.test.tsx',
             'src/hooks/useSoftwareKeyboardOpen.test.tsx',
+            'src/hooks/useMuxStatus.readiness.test.tsx',
+            'src/components/review-composer/__tests__/readyBeforePublish.test.tsx',
             'src/hooks/useBlurComposerOnKeyboardDismiss.test.tsx',
             'src/hooks/useDockCorrection.test.tsx',
             'src/hooks/useEntityImageFallback.test.tsx',

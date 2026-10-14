@@ -6,7 +6,7 @@ Date: 2026-10-12. Setting `reviews.video_enabled` added and left **OFF**.
 - New Review page, Timeline Update page and both edit pages accept photos plus one video (4 items, 1 video, 100 MB browser-reported, 60 s) when the setting is ON, Mux uploads are ON and the review (or parent review) is public.
 - Videos upload through Mux only (`uploadMedia(..., { videoMuxOnly: true })`, sends `declared_size`); no storage fallback. Mux off → picking disabled with a message.
 - Live status chip on video tiles (Processing → Ready / Upload failed) via `useMuxStatus`, no reload.
-- Save blocked while a file is transferring; allowed while processing; blocked for a failed NEW video; a saved video that failed later does not block unrelated edits.
+- Original Phase 2 contract: Save blocked while transferring, allowed while processing. Superseded by the approved 2026-10-14 ready-before-publish UX: new/replacement Mux videos must be Ready with asset/playback identity and finite server duration in (0,60]; saved videos retain their unrelated-edit behavior. The database still admits Processing saves from older clients/races.
 - Cancelling a transfer drops its late result (slot released once, preview image removed, Mux video kept).
 - Review visibility: Private/Circle disabled with a reason when the review or any of its timeline updates has a video. Server rule stays authoritative; Phase 1 error codes mapped to friendly messages.
 - Saving: kept saved videos are sent exactly as loaded; new videos without trusted Mux fields; cover left to the server whenever a video is present. Uncertain-save comparison ignores server-filled Mux details.

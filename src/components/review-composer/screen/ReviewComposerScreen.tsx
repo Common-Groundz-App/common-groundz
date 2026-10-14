@@ -7,6 +7,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,6 +19,8 @@ import SubjectSelectStep from '@/components/profile/reviews/steps/SubjectSelectS
 import StepFour from '@/components/profile/reviews/steps/StepFour';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
+import { ComposerMediaPreview } from '@/components/feed/composer/ComposerMediaPreview';
+import { composerMuxState, isNewMuxVideo, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
 import { useLocation as useLocationAccess } from '@/contexts/LocationContext';
@@ -91,6 +94,7 @@ const STEP_TITLES = ['Rating', 'Subject', 'Photos', 'Details'];
 
 export function ReviewComposerScreen(props: Props) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { log: logFunnel } = useSearchFunnel();
   const isEdit = props.mode === 'edit-review';
@@ -162,7 +166,7 @@ export function ReviewComposerScreen(props: Props) {
   const videoBlocker = videoSaveBlocker(state.values.media, storedMedia, muxStatuses);
   const videoOverlay = (m: MediaItem) => {
     const id = m.type === 'video' ? m.mux_upload_id : undefined;
-    return id ? <MuxUploadChip uploadId={id} status={muxStatuses[id]?.ui_status} /> : null;
+    return id ? <MuxUploadChip uploadId={id} status={composerMuxState(muxStatuses[id])} /> : null;
   };
 
   const ctx = sectionContextOf(state);
@@ -364,8 +368,10 @@ export function ReviewComposerScreen(props: Props) {
     navigate(props.cancelTo, { replace: true });
   };
 
+  const saveLock = useRef(false);
+  useEffect(() => { if (state.status === 'ready') saveLock.current = false; }, [state.status]);
   const handleSave = async () => {
-    if (!canSubmit(state)) return;
+    if (saveLock.current || !canSubmit(state) || isUploading || videoBlocker) return;
     const v = validateForSubmit(state);
     dispatch({ type: 'VALIDATED', sessionKey, errors: v.errors });
     if (!v.ok) {
@@ -388,6 +394,7 @@ export function ReviewComposerScreen(props: Props) {
     }
     attemptRef.current = { ...built.payload } as Record<string, unknown>;
     if (attemptRef.current.metadata === undefined) delete attemptRef.current.metadata;
+    saveLock.current = true;
     dispatch({ type: 'SAVE_STARTED', sessionKey });
     uploads.send({ type: 'SAVING' });
 
@@ -425,7 +432,18 @@ export function ReviewComposerScreen(props: Props) {
       void gatherEvidence();
       return;
     }
+    const savedReview = outcome as { id: string };
     uploads.send({ type: 'COMMITTED' });
+    // The returned id is preserved; readback failure never retries the insert.
+    if (videoIds.length > 0) try {
+      const fresh = await reloadReviewRecord(savedReview.id);
+      if (!fresh) throw new Error('Saved review not readable yet');
+      await queryClient.invalidateQueries({ queryKey: ['reviews'] });
+      await queryClient.invalidateQueries({ queryKey: ['entity-detail'] });
+    } catch {
+      if (aliveRef.current) toast({ title: 'Review saved', description: 'Refresh your saved review to recheck its video. Do not publish it again.' });
+    }
+    if (!aliveRef.current) return;
     // Photos uploaded here but removed before saving are referenced by nothing.
     void Promise.allSettled(
       uploads
@@ -566,6 +584,8 @@ export function ReviewComposerScreen(props: Props) {
           </div>
         )}
 
+        {videoBlocker && <div className="space-y-2"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><Button type="button" variant="ghost" size="sm" onClick={() => window.dispatchEvent(new Event('mux:recheck'))}>Check video status</Button></div>}
+
         {onStep(SID.media) && (
           <div id="composer-section-media" tabIndex={-1} className="w-full space-y-8 py-2 outline-none">
             <h2 className="text-center text-xl font-medium">
@@ -608,13 +628,20 @@ export function ReviewComposerScreen(props: Props) {
                   <span className="text-lg">🖼️</span>
                   <span>Your media ({state.values.media.length}/4)</span>
                 </Label>
-                <CompactMediaGrid
+                {state.values.media.some((m) => isNewMuxVideo(m, storedMedia)) ? (
+                  <ComposerMediaPreview
+                    preserveMediaOrder
+                    media={preparedComposerMedia(state.values.media, storedMedia, muxStatuses)}
+                    onRemove={handleMediaRemove}
+                    overlayForItem={videoOverlay}
+                  />
+                ) : (<CompactMediaGrid
                   media={state.values.media}
                   onRemove={handleMediaRemove}
                   overlayForItem={videoOverlay}
                   maxVisible={4}
                   className="group"
-                />
+                />)}
               </div>
             )}
 
@@ -624,6 +651,7 @@ export function ReviewComposerScreen(props: Props) {
                 <span>{videoPolicy.allowVideo ? 'Add photos or a short video' : 'Add photos'}</span>
               </Label>
               <MediaUploader
+                truthfulVideoProgress
                 allowVideo={videoPolicy.allowVideo}
                 videoMuxOnly
                 videoRefusedMessage={videoPolicy.reason ?? undefined}

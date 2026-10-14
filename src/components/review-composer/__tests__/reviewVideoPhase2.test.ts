@@ -12,6 +12,7 @@ import {
 import { reviewVideoErrorMessage } from '../serverErrors';
 import { buildEditTimelinePayload } from '../saveBuilders';
 import { emptyComposerValues } from '../values';
+import { VIDEO_PREPARATION_COPY, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 
 const photo: MediaItem = { url: 'https://x/p.jpg', type: 'image', order: 0 };
 const savedReady: MediaItem = {
@@ -95,10 +96,45 @@ describe('timeline edit payload', () => {
 });
 
 describe('videoSaveBlocker', () => {
-  it('blocks only a failed NEW video', () => {
+  it('blocks failed or processing NEW videos, not saved videos', () => {
     expect(videoSaveBlocker([fresh], [], { up_new: { ui_status: 'failed' } })).toBe(REVIEW_VIDEO_COPY.newVideoFailed);
-    expect(videoSaveBlocker([fresh], [], { up_new: { ui_status: 'processing' } })).toBeNull();
+    expect(videoSaveBlocker([fresh], [], { up_new: { ui_status: 'processing' } })).toBe(VIDEO_PREPARATION_COPY.processing);
     expect(videoSaveBlocker([savedFailed], [savedFailed], { up_failed: { ui_status: 'failed' } })).toBeNull();
+  });
+});
+
+describe('ready-before-publish contract', () => {
+  const ready = { ui_status: 'ready' as const, asset_id: 'asset', playback_id: 'play', duration: 8 };
+  for (const mode of ['Post create', 'Post edit', 'Review create', 'Review edit', 'Timeline create', 'Timeline edit']) {
+    it(`${mode}: missing/processing status blocks, verified Ready unlocks`, () => {
+      expect(videoSaveBlocker([fresh], [], {})).toBe(VIDEO_PREPARATION_COPY.processing);
+      expect(videoSaveBlocker([fresh], [], { up_new: ready })).toBeNull();
+      expect(videoSaveBlocker([], [], { up_new: ready })).toBeNull();
+    });
+  }
+  for (const partial of [{ duration: null }, { duration: NaN }, { duration: 0 }, { asset_id: null }, { playback_id: null }]) {
+    it(`does not trust incomplete ready ${JSON.stringify(partial)}`, () => {
+      expect(videoSaveBlocker([fresh], [], { up_new: { ...ready, ...partial } })).toBe(VIDEO_PREPARATION_COPY.processing);
+    });
+  }
+  it('server duration and errors beat Ready', () => {
+    expect(videoSaveBlocker([fresh], [], { up_new: { ...ready, duration: 61 } })).toBe(VIDEO_PREPARATION_COPY.tooLong);
+    expect(videoSaveBlocker([fresh], [], { up_new: { ...ready, error: 'failed' } })).toBe(VIDEO_PREPARATION_COPY.failed);
+  });
+  it('keeps saved ready/failed/processing and stored-file behavior unchanged', () => {
+    for (const item of [savedReady, savedFailed, { ...savedReady, mux_status: 'preparing' as const }]) {
+      expect(videoSaveBlocker([photo, item], [item], {})).toBeNull();
+    }
+    expect(videoSaveBlocker([{ ...fresh, provider: 'supabase' }], [], {})).toBeNull();
+    expect(videoSaveBlocker([fresh], [savedReady], {})).toBe(VIDEO_PREPARATION_COPY.processing);
+  });
+  it('projects only new composer media and never changes the save payload', () => {
+    const preview = preparedComposerMedia([photo, fresh], [], { up_new: ready });
+    expect(preview[1].mux_playback_id).toBe('play');
+    expect(preview[1].url).toBe('https://stream.mux.com/play.m3u8');
+    expect(fresh.mux_status).toBe('preparing');
+    expect(serializeMediaForSave([fresh])[0]).not.toHaveProperty('mux_playback_id');
+    expect(preparedComposerMedia([savedFailed], [savedFailed], { up_failed: ready })[0]).toBe(savedFailed);
   });
 });
 
