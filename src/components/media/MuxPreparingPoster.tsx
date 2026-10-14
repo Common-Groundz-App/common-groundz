@@ -1,27 +1,26 @@
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { Loader2, VideoOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { MediaItem } from '@/types/media';
 import { isMuxErroredOrBroken, muxPosterUrl } from '@/utils/muxMedia';
+import { VIDEO_TILE_COPY } from '@/utils/videoTileCopy';
 
 interface MuxPreparingPosterProps {
   item: MediaItem;
   className?: string;
   /** Tailwind object-fit class, defaults to cover. */
   objectFit?: 'cover' | 'contain';
-  /** Hide the badge (e.g. tiny composer thumbnails). */
+  /** Hide the label (e.g. tiny thumbnails). */
   hideBadge?: boolean;
   /** Optional alt override. */
   alt?: string;
 }
 
 /**
- * Phase 2A — Renders the Mux poster + a Processing/Error badge when a Mux
- * MediaItem is not yet playable. Never mounts a <video> element.
- *
- * Renderers should call this whenever isMuxPreparing(item) is true, instead
- * of constructing their own <video>. This keeps every video surface safe
- * the moment Phase 2B starts producing Mux items.
+ * Neutral placeholder for a Mux video that can't play yet (processing) or
+ * at all (failed / too long). Same tile for everyone on posts, reviews and
+ * timeline updates; owners get their detailed note outside the tile.
+ * Never mounts a <video>, so it never plays or counts as a view.
  */
 export const MuxPreparingPoster: React.FC<MuxPreparingPosterProps> = ({
   item,
@@ -30,43 +29,37 @@ export const MuxPreparingPoster: React.FC<MuxPreparingPosterProps> = ({
   hideBadge = false,
   alt,
 }) => {
-  const poster = muxPosterUrl(item);
   const errored = isMuxErroredOrBroken(item);
+  // A failed asset's poster is usually black or missing — never show it.
+  const poster = errored ? null : muxPosterUrl(item);
+  const label = errored ? VIDEO_TILE_COPY.unavailable : VIDEO_TILE_COPY.processing;
+  const Icon = errored ? VideoOff : Loader2;
 
   return (
     <div
-      className={cn(
-        'relative w-full h-full bg-muted overflow-hidden',
-        className,
-      )}
+      className={cn('relative w-full h-full min-h-24 bg-muted overflow-hidden', className)}
       data-mux-status={item.mux_status ?? 'preparing'}
       data-testid="mux-preparing-poster"
     >
-      {poster ? (
+      {poster && (
         <img
           src={poster}
-          alt={alt ?? item.alt ?? 'Video processing'}
-          className={cn(
-            'w-full h-full',
-            objectFit === 'cover' ? 'object-cover' : 'object-contain',
-          )}
+          alt={alt ?? item.alt ?? label}
+          className={cn('w-full h-full', objectFit === 'cover' ? 'object-cover' : 'object-contain')}
           loading="lazy"
           draggable={false}
         />
-      ) : (
-        <div className="w-full h-full bg-muted" />
       )}
 
-      {!hideBadge && errored && (
-        <div className="absolute inset-x-0 bottom-0 flex justify-center pb-2 pointer-events-none">
+      {!hideBadge && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div
-            className={cn(
-              'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium backdrop-blur-sm',
-              'bg-destructive/85 text-destructive-foreground',
-            )}
+            className="flex items-center gap-1.5 rounded-full bg-background/85 px-3 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur-sm"
+            role="status"
+            data-testid="video-tile-label"
           >
-            <AlertTriangle className="h-3 w-3" />
-            <span>Couldn't process video</span>
+            <Icon className={cn('h-3.5 w-3.5', !errored && 'animate-spin')} />
+            <span>{label}</span>
           </div>
         </div>
       )}
