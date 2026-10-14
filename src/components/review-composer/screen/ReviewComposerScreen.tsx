@@ -1,3 +1,4 @@
+import { VideoRecheckLink } from '@/components/feed/composer/VideoRecheckLink';
 /**
  * Step 3B — the full-page composer for new review / edit review.
  *
@@ -20,7 +21,7 @@ import StepFour from '@/components/profile/reviews/steps/StepFour';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { ComposerMediaPreview } from '@/components/feed/composer/ComposerMediaPreview';
-import { composerMuxState, isNewMuxVideo, preparedComposerMedia } from '@/utils/composerVideoReadiness';
+import { composerMuxState, isNewMuxVideo, mediaIdentity, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
 import { useLocation as useLocationAccess } from '@/contexts/LocationContext';
@@ -276,7 +277,7 @@ export function ReviewComposerScreen(props: Props) {
     if (decision === 'add') dispatch({ type: 'MEDIA_ADDED', sessionKey, media });
     else if (decision === 'delete') void deleteMedia(media.url).catch(() => undefined);
   };
-  const handleMediaRemove = (media: MediaItem) => dispatch({ type: 'MEDIA_REMOVED', sessionKey, url: media.url });
+  const handleMediaRemove = (media: MediaItem) => dispatch({ type: 'MEDIA_REMOVED', sessionKey, ...mediaIdentity(media) });
   const reserveSlots = useCallback((n: number) => registryReserveSlots(uploadSid, n), [uploadSid]);
   const releaseSlot = useCallback(() => registryReleaseSlot(uploadSid), [uploadSid]);
   const onUploadsChange = useCallback(
@@ -584,7 +585,7 @@ export function ReviewComposerScreen(props: Props) {
           </div>
         )}
 
-        {videoBlocker && <div className="space-y-2"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><Button type="button" variant="ghost" size="sm" onClick={() => window.dispatchEvent(new Event('mux:recheck'))}>Check video status</Button></div>}
+        {videoBlocker && <div className="space-y-2"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><VideoRecheckLink active={!!videoBlocker} /></div>}
 
         {onStep(SID.media) && (
           <div id="composer-section-media" tabIndex={-1} className="w-full space-y-8 py-2 outline-none">

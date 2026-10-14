@@ -46,3 +46,15 @@ export function preparedComposerMedia(media: readonly MediaItem[], stored: reado
       mux_error: undefined, duration: row.duration ?? undefined, url: muxHlsUrl(row.playback_id), thumbnail_url: muxThumbnailUrl(row.playback_id) };
   });
 }
+/** Stable removal identity: id, then mux_upload_id, then url (legacy photos only). Never index. */
+export interface MediaIdentity { id?: string; muxUploadId?: string; url?: string }
+export function mediaIdentity(item: MediaItem): MediaIdentity {
+  if (item.id) return { id: item.id };
+  if (item.mux_upload_id) return { muxUploadId: item.mux_upload_id };
+  return { url: item.url };
+}
+export function matchesMediaIdentity(item: MediaItem, key: MediaIdentity): boolean {
+  if (key.id) return item.id === key.id;
+  if (key.muxUploadId) return item.mux_upload_id === key.muxUploadId;
+  return !!key.url && !item.id && !item.mux_upload_id && item.url === key.url;
+}

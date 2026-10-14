@@ -21,6 +21,8 @@ interface ComposerMediaPreviewProps {
    */
   previewSrcOverride?: (item: MediaItem) => string | undefined;
   preserveMediaOrder?: boolean;
+  /** Resume playback after the local→Mux source swap if it was playing. */
+  resumeAfterSourceSwap?: boolean;
 }
 
 /**
@@ -37,6 +39,7 @@ export function ComposerMediaPreview({
   overlayForItem,
   previewSrcOverride,
   preserveMediaOrder,
+  resumeAfterSourceSwap,
 }: ComposerMediaPreviewProps) {
   if (media.length === 0) return null;
 
@@ -51,6 +54,7 @@ export function ComposerMediaPreview({
         onItemClick={() => {}}
         disableItemClick
         previewSrcOverride={previewSrcOverride}
+        resumeAfterSourceSwap={resumeAfterSourceSwap}
         renderTileOverlay={(item) => (
           <>
             {overlayForItem?.(item)}
