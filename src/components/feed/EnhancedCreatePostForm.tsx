@@ -32,7 +32,7 @@ import { getInitialsFromName } from '@/utils/profileUtils';
 import { ComposerMediaPreview } from './composer/ComposerMediaPreview';
 import { MuxUploadChip } from './composer/MuxUploadChip';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
-import { composerMuxState, matchesMediaIdentity, mediaIdentity, newMuxVideoSaveBlocker, preparedComposerMedia } from '@/utils/composerVideoReadiness';
+import { composerMuxState, composerPreviewMedia, matchesMediaIdentity, mediaIdentity, newMuxVideoSaveBlocker, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
@@ -450,6 +450,8 @@ export function EnhancedCreatePostForm({
   // remove / unmount / successful submit. Lets the composer show native
   // <video controls> for Mux uploads while Mux is still preparing HLS.
   const localPreviewUrlsRef = useRef<Map<string, string>>(new Map());
+  // Frozen player items for locally previewed videos (see composerPreviewMedia).
+  const frozenPreviewItemsRef = useRef<Map<string, MediaItem>>(new Map());
 
   const revokeLocalPreview = useCallback((mediaId?: string) => {
     if (!mediaId) return;
@@ -458,6 +460,7 @@ export function EnhancedCreatePostForm({
       try { URL.revokeObjectURL(url); } catch { /* ignore */ }
       localPreviewUrlsRef.current.delete(mediaId);
     }
+    frozenPreviewItemsRef.current.delete(mediaId);
   }, []);
 
   const revokeAllLocalPreviews = useCallback(() => {
@@ -465,6 +468,7 @@ export function EnhancedCreatePostForm({
       try { URL.revokeObjectURL(url); } catch { /* ignore */ }
     });
     localPreviewUrlsRef.current.clear();
+    frozenPreviewItemsRef.current.clear();
   }, []);
 
   useEffect(() => {
@@ -1390,7 +1394,12 @@ export function EnhancedCreatePostForm({
         {/* Media preview */}
         {media.length > 0 && (
           <ComposerMediaPreview
-            media={preparedComposerMedia(media, postToEdit?.media ?? [], muxStatuses)}
+            media={composerPreviewMedia(
+              media,
+              preparedComposerMedia(media, postToEdit?.media ?? [], muxStatuses),
+              (id) => localPreviewUrlsRef.current.has(id),
+              frozenPreviewItemsRef.current,
+            )}
             onRemove={removeMedia}
             previewSrcOverride={(item) =>
               // Newly picked videos keep playing from the local copy even after
