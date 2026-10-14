@@ -1,5 +1,7 @@
 -- Post video Phase 2 server-rule tests. One statement; ends with RAISE so every
--- fixture is rolled back — the error message is the report. Made-up Mux
+-- fixture is rolled back — the error message is the report.
+-- Updated for Phase 3: saves create links automatically; P2 uses its own uploads
+-- because a removed upload cannot be relinked to a different Post. Made-up Mux
 -- details only; nothing is sent to Mux. Author = Hana (test account).
 DO $test$
 DECLARE
@@ -21,7 +23,9 @@ BEGIN
          (U,'pp_late','waiting',true,now()+interval '1h',NULL,NULL,NULL,NULL),
          (U,'pp_b','waiting',true,now()+interval '1h',NULL,NULL,NULL,NULL),
          (O,'pp_other','ready',true,now()+interval '1h','A_O','PB_O',5,NULL),
-         (U,'pp_flag','waiting',true,now()+interval '1h',NULL,NULL,NULL,NULL);
+         (U,'pp_flag','waiting',true,now()+interval '1h',NULL,NULL,NULL,NULL),
+         (U,'pp_new2','waiting',true,now()+interval '1h',NULL,NULL,NULL,NULL),
+         (U,'pp_b2','waiting',true,now()+interval '1h',NULL,NULL,NULL,NULL);
   -- an "old" (pre-rule) long upload
   ALTER TABLE public.mux_uploads DISABLE TRIGGER mux_uploads_duration_rule_guard;
   INSERT INTO public.mux_uploads(user_id, upload_id, status, is_test, expires_at, asset_id, playback_id, duration, duration_rule_applies)
@@ -186,8 +190,8 @@ BEGIN
   UPDATE public.posts SET media = jsonb_build_array(photo, createv || '{"mux_upload_id":"pp_late","order":1}'::jsonb) WHERE id=P;
   EXECUTE 'reset role';
   PERFORM set_config('request.jwt.claims', '', true);
-  INSERT INTO public.mux_upload_mappings(mux_upload_id, content_type, content_id, media_index, user_id, status)
-  VALUES ('pp_late','post',P,1,U,'pending') RETURNING id INTO M;
+  -- Phase 3: the save above already created this link
+  SELECT id INTO M FROM public.mux_upload_mappings WHERE mux_upload_id='pp_late' AND content_type='post' AND content_id=P AND status='pending';
   UPDATE public.mux_uploads SET status='ready', asset_id='A_LATE', playback_id='PB_LATE', duration=7, aspect_ratio='9:16' WHERE upload_id='pp_late';
   SELECT media INTO j FROM public.posts WHERE id=P;
 
@@ -247,38 +251,38 @@ BEGIN
   ELSE bad:=bad+1; res:=res||E'\nFAIL patch '||coalesce(v,'null')||' '||j2::text; END IF;
 
   -- T18 Mux patch for an eligible >60s upload -> too_long, stale playable fields removed
-  UPDATE public.mux_uploads SET status='ready', asset_id='A_B', playback_id='PB_B', duration=70 WHERE upload_id='pp_b';
+  UPDATE public.mux_uploads SET status='ready', asset_id='A_B', playback_id='PB_B', duration=70 WHERE upload_id='pp_b2';
   PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
   EXECUTE 'set local role authenticated';
   INSERT INTO public.posts(user_id,title,content,post_type,visibility,media)
-  VALUES (U,'pp2','c','experience','public', jsonb_build_array(createv)) RETURNING id INTO P2; -- pp_new, processing
+  VALUES (U,'pp2','c','experience','public', jsonb_build_array(createv || '{"mux_upload_id":"pp_new2"}'::jsonb)) RETURNING id INTO P2; -- pp_new, processing
   EXECUTE 'reset role';
   PERFORM set_config('request.jwt.claims', '', true);
   -- simulate stale playable fields stored before the patch (old-data path)
   ALTER TABLE public.posts DISABLE TRIGGER zz_posts_media_mux_before;
   ALTER TABLE public.posts DISABLE TRIGGER enforce_post_edit_window_trigger;
-  UPDATE public.posts SET media = jsonb_build_array(createv || '{"mux_upload_id":"pp_b","mux_playback_id":"STALE","thumbnail_url":"https://x/t.jpg"}'::jsonb) WHERE id=P2;
+  UPDATE public.posts SET media = jsonb_build_array(createv || '{"mux_upload_id":"pp_b2","mux_playback_id":"STALE","thumbnail_url":"https://x/t.jpg"}'::jsonb) WHERE id=P2;
   ALTER TABLE public.posts ENABLE TRIGGER zz_posts_media_mux_before;
   ALTER TABLE public.posts ENABLE TRIGGER enforce_post_edit_window_trigger;
-  INSERT INTO public.mux_upload_mappings(mux_upload_id, content_type, content_id, media_index, user_id, status)
-  VALUES ('pp_b','post',P2,0,U,'pending') RETURNING id INTO M;
+  -- Phase 3: the media save above already created this link
+  SELECT id INTO M FROM public.mux_upload_mappings WHERE mux_upload_id='pp_b2' AND content_type='post' AND content_id=P2 AND status='pending';
   v := public.patch_content_media_from_mux(M);
   SELECT media->0 INTO j FROM public.posts WHERE id=P2;
-  SELECT duration_rule_applies INTO b FROM public.mux_uploads WHERE upload_id='pp_b';
+  SELECT duration_rule_applies INTO b FROM public.mux_uploads WHERE upload_id='pp_b2';
   IF v='patched' AND j->>'mux_error'='too_long' AND j->>'url'='' AND NOT j ? 'mux_playback_id' AND NOT j ? 'thumbnail_url' AND b THEN
     ok:=ok+1; res:=res||E'\nPASS Mux patch: new 70 s video too long, stale playback/url/thumbnail removed, flag unchanged';
   ELSE bad:=bad+1; res:=res||E'\nFAIL patch too long '||coalesce(v,'null')||' '||j::text; END IF;
 
   -- T19 existing linking call (sync_mux_post_mappings) still works
-  UPDATE public.mux_uploads SET status='ready', asset_id='A_N', playback_id='PB_N', duration=5 WHERE upload_id='pp_new';
+  UPDATE public.mux_uploads SET status='ready', asset_id='A_N', playback_id='PB_N', duration=5 WHERE upload_id='pp_new2';
   PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
   EXECUTE 'set local role authenticated';
-  UPDATE public.posts SET media = jsonb_build_array(photo, createv || '{"order":1}'::jsonb) WHERE id=P2;
+  UPDATE public.posts SET media = jsonb_build_array(photo, createv || '{"order":1,"mux_upload_id":"pp_new2"}'::jsonb) WHERE id=P2;
   EXECUTE 'reset role';
   PERFORM set_config('request.jwt.claims', '', true);
-  j := public.sync_mux_post_mappings(P2, '[{"mux_upload_id":"pp_new","media_index":1}]'::jsonb);
+  j := public.sync_mux_post_mappings(P2, '[{"mux_upload_id":"pp_new2","media_index":1}]'::jsonb);
   SELECT media->1 INTO j2 FROM public.posts WHERE id=P2;
-  SELECT status INTO v FROM public.mux_upload_mappings WHERE mux_upload_id='pp_new' AND content_id=P2;
+  SELECT status INTO v FROM public.mux_upload_mappings WHERE mux_upload_id='pp_new2' AND content_id=P2;
   IF j2->>'mux_status'='ready' AND j2->>'mux_playback_id'='PB_N' AND v='patched' THEN
     ok:=ok+1; res:=res||E'\nPASS existing linking call still links and patches';
   ELSE bad:=bad+1; res:=res||E'\nFAIL sync '||coalesce(v,'none')||' '||j2::text||' '||j::text; END IF;
