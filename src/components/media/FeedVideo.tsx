@@ -60,6 +60,8 @@ interface FeedVideoProps {
    * `onResumeConsumed`. Only the originally-opened tile receives this.
    */
   resumeState?: VideoExitHandoff;
+  /** Composer only: resume playback after a source swap if it was playing (not user-paused). */
+  resumeAfterSourceSwap?: boolean;
   onResumeConsumed?: () => void;
 }
 
@@ -250,7 +252,9 @@ function FeedVideoPlayer({
   srcOverride,
   resumeState,
   onResumeConsumed,
+  resumeAfterSourceSwap,
 }: FeedVideoProps) {
+  const swapWasPlayingRef = useRef(false);
 
 
 
@@ -932,12 +936,26 @@ function FeedVideoPlayer({
         try { v.removeAttribute('src'); v.load(); } catch { /* ignore */ }
       };
     }
+    // Composer-only: resume after a source swap when it was really playing.
+    let onSwapReady: (() => void) | null = null;
+    if (resumeAfterSourceSwap && swapWasPlayingRef.current) {
+      swapWasPlayingRef.current = false;
+      onSwapReady = () => {
+        if (token.cancelled || userPausedRef.current || userPausedRefManaged.current) return;
+        v.play().catch(() => { /* autoplay blocked: element stays paused, UI follows */ });
+      };
+      v.addEventListener('loadeddata', onSwapReady, { once: true });
+    }
     return () => {
+      if (resumeAfterSourceSwap) {
+        swapWasPlayingRef.current = !v.paused && !v.ended && !userPausedRef.current && !userPausedRefManaged.current;
+      }
+      if (onSwapReady) v.removeEventListener('loadeddata', onSwapReady);
       token.cancelled = true;
       markSystemPause(1000);
       detach();
     };
-  }, [item.url, item.mux_playback_id, item.mux_status, item.provider, srcOverride, markSystemPause]);
+  }, [item.url, item.mux_playback_id, item.mux_status, item.provider, srcOverride, markSystemPause, resumeAfterSourceSwap]);
 
 
   // Reset userPaused when video leaves viewport, so re-entry can autoplay again.

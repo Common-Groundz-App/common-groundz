@@ -30,6 +30,7 @@ interface FeedCollageProps {
    * callers never pass this so feed behavior is unchanged.
    */
   previewSrcOverride?: (item: MediaItem) => string | undefined;
+  resumeAfterSourceSwap?: boolean;
   /**
    * Reverse handoff target: when the lightbox closes on the originally
    * opened video, this carries the lightbox's playback state so the
@@ -69,6 +70,7 @@ export function FeedCollage({
   renderTileOverlay,
   disableItemClick,
   previewSrcOverride,
+  resumeAfterSourceSwap,
   videoResume,
   onResumeConsumed,
 }: FeedCollageProps) {
@@ -117,6 +119,7 @@ export function FeedCollage({
             sourceId={sourceId}
             objectFit={fit}
             srcOverride={previewSrcOverride?.(item)}
+            resumeAfterSourceSwap={resumeAfterSourceSwap}
             onTap={disableItemClick ? undefined : (handoff, extras) => onItemClick(originalIndex, handoff, extras)}
             resumeState={videoResume?.index === originalIndex ? videoResume.handoff : undefined}
             onResumeConsumed={videoResume?.index === originalIndex ? onResumeConsumed : undefined}
@@ -146,6 +149,7 @@ export function FeedCollage({
           renderTileOverlay={renderTileOverlay}
           disableItemClick={disableItemClick}
           previewSrcOverride={previewSrcOverride}
+          resumeAfterSourceSwap={resumeAfterSourceSwap}
           videoResume={videoResume}
           onResumeConsumed={onResumeConsumed}
         />
@@ -214,6 +218,7 @@ interface SingleMediaTileProps {
   renderTileOverlay?: (item: MediaItem, originalIndex: number) => React.ReactNode;
   disableItemClick?: boolean;
   previewSrcOverride?: (item: MediaItem) => string | undefined;
+  resumeAfterSourceSwap?: boolean;
   videoResume?: { index: number; handoff: VideoExitHandoff } | null;
   onResumeConsumed?: () => void;
 }
@@ -331,7 +336,7 @@ function computeShape(
   };
 }
 
-function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverlay, disableItemClick, previewSrcOverride, videoResume, onResumeConsumed }: SingleMediaTileProps) {
+function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverlay, disableItemClick, previewSrcOverride, resumeAfterSourceSwap, videoResume, onResumeConsumed }: SingleMediaTileProps) {
   const { item, originalIndex } = entry;
   const isVideo = item.type === 'video';
 
@@ -452,6 +457,7 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverl
             sourceId={sourceId}
             objectFit={fit}
             srcOverride={previewSrcOverride?.(item)}
+            resumeAfterSourceSwap={resumeAfterSourceSwap}
             onTap={disableItemClick ? undefined : (handoff, extras) => onItemClick(originalIndex, handoff, extras)}
             resumeState={videoResume?.index === originalIndex ? videoResume.handoff : undefined}
             onResumeConsumed={videoResume?.index === originalIndex ? onResumeConsumed : undefined}
