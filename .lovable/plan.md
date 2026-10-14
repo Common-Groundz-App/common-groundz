@@ -1,39 +1,39 @@
-# Phase 2 — Old Posts report (read-only, 2026-10-14)
+# Phase 2 build: server rules for Post videos
 
-Nothing was changed. All counts come from production data.
+## Old-posts report (done, read-only)
 
-## Results
+161 posts and 38 post videos (16 on Mux, 22 older stored files). No post has more than 4 items or more than 1 video, and no post video is over 60 s (the longest is 32 s). Every video has a stable identity.
 
-| Check | Result |
-|---|---|
-| Posts total | 161 |
-| Post videos total | 38 (17 on live posts) — 16 Mux, 22 older stored files |
-| Posts with more than 4 media items | **0** |
-| Posts with more than 1 video | **0** |
-| Post videos over 60 s | **0** (longest is 32 s) |
-| Mux videos with unknown length | 0 |
-| Mux videos with no link record | **2** (1 on a live post, 1 on a deleted post) |
-| Videos with no stable identity (no upload ID, playback ID or file address) | **0** |
-| Mux videos pointing to an upload we have no record of | 0 |
-| One upload used by more than one post | 0 |
+**Known historical data, left out on purpose:** posts `d4941fd5-c594-433b-9501-9d339482f55b` (live) and `3e5b7e00-1c4b-49ca-8cc3-9cc1f31b5b6f` (deleted) each have a Mux video with no link record. They stay exactly as they are and won't be repaired or relinked, because their Mux assets may have been deleted. The new rules never touch them unless their media is changed.
 
-## The two unlinked videos
+## What gets built
 
-Both finished processing at Mux ("ready"), but because the second linking request never happened, the post still says "preparing". This is exactly the stuck-video bug Phase 3 removes.
+1. **Max 4 items and max 1 video per post, checked by the server.** A save is refused only when it adds items or videos past the limit. Caption edits, unchanged media and removals always go through.
+2. **60-second rule for new videos only.** Each Mux upload is marked "covered by the rule" when it is created, from the moment this ships. A covered upload that Mux reports as over 60 s becomes "too long" and never gets a playback link. Uploads made before this ships are never marked, so old videos keep playing.
+3. **Only the server can set video state.** Status, playback ID, asset ID, length and error on post media can only be written by the trusted Mux path. A browser save that tries to set or change them is refused. A kept video must come back exactly as it was loaded.
+4. **The uploader must be the post's author.** A new Mux video on a post is accepted only if that same user created the upload.
+5. **Old stored-file videos aren't touched.** Items without Mux details pass through unchanged.
+6. **/create doesn't change.** No app code changes in this phase. The two existing linking requests keep working (they're replaced in Phase 3).
 
-- Live post `d4941fd5-c594-433b-9501-9d339482f55b` (2026-05-21, 8 s) — viewers see it stuck on "Video processing".
-- Deleted post `3e5b7e00-1c4b-49ca-8cc3-9cc1f31b5b6f` (2026-05-23, 10 s) — not visible to anyone.
+## Tests (targeted, then stop and report)
 
-## What this means for enforcement
+SQL tests run on made-up records inside a transaction that's rolled back, so nothing real is changed. They cover:
+- a 5th item is refused, and so is a 2nd video;
+- an unrelated edit to an over-limit post goes through, and so does removing items from it;
+- a covered upload over 60 s becomes "too long", while an old uncovered one stays ready;
+- a browser save that sets a playback ID, status or length is refused;
+- a kept video sent back exactly as loaded goes through;
+- a video uploaded by another user is refused;
+- an old stored-file video goes through untouched;
+- the existing linking requests and the Mux patch still work;
+- the two historical posts are unaffected.
 
-- No old post breaks the 4-item, 1-video or 60-second rules, so the new rules will not lock any existing post. The grandfathering protection stays in anyway, as a safety net.
-- Every video already has a stable identity, so Phase 4 needs no special fallback decision.
-- The 22 older stored-file videos have no Mux details. They are identified by their file address and are left untouched.
+I'll also run the existing app tests for the post composer and media, then report the results and stop before Phase 3.
 
-## Decision needed before enforcement
+## Technical details
 
-For the stuck live post: repair its link once (the video would then play normally — it is never marked as "new" for the 60-second rule), or leave it as-is. The recommendation is to repair it, using the trusted server path, as the first step of the Phase 2 build.
-
-## Next (only after approval)
-
-Phase 2 build: the post server rules from the approved plan (limits, 60 s for new videos only, server-owned video state, uploader must be the author), plus the optional one-time repair above. Then stop and report.
+- Migration: add `mux_uploads.duration_rule_applies boolean not null default false`, then change the default to `true` after the backfill. Existing rows stay `false`. Mapping repair never changes it.
+- `posts_media_mux_before` (BEFORE INSERT/UPDATE OF media on `posts`, ordered after `media_guard` and `enforce_post_edit_window_trigger`). It mirrors `review_media_mux_before`: if the media is unchanged, it returns early. Otherwise it compares the new item and video counts against both the limits and the old counts. A Mux field changed by a non-trusted caller (`is_trusted_server_context()`) is refused. A new `mux_upload_id` must belong to `mux_uploads.user_id = NEW.user_id`. Error codes follow the `review_video_*` style (`post_media_too_many`, `post_video_too_many`, `post_video_untrusted_fields`, `post_video_not_owner`).
+- In the post branch of `patch_content_media_from_mux`: when `duration_rule_applies and duration > 60`, write `errored` with error `too_long` and no playback ID.
+- Mapping sync and retiring the edge functions stay in Phase 3.
+- The SQL test file is `supabase/tests/post_video_phase2.sql`. The two historical post IDs get a note in the verification doc `docs/verification/post-video-phase-2.md`, and roadmap.md gets updated.
