@@ -4963,6 +4963,10 @@ export type Database = {
         Returns: string
       }
       post_media_video_count: { Args: { p_media: Json }; Returns: number }
+      post_mux_link_items: {
+        Args: { p_media: Json; p_post_id: string }
+        Returns: Json
+      }
       post_mux_patch_is_valid: {
         Args: { p_new: Json; p_old: Json }
         Returns: boolean
@@ -4994,6 +4998,10 @@ export type Database = {
       recompute_review_timeline_state: {
         Args: { p_review_id: string }
         Returns: undefined
+      }
+      reconcile_post_mux_mappings: {
+        Args: { p_post_id: string }
+        Returns: Json
       }
       refresh_social_influence_scores_v2: { Args: never; Returns: number }
       repair_hashtag_relationships: { Args: never; Returns: Json }
@@ -5071,6 +5079,10 @@ export type Database = {
       slugify_entity_name: { Args: { input_name: string }; Returns: string }
       sync_mux_post_mappings: {
         Args: { p_content_id: string; p_items: Json }
+        Returns: Json
+      }
+      sync_mux_post_mappings_core: {
+        Args: { p_content_id: string; p_items: Json; p_patch: boolean }
         Returns: Json
       }
       sync_review_mux_mappings: {
