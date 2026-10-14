@@ -1,16 +1,26 @@
 # Post composer: stop the pause when processing finishes
 
 ## What's actually happening
-The last fix kept your local copy on screen, but the composer still hands the player an updated version of the video when processing finishes. That version carries the new Mux address and "ready" status. The player treats the address change as a new video: it unloads and reloads your local copy, so it lands on 0:00 paused while the button still shows "playing".
+The last fix kept your local copy on screen, but the composer still hands the player an updated version of the video when processing finishes. That version has the new Mux address and "ready" status, and the player treats the change as a new video. It unloads and reloads your local copy, which leaves it on 0:00 paused while the button still shows "playing".
 
 ## Fix (/create only)
-- While a video you just picked has a local copy, the composer keeps passing the player the original, unchanged item. The "ready" version is no longer passed in, so nothing changes from the player's point of view, and it just keeps playing.
-- The "Ready" chip and the Post button still read Mux's status directly. They keep working as they do now.
-- Saved videos (editing a post) have no local copy, so they still use the Mux version.
-- Review and Timeline composers are unchanged (still deferred). The shared video player and the feed are untouched.
+- While a newly picked video has a local copy, the player keeps receiving the exact same, unchanged video details from start to finish. Nothing the player watches changes when processing finishes, so it just keeps playing.
+- The "Ready" chip and the Post button keep reading Mux's status separately, so they work as they do now.
+- Saved videos (when editing a post) have no local copy, so they still use the Mux version.
+- Review and Timeline composers, the shared video player and the feed are untouched.
 
 ## Technical details
-- Cause: `FeedVideo`'s source-attach effect depends on `item.url`, `mux_playback_id` and `mux_status`. `preparedComposerMedia` rewrites `url` to the HLS address on Ready. The effect re-runs, detaches the source (`removeAttribute('src'); load()`) and reattaches the same blob. Line ~357's url-change reset also fires.
-- Change in `EnhancedCreatePostForm`: build the preview media as `media.map(item => item.id && localPreviewUrlsRef.current.has(item.id) ? item : prepared[i])`. In other words, skip the projection for items that have a local preview.
-- Tests: a rendered test where the ready status arrives for a locally previewed item. The `<video>` element keeps the same `src` and is not reloaded, and saved videos still get the projection. Then the full suite and typecheck.
+- Cause: `FeedVideo`'s source-attach effect depends on `item.url`, `mux_playback_id`, `mux_status` and `provider`, and `preparedComposerMedia` rewrites these on Ready. The effect then detaches and reattaches the same blob (`removeAttribute('src'); load()`), and the url-change reset (~line 357) also fires.
+- Change in `EnhancedCreatePostForm`:
+  - Build the preview list by matching each item to its prepared version by identity (`matchesMediaIdentity`: `id`, then `mux_upload_id`), never by array position.
+  - Items that have a local preview get a frozen composer-only playback item. It's captured once per media `id` when the preview is created, held in a ref, and cleared on remove or unmount. This means no attach dependency can change, even if the raw `media` state is updated on Ready.
+  - Ready/Post validation and the save payload don't read the frozen item. They keep using `muxStatuses` and `media` as today.
+- Regression tests (rendered, with Processing → Ready arriving through mocked status):
+  - With a locally previewed video, no `load()` call, no `removeAttribute('src')`, the same `<video>` element, and no pause.
+  - A user-paused preview stays paused through Ready.
+  - Remove and replace still work after Ready.
+  - A saved Mux video with no local preview still gets the Mux version.
+  - Ready/Post gating still follows Mux status.
+  - Then the full suite and typecheck.
+- After implementing, the change counts as fixed only once you repeat the real upload test: playback carries on through Ready without another click, and the controls match what the video is actually doing.
 - No server, database, feed, FeedVideo or Review-video setting changes.
