@@ -1,3 +1,4 @@
+import { VideoRecheckLink } from '@/components/feed/composer/VideoRecheckLink';
 /**
  * Step 3C — full-page composer for adding / editing a timeline update.
  *
@@ -20,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { ComposerMediaPreview } from '@/components/feed/composer/ComposerMediaPreview';
-import { composerMuxState, isNewMuxVideo, preparedComposerMedia } from '@/utils/composerVideoReadiness';
+import { composerMuxState, isNewMuxVideo, mediaIdentity, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 import ChoiceChips from '@/components/profile/reviews/questionnaire/ChoiceChips';
 import { BASE_ON_RATING_ACTION_LABEL, RECOMMENDATION_INTENT_OPTIONS } from '@/services/review/recommendationResolver';
@@ -167,7 +168,7 @@ export function TimelineComposerScreen(props: Props) {
     if (decision === 'add') dispatch({ type: 'MEDIA_ADDED', sessionKey, media });
     else if (decision === 'delete') void deleteMedia(media.url).catch(() => undefined);
   };
-  const handleMediaRemove = (media: MediaItem) => dispatch({ type: 'MEDIA_REMOVED', sessionKey, url: media.url });
+  const handleMediaRemove = (media: MediaItem) => dispatch({ type: 'MEDIA_REMOVED', sessionKey, ...mediaIdentity(media) });
   const reserveSlots = useCallback((n: number) => registryReserveSlots(uploadSid, n), [uploadSid]);
   const releaseSlot = useCallback(() => registryReleaseSlot(uploadSid), [uploadSid]);
   const onUploadsChange = useCallback((list: MediaUploadState[]) => setIsUploading(list.some((u) => u.status === 'uploading')), []);
@@ -393,7 +394,7 @@ export function TimelineComposerScreen(props: Props) {
         />
       )}
 
-      {videoBlocker && <div className="mb-3 space-y-2"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><Button type="button" variant="ghost" size="sm" onClick={() => window.dispatchEvent(new Event('mux:recheck'))}>Check video status</Button></div>}
+      {videoBlocker && <div className="mb-3 space-y-2"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><VideoRecheckLink active={!!videoBlocker} /></div>}
 
       <div className="space-y-6">
         <div className="space-y-2" data-testid="timeline-subject">

@@ -1,3 +1,4 @@
+import { matchesMediaIdentity } from '@/utils/composerVideoReadiness';
 /**
  * Central composer state: one reducer, keyed by a session key.
  *
@@ -135,7 +136,7 @@ export type ComposerAction =
   | Keyed<{ type: 'EVIDENCE'; evidence: AmbiguousSaveEvidence }>
   | Keyed<{ type: 'ALLOW_MANUAL_RETRY' }>
   | Keyed<{ type: 'MEDIA_ADDED'; media: MediaItem }>
-  | Keyed<{ type: 'MEDIA_REMOVED'; url: string }>;
+  | Keyed<{ type: 'MEDIA_REMOVED'; id?: string; muxUploadId?: string; url?: string }>;
 
 const MEDIA_LIMIT = 4;
 
@@ -180,7 +181,7 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
     }
     case 'MEDIA_REMOVED': {
       if (state.status !== 'ready') return state;
-      const next = state.values.media.filter((m) => m.url !== action.url).map((m, i) => ({ ...m, order: i }));
+      const next = state.values.media.filter((m) => !matchesMediaIdentity(m, action)).map((m, i) => ({ ...m, order: i }));
       if (next.length === state.values.media.length) return state;
       return { ...state, values: { ...state.values, media: next }, meta: touch(state, 'media') };
     }

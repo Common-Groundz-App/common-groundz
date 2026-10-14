@@ -1,3 +1,4 @@
+import { VideoRecheckLink } from '@/components/feed/composer/VideoRecheckLink';
 
 import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -31,7 +32,7 @@ import { getInitialsFromName } from '@/utils/profileUtils';
 import { ComposerMediaPreview } from './composer/ComposerMediaPreview';
 import { MuxUploadChip } from './composer/MuxUploadChip';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
-import { composerMuxState, newMuxVideoSaveBlocker, preparedComposerMedia } from '@/utils/composerVideoReadiness';
+import { composerMuxState, matchesMediaIdentity, mediaIdentity, newMuxVideoSaveBlocker, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
@@ -497,10 +498,11 @@ export function EnhancedCreatePostForm({
   };
 
   const removeMedia = (itemToRemove: MediaItem) => {
+    const key = mediaIdentity(itemToRemove);
     revokeLocalPreview(itemToRemove.id);
     setMedia((prev) =>
       prev
-        .filter((item) => item.url !== itemToRemove.url)
+        .filter((item) => !matchesMediaIdentity(item, key))
         .map((item, index) => ({ ...item, order: index }))
     );
   };
@@ -1390,6 +1392,7 @@ export function EnhancedCreatePostForm({
           <ComposerMediaPreview
             media={preparedComposerMedia(media, postToEdit?.media ?? [], muxStatuses)}
             onRemove={removeMedia}
+            resumeAfterSourceSwap
             previewSrcOverride={(item) =>
               item.id && (!item.mux_upload_id || composerMuxState(muxStatuses[item.mux_upload_id]) !== 'ready') ? localPreviewUrlsRef.current.get(item.id) : undefined
             }
@@ -1402,7 +1405,7 @@ export function EnhancedCreatePostForm({
           />
         )}
 
-        {videoBlocker && <div className="mt-3 space-y-1"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><Button type="button" size="sm" variant="ghost" onClick={() => window.dispatchEvent(new Event('mux:recheck'))}>Check video status</Button></div>}
+        {videoBlocker && <div className="mt-3 space-y-1"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><VideoRecheckLink active={!!videoBlocker} /></div>}
 
         {/* Location chip */}
         {location && (
