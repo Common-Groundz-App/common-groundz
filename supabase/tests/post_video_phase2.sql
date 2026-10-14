@@ -220,12 +220,14 @@ BEGIN
   END LOOP;
   PERFORM set_config('app.mux_system_patch','off',true);
 
-  -- T16 patch flag without trusted context refused
+  -- T16 patch flag without trusted context refused (payload built as owner;
+  -- signed-in users cannot call the rebuild function directly)
+  j2 := jsonb_set(j,'{1}', public.post_mux_truth_item(j->1,U));
   PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
   EXECUTE 'set local role authenticated';
   BEGIN
     PERFORM set_config('app.mux_system_patch','on',true);
-    UPDATE public.posts SET media = jsonb_set(j,'{1}', public.post_mux_truth_item(j->1,U)) WHERE id=P;
+    UPDATE public.posts SET media = j2 WHERE id=P;
     bad:=bad+1; res:=res||E'\nFAIL patch flag accepted for signed-in user';
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM='mux_patch_invalid' THEN ok:=ok+1; res:=res||E'\nPASS patch flag without trusted context refused';
