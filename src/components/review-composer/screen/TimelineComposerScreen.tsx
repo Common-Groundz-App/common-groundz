@@ -215,6 +215,7 @@ export function TimelineComposerScreen(props: Props) {
   useEffect(() => { if (state.status === 'ready') saveLock.current = false; }, [state.status]);
   const handleSave = async () => {
     if (saveLock.current || !canSubmit(state) || isUploading || videoBlocker) return;
+    if (isEdit && !updateId) return;
     const v = validateForSubmit(state);
     dispatch({ type: 'VALIDATED', sessionKey, errors: v.errors });
     if (!v.ok) {
@@ -230,7 +231,7 @@ export function TimelineComposerScreen(props: Props) {
       const built = buildEditTimelinePayload({
         values: state.values,
         reviewId: review.id,
-        updateId: updateId!,
+        updateId: updateId ?? '',
         storedMedia: state.storedUpdate?.media ?? [],
       });
       if (!built.ok) return;
