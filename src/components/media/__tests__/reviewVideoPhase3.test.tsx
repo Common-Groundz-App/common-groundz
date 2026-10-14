@@ -68,19 +68,19 @@ describe('display rule', () => {
   });
   it('processing: author only', () => {
     expect(displayStateFor(mockMuxPreparingMediaItem, owner)).toBe('owner_processing');
-    expect(displayStateFor(mockMuxPreparingMediaItem, other)).toBe('hidden');
+    expect(displayStateFor(mockMuxPreparingMediaItem, other)).toBe('viewer_processing');
   });
   it('failed / too long: author only, message depends on the entry window', () => {
     const tooLong = { ...mockMuxErroredMediaItem, mux_error: 'too_long' };
     for (const m of [mockMuxErroredMediaItem, tooLong]) {
       expect(displayStateFor(m, owner)).toBe('owner_failed_editable');
       expect(displayStateFor(m, ownerLocked)).toBe('owner_failed_locked');
-      expect(displayStateFor(m, other)).toBe('hidden');
+      expect(displayStateFor(m, other)).toBe('viewer_unavailable');
     }
   });
   it('ready without playback id counts as failed', () => {
     const broken = { ...mockMuxReadyMediaItem, mux_playback_id: undefined };
-    expect(displayStateFor(broken, other)).toBe('hidden');
+    expect(displayStateFor(broken, other)).toBe('viewer_unavailable');
   });
 });
 
@@ -97,10 +97,10 @@ describe('stable identity', () => {
     expect(stableReviewMediaId('review', 'r1', { mux_upload_id: 'u', url: '' }))
       .not.toBe(stableReviewMediaId('review_update', 'r1', { mux_upload_id: 'u', url: '' }));
   });
-  it('filtering keeps order and drops hidden items for others', () => {
+  it('keeps order and keeps the processing slot for others', () => {
     const media = [photo('a', 0), { ...mockMuxPreparingMediaItem, order: 1 }, photo('b', 2)];
     const v = visibleReviewMedia(media, { kind: 'review', ownerId: 'r', ...other });
-    expect(v.items.map((m) => m.url)).toEqual(['https://x/a.jpg', 'https://x/b.jpg']);
+    expect(v.items.map((m) => m.type)).toEqual(['image', 'video', 'image']);
     expect(v.ownerNotice).toBeNull();
   });
 });
@@ -153,15 +153,24 @@ describe('ReviewMediaBlock', () => {
     expect(feedVideoCalls[feedVideoCalls.length - 1].resumeState).toBeUndefined();
   });
 
-  it('hidden processing video does not shift the tapped photo', () => {
+  it('processing placeholder does not shift the tapped photo', () => {
     render(<ReviewMediaBlock media={[{ ...mockMuxPreparingMediaItem, order: 0 }, photo('b', 1)]} kind="review" ownerId="r" isOwner={false} canEdit={false} />);
-    fireEvent.click(screen.getByRole('img'));
+    fireEvent.click(screen.getByAltText('Media 2'));
     expect(lightboxProps.media[lightboxProps.initialIndex].url).toBe('https://x/b.jpg');
   });
 
-  it('others see nothing and no failure text for a failed video', () => {
-    const { container } = render(<ReviewMediaBlock media={[mockMuxErroredMediaItem]} kind="review" ownerId="r" isOwner={false} canEdit={false} />);
-    expect(container.innerHTML).toBe('');
+  it('others see a neutral "Video unavailable" tile and no failure details', () => {
+    render(<ReviewMediaBlock media={[mockMuxErroredMediaItem]} kind="review" ownerId="r" isOwner={false} canEdit={false} />);
+    expect(screen.getByTestId('video-tile-label').textContent).toBe('Video unavailable');
+    expect(screen.queryByTestId('review-video-owner-notice')).toBeNull();
+    expect(document.body.textContent).not.toContain("Couldn't");
+    expect(feedVideoCalls.length).toBe(0);
+  });
+
+  it('others see a neutral "Video processing" tile', () => {
+    render(<ReviewMediaBlock media={[mockMuxPreparingMediaItem]} kind="review" ownerId="r" isOwner={false} canEdit={false} />);
+    expect(screen.getByTestId('video-tile-label').textContent).toBe('Video processing');
+    expect(feedVideoCalls.length).toBe(0);
   });
 
   it('author recovery note follows the entry window', () => {
