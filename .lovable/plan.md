@@ -17,13 +17,23 @@ Nothing runs or deploys in this step. No migration, no Edge Function deployment,
 - **T28** Right after a save, a link whose `media_id` doesn't match its slot item is not marked done.
 - **T29** A removed link that comes back on the same Post gains the current `media_id`.
 
-## 3. Show everything verbatim, in numbered parts, then stop
+## 3. Phase 2 suite: production-safe only (decision taken)
+- No live-table trigger pause, and no new bypass or weakened rule to make tests runnable.
+- For each of the three old-data setups, first try a safe equivalent:
+  - set the data up through a normal save, or
+  - check the logic through the pure helper (for example `post_mux_truth_item` or the patch-validity check on a hand-built "old" item).
+
+  Each check is labelled either **helper coverage** or **signed-in end-to-end coverage**.
+- Any check that still can't keep equivalent coverage is marked **blocked / not rerun in production**. Its earlier 31/31 pass stays in the verification record. Rerunning it is possible only in an isolated, non-production database.
+- I'll list exactly which assertions each blocked block covers.
+
+## 4. Show everything verbatim, in numbered parts, then stop
 1. The complete forward migration with fixes 1–2, including the full `patch_content_media_from_mux`. Split across messages, nothing shortened.
 2. The complete `post_video_phase4.sql`, word for word.
 3. The complete `mux-sync-post-mappings` draft.
 4. The complete `mux-register-mappings` draft.
-5. The Phase 2 fixture blocks that turn table triggers off, shown exactly as they are today. These can't be rewritten without that pause: the database won't let us set `session_replication_role` here. So this part waits on your choice of the three options from my last message.
-6. The complete rollback script, built from the captured live definitions and grants, verbatim. It already covers the new trigger and the three helpers. No other trigger changes.
-7. App tests and type check rerun after the edits. These touch draft SQL only, so the result is expected to be unchanged: 1097 passed, 3 skipped, type check clean.
+5. The Phase 2 blocks that need old data, verbatim. Next to each: its safe replacement, or its blocked status and the assertions it covers.
+6. The complete rollback script, verbatim.
+7. **Actual** app test and type check results from a fresh run. These check the app code only. They don't check the draft SQL, which stays unexecuted and untested until you approve the run.
 
-Then stop and wait for your approval of the actual run.
+Then stop. Running anything on the database, or deploying, needs your separate approval.
