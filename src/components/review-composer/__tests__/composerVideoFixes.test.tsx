@@ -41,3 +41,25 @@ describe('VideoRecheckLink', () => {
     vi.useRealTimers();
   });
 });
+
+import { composerPreviewMedia } from '@/utils/composerVideoReadiness';
+describe('composerPreviewMedia (post composer player input)', () => {
+  const v: MediaItem = { url: '', type: 'video', order: 0, id: 'v1', provider: 'mux', mux_upload_id: 'u1', mux_status: 'preparing' };
+  const saved: MediaItem = { url: 'old', type: 'video', order: 1, id: 's1', provider: 'mux', mux_upload_id: 'u2', mux_status: 'ready', mux_playback_id: 'pb2' };
+  it('keeps every player source field identical through Processing → Ready for local previews', () => {
+    const frozen = new Map<string, MediaItem>();
+    const local = (id: string) => id === 'v1';
+    const before = composerPreviewMedia([v, saved], preparedComposerMedia([v, saved], [saved], {}), local, frozen)[0];
+    const readyStatuses = { u1: { ui_status: 'ready' as const, asset_id: 'a', playback_id: 'pb', duration: 8 } };
+    // Even if raw media were patched on Ready, the frozen item wins.
+    const patched = { ...v, mux_status: 'ready' as const, mux_playback_id: 'pb', url: 'https://stream.mux.com/pb.m3u8' };
+    const after = composerPreviewMedia([patched, saved], preparedComposerMedia([patched, saved], [saved], readyStatuses), local, frozen)[0];
+    for (const k of ['url', 'mux_playback_id', 'mux_status', 'provider', 'id'] as const) expect(after[k]).toBe(before[k]);
+  });
+  it('matches prepared items by identity even when order differs; saved videos use Mux', () => {
+    const prepared = [saved, v];
+    const out = composerPreviewMedia([v, saved], prepared, () => false, new Map());
+    expect(out.map((m) => m.id)).toEqual(['v1', 's1']);
+    expect(out[1].mux_playback_id).toBe('pb2');
+  });
+});

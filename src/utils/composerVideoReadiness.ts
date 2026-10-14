@@ -58,3 +58,26 @@ export function matchesMediaIdentity(item: MediaItem, key: MediaIdentity): boole
   if (key.muxUploadId) return item.mux_upload_id === key.muxUploadId;
   return !!key.url && !item.id && !item.mux_upload_id && item.url === key.url;
 }
+
+/**
+ * Composer-only player input. Items with a local preview get a frozen item
+ * (captured once per id) so no player source dependency changes on Ready;
+ * others get their prepared version, matched by identity, never by index.
+ * Never use the result for validation or the save payload.
+ */
+export function composerPreviewMedia(
+  media: readonly MediaItem[],
+  prepared: readonly MediaItem[],
+  hasLocalPreview: (id: string) => boolean,
+  frozen: Map<string, MediaItem>,
+): MediaItem[] {
+  return media.map((item) => {
+    if (item.id && hasLocalPreview(item.id)) {
+      let f = frozen.get(item.id);
+      if (!f) { f = item; frozen.set(item.id, item); }
+      return f.order === item.order ? f : { ...f, order: item.order };
+    }
+    const key = mediaIdentity(item);
+    return prepared.find((p) => matchesMediaIdentity(p, key)) ?? item;
+  });
+}
