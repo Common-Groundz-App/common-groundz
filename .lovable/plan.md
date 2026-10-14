@@ -30,22 +30,22 @@
 3. **Linking in one save for posts.** Linking happens inside the post save, and the two separate requests are retired. This covers: video ready before saving, a failed save, removing or replacing a video, deleting a post, and duplicate or late Mux messages.
 4. **Stable video IDs for posts.** Each post video gets an ID based on its own upload, never its position in the list. That ID drives resume-playback, the full-screen viewer and view counts. Old posts work without being rewritten.
 5. **Review and update view counts.** The post view rules are reused (same watch threshold and duplicate rules). A view isn't counted twice when you open a video full-screen from the card. Each count goes to the right type: post, review or timeline update. Counting a view never changes edit times, reopens the edit window or touches photo cleanup.
-6. **Recheck.** Full automated suite, plus one short signed-in check covering the new tiles, a post video upload and one review view. The earlier Phase 4 results stay valid. Only the checks these changes affect are rerun, and Review video is marked as reopened until this passes.
+6. **Recheck.** I run the full automated suite. Then you do one short signed-in check covering the new tiles, a post video upload, and one view each on a post, a review and a timeline update. Earlier Phase 4 results stay valid. Only the checks these changes affect are rerun, and Review video is marked as reopened until this passes.
 
 ## Acceptance requirements (from review)
 
 - **/create stays exactly as it is.** Upload progress, the preparing and ready preview, autoplay, mute, cancel and replace before pressing Post must all be unchanged, with no new loading step and no preview reset. These are tested before and after phase 3. If keeping them unchanged turns out to be impossible, I stop and ask you first.
-- **Old posts are protected.** The new rules apply only to media that is added or changed. An old post with unusual media can still have its caption edited, and its media can still be safely removed. Old videos are never rewritten or marked invalid.
-- **The 60-second check is for new videos only.** It applies to videos linked after the rule ships. Existing videos keep playing even if they are over 60 s.
-- **The old linking requests are made harmless.** For one release, they can't create duplicate links or bring back removed ones. After that release, they're removed once the new linking has been confirmed in real use.
-- **Stable IDs come before view counts.** Old posts without the newer fields get a fixed fallback ID that never changes. That ID stays the same through edits, layout changes and opening a video full-screen.
+- **Old posts are protected.** The new rules apply only to media that is added or changed. An old post with unusual media can still have its caption edited. Removing items from an over-limit old post is always allowed, even if what's left is still over today's limits. Only additions that make it worse are refused. Old videos are never rewritten or marked invalid.
+- **The 60-second check is for new videos only.** Each upload is marked as covered by the rule when it is first created after the rule ships. Fixing a missing link on an old video never makes it count as new. Existing videos keep playing even if they are over 60 s.
+...
+- **Stable IDs come before view counts.** Each video's ID comes from something about it that never changes: its upload ID, then its playback ID, then its stored file address. It's never based on its position in the list. If the phase 2 report finds old videos with none of these, I'll tell you before choosing what to do. That ID stays the same through edits, layout changes and opening a video full-screen.
 - **The server checks every view.** Before counting, it confirms the post, review or update exists and the viewer is allowed to see it. Post, review and update views are each tested separately. Placeholders, pre-loading and failed playback never count.
 - **Placeholders don't break the viewer.** Tapping media and moving through the full-screen viewer behave the same when a placeholder tile is present.
 - **Checks after every phase.** Targeted tests run after each phase. The full suite, type check and build run before close-out. Phase 4 checks are rerun wherever behaviour changed, and earlier results are kept only where it didn't.
 
 ## Extra suggestions
 
-- **Admin count:** the existing Mux status card also shows a count of post videos stuck processing or failed, so problems are easy to spot.
+- **Admin count:** put off until all six phases are done (not part of this work).
 - **Old posts report:** the read-only check in phase 2 is saved as a short report: how many old posts break today's limits, have over-60 s videos or have no link record. That way the old-post protection is based on real numbers.
 - **One message set:** all tile and owner wording lives in one place, so posts and reviews always say the same thing.
 
@@ -56,7 +56,7 @@ Public playback links, the one-hour rule, no reordering, privacy and Circle rule
 ## Technical details
 
 - Display: replace `displayStateFor` 'hidden' for non-owners with `viewer_processing` / `viewer_unavailable`; new shared `VideoUnavailableTile`; `FeedVideo`/`MuxPreparingPoster` gain an `isOwner` input (posts via `isPostOwner`).
-- Posts: a BEFORE trigger on `posts.media` that mirrors `review_media_mux_before` and is scoped to rows where the media changed. Existing over-limit rows pass when their media is unchanged. Add `duration > 60` → errored/too_long in the post branch of `patch_content_media_from_mux`. An AFTER trigger syncs `mux_upload_mappings`. `mux-register-mappings` / `mux-sync-post-mappings` are kept as no-op-safe callers for one release, then removed.
+- Posts: a BEFORE trigger on `posts.media` that mirrors `review_media_mux_before`. A save is rejected only if it adds items or videos beyond the limits (it compares the new counts with both the limits and the old counts), so removals always pass. Grandfathering: a `duration_rule_applies` flag on `mux_uploads`, set at creation from the release time. `duration > 60` → errored/too_long applies only when that flag is true. Mapping repair never touches the flag. An AFTER trigger syncs `mux_upload_mappings` idempotently. `mux-register-mappings` / `mux-sync-post-mappings` become no-op-safe for one release, then are removed.
 - IDs: `stableMediaId('post', postId, item)`, generalised from `stableReviewMediaId`.
 - Views: `track-media-view` source enum gains `review_update`, and `media_views` accepts it. `FeedVideo` tracking is enabled when a valid source and id are present and the item is playable.
 - Tests: SQL tests on made-up records, rolled back; unit and rendered tests for the tiles, IDs and view attribution; the post composer's existing tests must stay green.
