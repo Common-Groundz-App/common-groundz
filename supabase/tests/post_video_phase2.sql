@@ -177,7 +177,7 @@ BEGIN
   EXECUTE 'reset role';
   SELECT count(*)::text INTO v FROM public.mux_upload_mappings WHERE content_id=PH;
   EXECUTE 'set local role authenticated';
-  IF (j2->0 - 'order') = (j->1 - 'order') AND j2->0->>'mux_status'='preparing' AND j2->2 = j->3 AND v='0' THEN
+  IF ((j2->0) - 'order') = ((j->1) - 'order') AND j2->0->>'mux_status'='preparing' AND j2->2 = j->3 AND v='0' THEN
     ok:=ok+1; res:=res||E'\nPASS photo removed beside historical video: video kept as-is (not repaired), stored-file video untouched, no link';
   ELSE bad:=bad+1; res:=res||E'\nFAIL neighbour removal '||j2::text; END IF;
 
