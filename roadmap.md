@@ -436,7 +436,7 @@ cross-read between them.
 - [ ] Ready-before-publish authenticated real-Mux acceptance: separately authorized upload/publish/playback check required; unavailable in this environment (`external_unmanaged`).
 - [x] Phase 1: shared "Video processing" / "Video unavailable" tiles for posts, reviews, updates
 - [x] Phase 2: post server rules (+ read-only old-posts report) — 31/31 rolled-back DB tests (docs/verification/post-video-phase-2.md)
-- [ ] Phase 3: post linking in one save (/create unchanged)
+- [x] Phase 3: post linking in one save (/create unchanged) — 8/8 Phase 3 + 31/31 Phase 2 rerun DB tests; simultaneous races unverified (docs/verification/post-video-phase-3.md)
 - [ ] Phase 4: stable post video IDs
 - [ ] Phase 5: review + timeline-update view counts
 - [ ] Phase 6: recheck (suite + short signed-in check: post, review, update views)
