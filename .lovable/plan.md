@@ -1,53 +1,62 @@
 # Phase 2 check, then Phase 3: post video linking in one save
 
 ## Phase 2 check
-The server rules are live and match the plan. Everything below was checked read-only:
+The server rules are live and match the plan. Checked read-only:
 - The post rules trigger is in place.
 - The 60-second "new uploads only" flag and its guard are in place.
 - Video state is rebuilt on the server on every save.
 - The trusted Mux patch only accepts the expected change.
-- The two old stuck posts were left untouched, as you decided.
+- The two old stuck posts are untouched.
 
-One leftover: after the database test was fixed, the full 31-test run was never repeated in one go. The earlier "31/31" combined two separate runs. Step 0 below reruns it properly before anything new is built. Phase 2 is marked complete only if that run passes.
+One leftover: after the database test was fixed, the full 31-test run was never repeated in one go. The earlier "31/31" combined two separate runs. Step 0 reruns it properly. Phase 2 counts as complete only if that run passes. If a correct test exposes a real bug, I fix the rules themselves (not the test) and rerun everything.
 
 ## Phase 3: what changes
-Today, after you press Post (or save an edit), the app saves the post and then makes a second, separate request to "link" the video. If that second request fails, the post is saved but the video stays stuck on "processing" forever. That's how the two old stuck posts happened.
+Today, after you press Post (or save an edit), the app saves the post and then makes a second, separate request to "link" the video. If that request fails, the video can stay on "processing" on a saved post. (The two old stuck posts may have a different cause — their videos may have been deleted — so I'm not claiming this explains them.)
 
 After Phase 3, linking happens inside the same save, the way review videos already work. Either both succeed or neither does.
 
 - /create looks and behaves the same: upload, processing, Ready, the Post button, X, and the preview that keeps playing.
-- No more "Video sync pending" message, because there's no second step left to fail.
-- Old posts, old stored-file videos and the two known stuck posts are left alone.
+- No more "Video sync pending" message.
+- Old posts, old stored-file videos and the two known stuck posts are never repaired or relinked.
 - Review videos stay OFF.
 
-## Covered cases (all tested)
-- New post with a ready video, with a video plus photos, and with photos only (no link created).
-- A failed save leaves no link behind.
-- Editing a post:
-  - Caption-only edit: the link is unchanged.
-  - Removing the video retires its link.
-  - Replacing it retires the old link and adds the new one.
-  - Re-adding a previously removed video brings its link back.
-- Deleting a post retires its links.
-- A duplicate or late message from Mux after removal or deletion changes nothing.
-- The old linking requests (from a browser tab that hasn't reloaded yet) still work and do no harm for one release.
+## Safeguards (from review)
+- **Deleting posts:** posts are deleted by setting `is_deleted` (confirmed), and can also be hard-deleted. The new step runs when `media` or `is_deleted` changes, and on hard delete. A delete always retires the post's active video links, even if media didn't change.
+- **No loops:** checked: today's linking function can rewrite the post's media while catching up, and that would fire the new step again. The save path will only update link records and will never rewrite the post. Because the save already rebuilt trusted video state, a ready video's link is marked done directly. A depth guard also stops the step from running inside its own update. Tested.
+- **Old browser tabs:** the two old linking requests stay for one release, but they ignore the list the browser sends. They re-read the post as saved right now and confirm against that, so a stale request can never bring back a removed video or retire its replacement.
+- **Only saved content can bring a link back:** a link is restored only when the successfully saved post contains that video. Late Mux messages and stale requests never restore removed media.
+- **Old videos stay protected:** editing an old post (for example, removing a photo next to a historical video that has no link record) saves normally. It doesn't repair, relink or change that video.
+- **A save that worked never looks failed:** the linking retries and messages go away, but the saved-post recovery stays. If the read-back after saving fails, the saved post is kept and never posted twice.
 
 ## Steps
-0. Rerun the full Phase 2 database tests in one run (made-up records, rolled back). Fix only the tests if needed, and report.
-1. Add a "link after save" step to posts that reuses the existing linking logic. The browser no longer sends the list of what to link; the server reads it from the saved post itself.
-2. Remove the two follow-up requests from the post composer (create and edit). Keep the existing read-back of the saved post, so the feed shows the trusted version.
-3. Leave the two old linking functions in place but make them harmless: they confirm what the save already did and never change anything differently. They get removed in a later release.
-4. Run the database tests for every case above, plus the app's full test suite and type check. Then stop before Phase 4.
+0. Rerun the full Phase 2 database tests in one run (made-up records, rolled back). Report the results.
+1. Add a "link after save" step to posts, following the safeguards above.
+2. Remove the two follow-up requests from the post composer (create and edit). Keep the read-back and the saved-post recovery.
+3. Make the two old linking functions follow the saved post, not the browser's list.
+4. Test:
+   - Create: with a video, with a video plus photos, photos only.
+   - A failed save leaves no link behind.
+   - Edits: caption-only, remove the video, replace it, re-add it.
+   - Soft delete and hard delete.
+   - A late Mux message after removal or deletion.
+   - A stale old-tab request.
+   - No loop.
+   - Old-video edit protection.
+   - The two historical posts unchanged.
+   - Then the app's full test suite and type check.
+5. Stop before Phase 4. After that, one controlled real test (when you authorize it): upload → Ready → publish → plays in the feed right away, then remove or replace, then delete.
 
 ## Technical details
-- New `AFTER INSERT OR UPDATE OF media OR DELETE` trigger `zz_posts_media_mux_after` on `posts` (`SECURITY DEFINER`, `search_path=public`).
-  - It mirrors `review_media_mux_after`: it skips when media is unchanged or no video is involved before or after.
-  - Otherwise it builds items `{mux_upload_id, media_index}` from `NEW.media` (provider `mux`, non-empty upload id) and calls `sync_mux_post_mappings(NEW.id, items)` (advisory lock plus park/reactivate already in place).
-  - On delete, and on soft delete if posts use `is_deleted`/`deleted_at` (confirm in step 1), it sets active mappings to `removed`, with `last_error='content_deleted'`.
-  - It runs after `zz_posts_media_mux_before`, so it sees trusted media only.
-- Ownership: `sync_mux_post_mappings` inserts `user_id`. Confirm it uses the post author, which the before-trigger has already validated as the uploader.
-- Excluded rows: the trigger only fires on writes, so the two historical posts are never touched unless their media is edited. Their checksums are re-checked after the migration.
-- `mux-register-mappings` / `mux-sync-post-mappings`: kept as no-op-safe. Same RPC, same result, and idempotent against trigger-created rows. Removal goes on the roadmap.
-- Client (`EnhancedCreatePostForm`): delete both `functions.invoke` blocks and their retry and toast code. `refreshSavedPostMedia` readback stays.
-- Tests: `supabase/tests/post_video_phase3.sql` (rolled back, fixtures only), plus a client test that save no longer invokes either function. Then the full suite and typecheck.
-- `AGENTS.md`: replace the post-linking rule with "post Mux mappings are synced by a DB trigger in the same save". The roadmap gets Phase 3 ticked and a later item for removing the old functions.
+- New `zz_posts_media_mux_after` trigger:
+  - `AFTER INSERT OR UPDATE OF media, is_deleted OR DELETE ON posts`, `SECURITY DEFINER`, `search_path=public`.
+  - `IF pg_trigger_depth() > 1 THEN RETURN NULL`.
+  - Delete or `is_deleted` going true: active mappings become `removed` with `last_error='content_deleted'`. This branch runs before the "media unchanged" shortcut.
+  - Otherwise: skip if media is unchanged, or if there's no Mux video before or after. Build `{mux_upload_id, media_index}` from `NEW.media` and call a new `sync_mux_post_mappings_core(p_content_id, items, p_patch boolean)`.
+- `sync_mux_post_mappings` is refactored into the core plus a wrapper. Steps (a)–(e) stay unchanged; step (f) catch-up patch runs only when `p_patch`.
+  - The trigger passes `false` and sets `status='patched', patched_at=now()` for mappings whose item in `NEW.media` already has `mux_status` ready or errored, matched by upload id.
+  - Pending ones stay `pending` for the webhook, whose patch is a no-op for unchanged items and is depth-guarded.
+- Compatibility edge functions `mux-register-mappings` and `mux-sync-post-mappings`: ownership check unchanged; items are derived server-side from the current `posts.media` (ignoring `body.items`), and they call the wrapper.
+- Grandfathered items (no upload row, or no mapping and not changed) are skipped in item building, so the existing before-trigger byte-identical rule stays intact.
+- Client (`EnhancedCreatePostForm`): delete both `functions.invoke` blocks and their retries and toasts. Keep `savedPostIdRef` and `refreshSavedPostMedia` with their non-failure fallback.
+- Tests: `supabase/tests/post_video_phase3.sql` (fixtures only, rolled back), a client test that save never invokes either function, then the full suite and typecheck.
+- `AGENTS.md`: the post-linking rule is replaced with "post Mux mappings are synced by a DB trigger in the same save; compatibility endpoints reconcile against the persisted post". The roadmap gets Phase 3 ticked and a later item to remove the old functions.
