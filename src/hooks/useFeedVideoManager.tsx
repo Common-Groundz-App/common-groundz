@@ -169,6 +169,8 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
   const scrollDirRef = useRef<1 | -1>(1);
   const loadRafRef = useRef<number | null>(null);
 
+  const DIRECTION_HYSTERESIS_PX = 48;
+
   const notifyLoad = useCallback((id: string) => {
     const set = loadListenersRef.current.get(id);
     if (!set) return;
@@ -351,9 +353,15 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
     lastScrollYRef.current = window.scrollY || 0;
     const onScroll = () => {
       const y = window.scrollY || 0;
-      if (y > lastScrollYRef.current) scrollDirRef.current = 1;
-      else if (y < lastScrollYRef.current) scrollDirRef.current = -1;
-      lastScrollYRef.current = y;
+      // Hysteresis: flip direction only after a deliberate reversal, so
+      // small jitter doesn't swap the preload candidate back and forth.
+      const dy = y - lastScrollYRef.current;
+      if (dy * scrollDirRef.current > 0) {
+        lastScrollYRef.current = y;
+      } else if (Math.abs(dy) >= DIRECTION_HYSTERESIS_PX) {
+        scrollDirRef.current = dy > 0 ? 1 : -1;
+        lastScrollYRef.current = y;
+      }
       scheduleRecompute();
       scheduleLoadRecompute();
     };
@@ -413,9 +421,16 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
     if (el && observerRef.current) {
       try { observerRef.current.observe(el); } catch { /* ignore */ }
     }
-    scheduleRecompute();
+    // Cold mount: no active slot yet → evaluate on the next frame (no
+    // debounce) so the genuinely most-visible slot gets its seat promptly.
+    // Arbitration itself is unchanged (same recompute()).
+    if (el && activeIdRef.current === null && typeof window !== 'undefined') {
+      requestAnimationFrame(() => recompute());
+    } else {
+      scheduleRecompute();
+    }
     scheduleLoadRecompute();
-  }, [scheduleRecompute, scheduleLoadRecompute]);
+  }, [scheduleRecompute, scheduleLoadRecompute, recompute]);
 
   const unregisterSlot = useCallback((id: string) => {
     const slot = slotsRef.current.get(id);

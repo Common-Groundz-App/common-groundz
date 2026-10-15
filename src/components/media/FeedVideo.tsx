@@ -1264,7 +1264,10 @@ function FeedVideoPlayer({
       )}
 
       {/* Loading skeleton overlay */}
-      {status === 'loading' && <Skeleton className="absolute inset-0 rounded-md" />}
+      {/* Budget standby with a poster shows the poster, not a loader. */}
+      {status === 'loading' && !(hlsLoadGate === false && !!(srcOverride ? item.thumbnail_url : muxPosterUrl(item))) && (
+        <Skeleton className="absolute inset-0 rounded-md" />
+      )}
 
       {/* Error / unsupported overlay */}
       {(status === 'error' || status === 'unsupported') && (
