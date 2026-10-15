@@ -1409,7 +1409,7 @@ export function EnhancedCreatePostForm({
             media={composerPreviewMedia(
               media,
               preparedComposerMedia(media, postToEdit?.media ?? [], muxStatuses),
-              (id) => localPreviewUrlsRef.current.has(id),
+              (clientKey) => localPreviewUrlsRef.current.has(clientKey),
               frozenPreviewItemsRef.current,
             )}
             onRemove={removeMedia}
