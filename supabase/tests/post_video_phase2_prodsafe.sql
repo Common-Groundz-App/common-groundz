@@ -28,7 +28,8 @@ BEGIN
          (O,'pp_other','ready',true,now()+interval '1h','A_O','PB_O',5,NULL),
          (U,'pp_flag','waiting',true,now()+interval '1h',NULL,NULL,NULL,NULL),
          (U,'pp_new2','waiting',true,now()+interval '1h',NULL,NULL,NULL,NULL),
-         (U,'pp_b2','waiting',true,now()+interval '1h',NULL,NULL,NULL,NULL);
+         (U,'pp_b2','waiting',true,now()+interval '1h',NULL,NULL,NULL,NULL),
+         (U,'pp_b3','ready',true,now()+interval '1h','A_B3','PB_B3',70,NULL);
   -- Block A (old pre-rule uploads pp_oldlong/pp_hist) removed: needs a trigger pause.
 
   -- T1 eligibility flag: set at insert, immutable
@@ -148,9 +149,6 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '', true);
   -- Phase 3: the save above already created this link
   SELECT id INTO M FROM public.mux_upload_mappings WHERE mux_upload_id='pp_late' AND content_type='post' AND content_id=P AND status='pending';
-  -- DIAG (test-only)
-  res:=res||E'\nDIAG pp_late lookup M='||coalesce(M::text,'NULL')||' media='||(SELECT coalesce(jsonb_agg(jsonb_build_object('id',e->>'id','up',e->>'mux_upload_id')),'[]') FROM public.posts, jsonb_array_elements(media) e WHERE id=P)::text
-    ||' maps='||(SELECT coalesce(jsonb_agg(jsonb_build_object('post',content_id,'mid',media_id,'idx',media_index,'st',status)),'[]') FROM public.mux_upload_mappings WHERE mux_upload_id='pp_late')::text;
   UPDATE public.mux_uploads SET status='ready', asset_id='A_LATE', playback_id='PB_LATE', duration=7, aspect_ratio='9:16' WHERE upload_id='pp_late';
   SELECT media INTO j FROM public.posts WHERE id=P;
 
@@ -210,14 +208,14 @@ BEGIN
   ELSE bad:=bad+1; res:=res||E'\nFAIL patch '||coalesce(v,'null')||' '||j2::text; END IF;
 
   -- T18 (Block C replaced). T18a = helper coverage, T18b = signed-in end-to-end coverage.
-  UPDATE public.mux_uploads SET status='ready', asset_id='A_B', playback_id='PB_B', duration=70 WHERE upload_id='pp_b2';
+  -- T18a uses its own upload pp_b3 so pp_b2 stays genuinely 'waiting' for T18b
   -- T18a helper: rebuild of a hand-built item carrying stale playable fields
-  j := public.post_mux_truth_item(createv || '{"mux_upload_id":"pp_b2","mux_playback_id":"STALE","thumbnail_url":"https://x/t.jpg","url":"https://stream.mux.com/STALE.m3u8"}'::jsonb, U);
+  j := public.post_mux_truth_item(createv || '{"mux_upload_id":"pp_b3","mux_playback_id":"STALE","thumbnail_url":"https://x/t.jpg","url":"https://stream.mux.com/STALE.m3u8"}'::jsonb, U);
   IF j->>'mux_error'='too_long' AND j->>'url'='' AND NOT j ? 'mux_playback_id' AND NOT j ? 'thumbnail_url' THEN
     ok:=ok+1; res:=res||E'\nPASS [helper] rebuild: new 70 s video too long, stale playback/url/thumbnail removed';
   ELSE bad:=bad+1; res:=res||E'\nFAIL [helper] too long '||j::text; END IF;
   -- T18b end-to-end: signed-in save while processing, then trusted Mux patch after ready at 70 s
-  UPDATE public.mux_uploads SET status='waiting', asset_id=NULL, playback_id=NULL, duration=NULL WHERE upload_id='pp_b2';
+  -- (Step 2 fix) pp_b2 is never set ready before this save; the live monotonic-status guard cannot reset ready->waiting
   PERFORM set_config('request.jwt.claims', json_build_object('sub',U,'role','authenticated')::text, true);
   EXECUTE 'set local role authenticated';
   INSERT INTO public.posts(user_id,title,content,post_type,visibility,media)
@@ -226,9 +224,6 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '', true);
   UPDATE public.mux_uploads SET status='ready', asset_id='A_B', playback_id='PB_B', duration=70 WHERE upload_id='pp_b2';
   SELECT id INTO M FROM public.mux_upload_mappings WHERE mux_upload_id='pp_b2' AND content_type='post' AND content_id=P2 AND status='pending';
-  -- DIAG (test-only)
-  res:=res||E'\nDIAG pp_b2 lookup M='||coalesce(M::text,'NULL')||' media='||(SELECT coalesce(jsonb_agg(jsonb_build_object('id',e->>'id','up',e->>'mux_upload_id')),'[]') FROM public.posts, jsonb_array_elements(media) e WHERE id=P2)::text
-    ||' maps='||(SELECT coalesce(jsonb_agg(jsonb_build_object('post',content_id,'mid',media_id,'idx',media_index,'st',status)),'[]') FROM public.mux_upload_mappings WHERE mux_upload_id='pp_b2')::text;
   v := public.patch_content_media_from_mux(M);
   SELECT media->0 INTO j FROM public.posts WHERE id=P2;
   SELECT duration_rule_applies INTO b FROM public.mux_uploads WHERE upload_id='pp_b2';
