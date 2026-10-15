@@ -16,5 +16,9 @@
 - Truly simultaneous Post save vs. catch-up request.
 - Truly simultaneous Post save vs. Mux webhook patch.
 
+## Compatibility correction (2026-10-15, Phase 4 Step 2)
+- The old browser mapping endpoints (`mux-sync-post-mappings` on edit, `mux-register-mappings` on create) were not actually no-op-safe after Phase 3: the old register function still attempted a direct insert into `mux_upload_mappings`, caught the resulting error, marked the item `errored`/`insert_failed`, and returned HTTP 200 — so the Post published, but the redundant post-save call silently failed against the new `media_id` requirement.
+- In Phase 4 Step 2, both Edge Functions were formally updated and retired from direct table mapping inserts: they now exclusively invoke the server-authoritative `sync_mux_post_mappings` catch-up RPC derived from the locked, persisted Post.
+
 ## Known behavior (keep for now; review in Phase 4 or later)
 - A Mux upload removed from one Post cannot be added to a different Post; the save is refused. Current UI is unaffected because choosing a video always creates a new upload.
