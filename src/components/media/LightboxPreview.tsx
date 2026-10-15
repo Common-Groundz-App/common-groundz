@@ -134,6 +134,11 @@ export function LightboxPreview({
   // When true, onLoadedMetadata leaves `muted` alone and onSeeked handles the
   // one-shot unmute attempt instead of re-attempting play().
   const earlyPlayRanRef = useRef(false);
+  // Reveal safety net: if the handoff seek never lands, show the video and
+  // native controls WITHOUT auto-playing. Auto-play stays gated on a verified
+  // seek and is skipped entirely once the user has acted on the video.
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const userActedRef = useRef(false);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   // Phase 4 — attachHls detach handle for the current <video>. Cleared on
   // ref-callback unmount (key change remounts the video).
@@ -268,6 +273,14 @@ export function LightboxPreview({
   // poster overlay covers the next <video> until it's truly ready.
   useEffect(() => {
     setVideoReady(false);
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = setTimeout(() => {
+      if (!closedRef.current) setVideoReady(true);
+    }, 2500);
+    return () => {
+      if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+      revealTimerRef.current = null;
+    };
   }, [currentIndex]);
 
 
@@ -595,6 +608,39 @@ export function LightboxPreview({
             // small/blurry interim frame. Supabase videos reveal immediately
             // (no HLS attach delay) and behave exactly as before.
             const hidden = isMux && !videoReady;
+            // Applies the feed handoff once the playhead is verified at the
+            // target (real `seeked`, or a no-op seek). Plays only if the feed
+            // was playing and the user hasn't acted since the lightbox opened.
+            const completeHandoff = (v: HTMLVideoElement) => {
+              if (closedRef.current) return;
+              setVideoReady(true);
+              if (
+                handoffAppliedRef.current ||
+                !initialVideoState ||
+                !isEntryDisplayed()
+              ) {
+                return;
+              }
+              handoffAppliedRef.current = true;
+              if (earlyPlayRanRef.current) {
+                if (!initialVideoState.muted) {
+                  try { v.muted = false; } catch { /* ignore */ }
+                }
+                return;
+              }
+              if (!initialVideoState.wasPlaying) return;
+              if (userActedRef.current || !v.paused) return;
+              const tryPlay = v.play();
+              if (tryPlay && typeof tryPlay.catch === 'function') {
+                tryPlay.catch(() => {
+                  try { v.muted = true; } catch { /* ignore */ }
+                  const retry = v.play();
+                  if (retry && typeof retry.catch === 'function') {
+                    retry.catch(() => { /* still blocked; native controls visible */ });
+                  }
+                });
+              }
+            };
 
 
             return (
@@ -633,7 +679,16 @@ export function LightboxPreview({
                         Math.max(0, initialVideoState.currentTime),
                         Math.max(0, dur - 0.5)
                       );
+                      // No-op seek: the element is already at the target, so the
+                      // browser may never fire `seeked`. Complete the handoff now.
+                      if (Math.abs(v.currentTime - target) < 0.05) {
+                        completeHandoff(v);
+                        return;
+                      }
                       try { v.currentTime = target; } catch { /* ignore */ }
+                    } else if (initialVideoState.currentTime <= 0.05) {
+                      // Unknown duration but handoff is at the start: nothing to seek.
+                      completeHandoff(v);
                     }
                   }}
                   onLoadedData={() => {
@@ -659,39 +714,7 @@ export function LightboxPreview({
                     // and any subsequent user-initiated seeks.
                     setVideoReady(true);
 
-                    if (
-                      handoffAppliedRef.current ||
-                      !initialVideoState ||
-                      !isEntryDisplayed()
-                    ) {
-                      return;
-                    }
-                    handoffAppliedRef.current = true;
-                    const v = e.currentTarget;
-
-                    if (earlyPlayRanRef.current) {
-                      // iOS early-play already started playback (muted). If the
-                      // user's global pref is unmuted, try once to unmute. If the
-                      // browser re-mutes or throws, leave it muted — no retries.
-                      if (!initialVideoState.muted) {
-                        try { v.muted = false; } catch { /* ignore */ }
-                      }
-                      return;
-                    }
-
-                    // Non-iOS / no early-play path: attempt play here as before.
-                    if (!initialVideoState.wasPlaying) return;
-                    
-                    const tryPlay = v.play();
-                    if (tryPlay && typeof tryPlay.catch === 'function') {
-                      tryPlay.catch(() => {
-                        try { v.muted = true; } catch { /* ignore */ }
-                        const retry = v.play();
-                        if (retry && typeof retry.catch === 'function') {
-                          retry.catch(() => { /* still blocked; native controls visible */ });
-                        }
-                      });
-                    }
+                    completeHandoff(e.currentTarget);
                   }}
                   onClick={(e) => e.stopPropagation()}
                   onPlay={(e) => e.stopPropagation()}
@@ -701,7 +724,8 @@ export function LightboxPreview({
                     e.stopPropagation();
                   }}
                   onSeeking={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => { userActedRef.current = true; e.stopPropagation(); }}
+                  onKeyDown={() => { userActedRef.current = true; }}
                   onMouseDown={(e) => e.stopPropagation()}
                 />
                 {isMux && hiResPoster && (

@@ -8,6 +8,7 @@ import { readGlobalVideoMuted, setGlobalVideoMuted } from '@/hooks/useVideoMute'
 import { useFeedVideoManagerControls } from '@/hooks/useFeedVideoManager';
 import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
 import { findByMediaKey } from '@/utils/mediaIdentity';
+import { getPostDisplayMedia } from '@/utils/postDisplayMedia';
 
 interface PostMediaDisplayProps {
   media?: MediaItem[];
@@ -54,9 +55,13 @@ export function PostMediaDisplay({
   }
   
   // Filter out deleted media and sort by order
-  const validMedia = media
-    .filter(item => !item.is_deleted)
-    .sort((a, b) => a.order - b.order)
+  // Post display order (video first) is computed ONCE here and shared by the
+  // collage and the lightbox so their positions always agree.
+  const validMedia = getPostDisplayMedia(
+    media
+      .filter(item => !item.is_deleted)
+      .sort((a, b) => a.order - b.order)
+  )
     .map(item => {
       // Enhanced orientation detection - ensure each media item has accurate orientation
       if (!item.orientation && item.width && item.height) {
@@ -155,6 +160,7 @@ export function PostMediaDisplay({
     <>
       <FeedCollage
         media={validMedia}
+        preserveMediaOrder
         onItemClick={handleImageClick}
         source={source}
         sourceId={sourceId}
