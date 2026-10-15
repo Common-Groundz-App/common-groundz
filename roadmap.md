@@ -450,3 +450,10 @@ cross-read between them.
 - [ ] Phase 6: recheck (suite + short signed-in check: post, review, update views)
 - Deferred: admin stuck/failed post video count
 - [ ] Payments: collect customer payments — blocked: built-in payments need Lovable Cloud; project uses an external Supabase
+
+## Fix 1 record correction + Fix 1/2 follow-up
+- Correction: the original Fix 1 commit missed removing the lightbox 720p/rendition URL options; removed now (lightbox uses the canonical feed URL).
+- [x] Seekable-aware once-only handoff seek; already-reached targets complete immediately; explicit pause/scrub only override intent.
+- [x] Upcoming preload preempts passed grace within the 2-slot cap; direction hysteresis; cold-mount prompt activation; poster instead of loader on budget standby.
+- [ ] Combined Fix 1 + Fix 2 manual QA (user).
+- [ ] Fix 3 composer upload — paused.
