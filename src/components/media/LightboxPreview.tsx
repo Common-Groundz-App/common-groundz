@@ -23,35 +23,10 @@ import { analytics } from '@/services/analytics';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
 import { mediaKey, findByMediaKey } from '@/utils/mediaIdentity';
+import { decideHandoffSeek, handoffTarget } from '@/utils/lightboxHandoffSeek';
 
-/**
- * Phase 2 — lightbox-only Mux playback options.
- *
- * Always biases native HLS ABR to start at the highest rendition. On
- * unconstrained networks we ALSO strip renditions below 720p from the
- * manifest, because iOS native HLS otherwise locks onto a 270p rung for
- * 4K-source assets (heavy bitrate ladder → conservative cold start) and
- * never upshifts, producing a visibly blurry full-screen lightbox.
- *
- * Skipped when the user has Save-Data enabled or is on 2g/slow-2g, so
- * we don't force a 720p floor on someone explicitly minimizing data.
- */
-const getLightboxPlaybackOpts = (): MuxPlaybackOptions => {
-  const opts: MuxPlaybackOptions = { renditionOrder: 'desc' };
-  try {
-    const conn = (navigator as any)?.connection;
-    const saveData = conn?.saveData === true;
-    const eff = conn?.effectiveType;
-    const slow = eff === '2g' || eff === 'slow-2g';
-    if (!saveData && !slow) {
-      opts.minResolution = '720p';
-    }
-  } catch {
-    // navigator.connection unsupported (Safari) — default to 720p floor.
-    opts.minResolution = '720p';
-  }
-  return opts;
-};
+// Lightbox uses the same canonical adaptive Mux URL as feed + prewarm
+// (no forced rendition order / 720p floor); ABR ramps naturally.
 
 
 interface LightboxPreviewProps {
@@ -138,7 +113,12 @@ export function LightboxPreview({
   // native controls WITHOUT auto-playing. Auto-play stays gated on a verified
   // seek and is skipped entirely once the user has acted on the video.
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set only by explicit playback overrides (native pause / user scrub),
+  // never by incidental taps on the covering poster.
   const userActedRef = useRef(false);
+  const userSeekedRef = useRef(false);
+  const handoffSeekIssuedRef = useRef(false);
+  const programmaticRef = useRef(false);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   // Phase 4 — attachHls detach handle for the current <video>. Cleared on
   // ref-callback unmount (key change remounts the video).
@@ -273,6 +253,8 @@ export function LightboxPreview({
   // poster overlay covers the next <video> until it's truly ready.
   useEffect(() => {
     setVideoReady(false);
+    handoffSeekIssuedRef.current = false;
+    userSeekedRef.current = false;
     if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
     revealTimerRef.current = setTimeout(() => {
       if (!closedRef.current) setVideoReady(true);
@@ -639,6 +621,41 @@ export function LightboxPreview({
                     retry.catch(() => { /* still blocked; native controls visible */ });
                   }
                 });
+              }
+            };
+
+            // "Check repeatedly, seek once": called from every readiness
+            // event. Completes immediately when the target is already
+            // reached (incl. nonzero), seeks once when the target is
+            // seekable, otherwise waits for the next event.
+            const tryHandoffSeek = (v: HTMLVideoElement) => {
+              if (
+                closedRef.current ||
+                handoffAppliedRef.current ||
+                !initialVideoState ||
+                !isEntryDisplayed() ||
+                v.readyState < 1
+              ) {
+                return;
+              }
+              if (userSeekedRef.current) {
+                completeHandoff(v);
+                return;
+              }
+              const target = handoffTarget(initialVideoState.currentTime, v.duration);
+              const action = decideHandoffSeek({
+                currentTime: v.currentTime,
+                target,
+                seekable: v.seekable,
+                seekIssued: handoffSeekIssuedRef.current,
+              });
+              if (action === 'complete') {
+                completeHandoff(v);
+              } else if (action === 'seek') {
+                handoffSeekIssuedRef.current = true;
+                programmaticRef.current = true;
+                try { v.currentTime = target; } catch { handoffSeekIssuedRef.current = false; }
+                programmaticRef.current = false;
               }
             };
 
