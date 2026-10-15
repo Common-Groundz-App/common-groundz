@@ -782,7 +782,7 @@ export function EnhancedCreatePostForm({
         const persistedEditMedia = (mediaToSave.some((m) => m.provider === 'mux') || (postToEdit.media ?? []).some((m) => m.provider === 'mux'))
           ? await refreshSavedPostMedia(postToEdit.id)
           : null;
-        if (persistedEditMedia) setMedia((prev) => reconcileComposerMedia(prev, persistedEditMedia as MediaItem[]));
+        if (persistedEditMedia) setMedia((prev) => reconcileComposerMedia(prev, persistedEditMedia as unknown as MediaItem[]));
 
         // Replace entity relationships: delete-then-insert
         await supabase
@@ -984,7 +984,7 @@ export function EnhancedCreatePostForm({
 
       const persistedMedia = mediaToSave.some((m) => m.provider === 'mux') ? await refreshSavedPostMedia(newPost.id) : null;
       // Adopt authoritative server IDs without disturbing local previews.
-      if (persistedMedia) setMedia((prev) => reconcileComposerMedia(prev, persistedMedia as MediaItem[]));
+      if (persistedMedia) setMedia((prev) => reconcileComposerMedia(prev, persistedMedia as unknown as MediaItem[]));
 
       // ===== Hashtag persistence (non-blocking) =====
       const { all: detectedTags, source: hashtagSource } = extractHashtagsDetailed(title, content);

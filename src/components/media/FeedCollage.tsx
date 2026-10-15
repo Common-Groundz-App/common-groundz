@@ -235,7 +235,7 @@ interface SingleMediaTileProps {
   entry: DisplayEntry;
   source: 'post' | 'review' | 'entity';
   sourceId?: string;
-  onItemClick: (originalIndex: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
+  onItemClick: (originalIndex: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras, mediaKey?: string | null) => void;
   renderTileOverlay?: (item: MediaItem, originalIndex: number) => React.ReactNode;
   disableItemClick?: boolean;
   previewSrcOverride?: (item: MediaItem) => string | undefined;
