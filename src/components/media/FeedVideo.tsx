@@ -291,7 +291,14 @@ function FeedVideoPlayer({
   // `slotIsActive`. Otherwise we fall back to the legacy useVideoAutoplay
   // path so unwrapped surfaces (composer previews, etc.) behave as before.
   const stableSlotId = item.id ?? `${sourceId ?? 'anon'}:${item.url}`;
-  const { managed, isActive: slotIsActive, registerEl: registerSlotEl, requestActivate: requestSlotActivate } = useFeedVideoSlot(stableSlotId);
+  const { managed, isActive: slotIsActive, registerEl: registerSlotEl, requestActivate: requestSlotActivate, loadAllowed, pinHandoff } = useFeedVideoSlot(stableSlotId);
+  // Fix 2 — loading budget gate. Only managed HLS sources are gated;
+  // unmanaged surfaces and plain (non-HLS) sources keep legacy behaviour.
+  const sourceIsHls = !srcOverride && resolveVideoSrc(item).isHls;
+  const hlsLoadGate = managed && sourceIsHls ? loadAllowed : true;
+  const hlsLoadGateRef = useRef(hlsLoadGate);
+  hlsLoadGateRef.current = hlsLoadGate;
+  const attachGenRef = useRef(0);
 
   useVideoAutoplay(videoRef, {
     threshold: 0.5,
@@ -613,7 +620,9 @@ function FeedVideoPlayer({
       capturedEl.addEventListener('loadedmetadata', metaListener);
       // Pre-metadata timeout — finalize as skip so video plays from 0
       // rather than staying paused forever.
-      metaTimer = window.setTimeout(() => { finalize(); }, 1500);
+      // Fix 2 — a slot re-attached from poster-only may need longer than
+      // 1.5s for metadata; waiting longer keeps the saved position.
+      metaTimer = window.setTimeout(() => { finalize(); }, 5000);
     }
 
     return () => {
@@ -912,6 +921,9 @@ function FeedVideoPlayer({
       : resolveVideoSrc(item);
     const { src, isHls } = resolved;
     if (!src) return;
+    // Fix 2 — outside the loading budget: poster only, no HLS traffic.
+    if (isHls && !hlsLoadGate) return;
+    const gen = ++attachGenRef.current;
     isHlsSourceRef.current = isHls;
     hlsUnrecoverableRef.current = false;
     const token: AttachToken = { cancelled: false };
@@ -925,6 +937,7 @@ function FeedVideoPlayer({
       detach = attachHls(v, src, token, {
         onEvent: (e, p) => analytics.track(e, p),
         onUnrecoverable: () => {
+          if (token.cancelled || attachGenRef.current !== gen) return;
           hlsUnrecoverableRef.current = true;
           setStatus('error');
         },
@@ -951,11 +964,22 @@ function FeedVideoPlayer({
         swapWasPlayingRef.current = !v.paused && !v.ended && !userPausedRef.current && !userPausedRefManaged.current;
       }
       if (onSwapReady) v.removeEventListener('loadeddata', onSwapReady);
+      // Fix 2 — demotion out of the budget: snapshot position before
+      // teardown so re-attach resumes here (pause intent already lives in
+      // the pause store). Restore never autoplays: playback stays with
+      // FeedVideoManager's active-slot rules.
+      if (isHls && !hlsLoadGateRef.current) {
+        try {
+          if (Number.isFinite(v.currentTime) && v.currentTime > 0) {
+            saveFeedVideoResume(stableSlotIdRef.current, v.currentTime, v.duration);
+          }
+        } catch { /* ignore */ }
+      }
       token.cancelled = true;
       markSystemPause(1000);
       detach();
     };
-  }, [item.url, item.mux_playback_id, item.mux_status, item.provider, srcOverride, markSystemPause, resumeAfterSourceSwap]);
+  }, [item.url, item.mux_playback_id, item.mux_status, item.provider, srcOverride, markSystemPause, resumeAfterSourceSwap, hlsLoadGate]);
 
 
   // Reset userPaused when video leaves viewport, so re-entry can autoplay again.
@@ -1110,6 +1134,11 @@ function FeedVideoPlayer({
         if (dataUrl) extras = { entryPosterDataUrl: dataUrl };
         // Tier 2: kick off HLS prewarm in parallel with the open animation.
         // Pass v.currentTime so we target the segment the lightbox needs.
+        // Fix 2 — reserve this slot for the live handoff first; prewarm
+        // only targets the handed-off video, so it never bypasses the
+        // loading budget (speculative preloads are suspended while the
+        // lightbox is open).
+        pinHandoff();
         if (isMuxPlayable(item) && item.mux_playback_id) {
           prewarmMuxHls(item.mux_playback_id, v.currentTime);
         }
