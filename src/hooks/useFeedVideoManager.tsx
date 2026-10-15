@@ -7,6 +7,11 @@ import React, {
   useRef,
   useSyncExternalStore,
 } from 'react';
+import {
+  selectFeedVideoLoadSet,
+  nextGraceExpiry,
+  type LoadSlotGeometry,
+} from '@/hooks/feedVideoLoadBudget';
 
 /**
  * Phase 1 — Single Active Feed Video Manager (Phase 1.1 stabilization).
@@ -50,7 +55,15 @@ interface RegistryApi {
   subscribeSlotActive: (id: string, listener: Listener) => () => void;
   getSlotActiveSnapshot: (id: string) => boolean;
   requestActivate: (id: string) => boolean;
+  // Fix 2 — loading budget (separate from playback).
+  subscribeSlotLoad: (id: string, listener: Listener) => () => void;
+  getSlotLoadSnapshot: (id: string) => boolean;
+  pinHandoff: (id: string) => void;
+  releaseHandoff: (id: string) => void;
 }
+
+/** After the lightbox closes, handoff pins are released after this delay. */
+const HANDOFF_PIN_RELEASE_MS = 3000;
 
 const Ctx = createContext<RegistryApi | null>(null);
 // Sentinel context so nested providers can detect each other (dev-only warn).
@@ -145,7 +158,79 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
     if (next) notifySlot(next);
   }, [notifySlot]);
 
-  const recompute = useCallback(() => {
+  // ----- Fix 2 — loading budget state -----
+  const pinnedRef = useRef<Set<string>>(new Set());
+  const allowedRef = useRef<Set<string>>(new Set());
+  const graceRef = useRef<Map<string, number>>(new Map());
+  const loadListenersRef = useRef<Map<string, Set<Listener>>>(new Map());
+  const graceTimerRef = useRef<number | null>(null);
+  const pinReleaseTimerRef = useRef<number | null>(null);
+  const lastScrollYRef = useRef<number>(0);
+  const scrollDirRef = useRef<1 | -1>(1);
+  const loadRafRef = useRef<number | null>(null);
+
+  const notifyLoad = useCallback((id: string) => {
+    const set = loadListenersRef.current.get(id);
+    if (!set) return;
+    set.forEach((l) => { try { l(); } catch { /* ignore */ } });
+  }, []);
+
+  const recomputeLoad = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const vpH = window.innerHeight || document.documentElement.clientHeight || 0;
+    const geoms: LoadSlotGeometry[] = [];
+    slotsRef.current.forEach((slot, id) => {
+      if (!slot.el) return;
+      const r = slot.el.getBoundingClientRect();
+      if (r.height <= 0 && r.width <= 0) {
+        geoms.push({ id, distance: Infinity, ahead: false });
+        return;
+      }
+      const distance = r.bottom < 0 ? -r.bottom : r.top > vpH ? r.top - vpH : 0;
+      const below = r.top > vpH;
+      const above = r.bottom < 0;
+      const ahead = scrollDirRef.current === 1 ? below : above;
+      geoms.push({ id, distance, ahead });
+    });
+    const hidden = typeof document !== 'undefined' && document.hidden;
+    const next = selectFeedVideoLoadSet({
+      slots: geoms,
+      activeId: activeIdRef.current,
+      pinned: pinnedRef.current,
+      prevAllowed: allowedRef.current,
+      graceUntil: graceRef.current,
+      now: Date.now(),
+      viewportHeight: vpH,
+      lightboxOpen: lightboxOpenRef.current || hidden,
+    });
+    const prev = allowedRef.current;
+    allowedRef.current = next;
+    prev.forEach((id) => { if (!next.has(id)) notifyLoad(id); });
+    next.forEach((id) => { if (!prev.has(id)) notifyLoad(id); });
+
+    if (graceTimerRef.current !== null) {
+      window.clearTimeout(graceTimerRef.current);
+      graceTimerRef.current = null;
+    }
+    const exp = nextGraceExpiry(graceRef.current);
+    if (exp !== null) {
+      graceTimerRef.current = window.setTimeout(() => {
+        graceTimerRef.current = null;
+        recomputeLoad();
+      }, Math.max(0, exp - Date.now()) + 10);
+    }
+  }, [notifyLoad]);
+
+  const scheduleLoadRecompute = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (loadRafRef.current !== null) return;
+    loadRafRef.current = requestAnimationFrame(() => {
+      loadRafRef.current = null;
+      recomputeLoad();
+    });
+  }, [recomputeLoad]);
+
+  const recomputeActive = useCallback(() => {
     if (typeof window === 'undefined') return;
     const vpH = window.innerHeight || document.documentElement.clientHeight || 0;
     if (vpH <= 0) return;
@@ -226,6 +311,11 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
     }
   }, [updateActive]);
 
+  const recompute = useCallback(() => {
+    recomputeActive();
+    recomputeLoad();
+  }, [recomputeActive, recomputeLoad]);
+
   const flushNow = useCallback(() => {
     if (debounceRef.current !== null) {
       window.clearTimeout(debounceRef.current);
@@ -258,7 +348,15 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
       () => scheduleRecompute(),
       { threshold: [0, 0.35, 0.6, 1] }
     );
-    const onScroll = () => scheduleRecompute();
+    lastScrollYRef.current = window.scrollY || 0;
+    const onScroll = () => {
+      const y = window.scrollY || 0;
+      if (y > lastScrollYRef.current) scrollDirRef.current = 1;
+      else if (y < lastScrollYRef.current) scrollDirRef.current = -1;
+      lastScrollYRef.current = y;
+      scheduleRecompute();
+      scheduleLoadRecompute();
+    };
     const onResize = () => scheduleRecompute();
     const onVisibility = () => {
       if (document.hidden) {
@@ -293,8 +391,11 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
       document.removeEventListener('visibilitychange', onVisibility);
       if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (loadRafRef.current !== null) cancelAnimationFrame(loadRafRef.current);
+      if (graceTimerRef.current !== null) window.clearTimeout(graceTimerRef.current);
+      if (pinReleaseTimerRef.current !== null) window.clearTimeout(pinReleaseTimerRef.current);
     };
-  }, [scheduleRecompute, recompute, updateActive]);
+  }, [scheduleRecompute, scheduleLoadRecompute, recompute, updateActive]);
 
   // ----- Stable registry callbacks. Captured once; never change identity. -----
 
@@ -313,7 +414,8 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
       try { observerRef.current.observe(el); } catch { /* ignore */ }
     }
     scheduleRecompute();
-  }, [scheduleRecompute]);
+    scheduleLoadRecompute();
+  }, [scheduleRecompute, scheduleLoadRecompute]);
 
   const unregisterSlot = useCallback((id: string) => {
     const slot = slotsRef.current.get(id);
@@ -323,8 +425,12 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
     slotsRef.current.delete(id);
     if (manualOverrideIdRef.current === id) manualOverrideIdRef.current = null;
     if (activeIdRef.current === id) updateActive(null);
+    pinnedRef.current.delete(id);
+    graceRef.current.delete(id);
+    allowedRef.current.delete(id);
     scheduleRecompute();
-  }, [scheduleRecompute, updateActive]);
+    scheduleLoadRecompute();
+  }, [scheduleRecompute, scheduleLoadRecompute, updateActive]);
 
   const setLightboxOpen = useCallback((open: boolean) => {
     lightboxOpenRef.current = open;
@@ -334,11 +440,51 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
         debounceRef.current = null;
       }
       manualOverrideIdRef.current = null;
+      if (pinReleaseTimerRef.current !== null) {
+        window.clearTimeout(pinReleaseTimerRef.current);
+        pinReleaseTimerRef.current = null;
+      }
       updateActive(null);
+      recomputeLoad();
     } else {
       flushNow();
+      if (pinReleaseTimerRef.current !== null) window.clearTimeout(pinReleaseTimerRef.current);
+      pinReleaseTimerRef.current = window.setTimeout(() => {
+        pinReleaseTimerRef.current = null;
+        if (lightboxOpenRef.current) return;
+        pinnedRef.current.clear();
+        recomputeLoad();
+      }, HANDOFF_PIN_RELEASE_MS);
     }
-  }, [flushNow, updateActive]);
+  }, [flushNow, updateActive, recomputeLoad]);
+
+  const subscribeSlotLoad = useCallback((id: string, listener: Listener) => {
+    let set = loadListenersRef.current.get(id);
+    if (!set) {
+      set = new Set();
+      loadListenersRef.current.set(id, set);
+    }
+    set.add(listener);
+    return () => {
+      const s = loadListenersRef.current.get(id);
+      if (!s) return;
+      s.delete(listener);
+      if (s.size === 0) loadListenersRef.current.delete(id);
+    };
+  }, []);
+
+  const getSlotLoadSnapshot = useCallback((id: string) => allowedRef.current.has(id), []);
+
+  const pinHandoff = useCallback((id: string) => {
+    if (!slotsRef.current.has(id)) return;
+    pinnedRef.current.add(id);
+    recomputeLoad();
+  }, [recomputeLoad]);
+
+  const releaseHandoff = useCallback((id: string) => {
+    if (!pinnedRef.current.delete(id)) return;
+    recomputeLoad();
+  }, [recomputeLoad]);
 
   const subscribeSlotActive = useCallback((id: string, listener: Listener) => {
     let set = slotListenersRef.current.get(id);
@@ -397,8 +543,9 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
 
     manualOverrideIdRef.current = id;
     updateActive(id);
+    recomputeLoad();
     return true;
-  }, [updateActive]);
+  }, [updateActive, recomputeLoad]);
 
   // Stable api object — never changes identity.
   const api = useMemo<RegistryApi>(
@@ -409,8 +556,12 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
       subscribeSlotActive,
       getSlotActiveSnapshot,
       requestActivate,
+      subscribeSlotLoad,
+      getSlotLoadSnapshot,
+      pinHandoff,
+      releaseHandoff,
     }),
-    [setSlotEl, unregisterSlot, setLightboxOpen, subscribeSlotActive, getSlotActiveSnapshot, requestActivate]
+    [setSlotEl, unregisterSlot, setLightboxOpen, subscribeSlotActive, getSlotActiveSnapshot, requestActivate, subscribeSlotLoad, getSlotLoadSnapshot, pinHandoff, releaseHandoff]
   );
 
   return (
@@ -435,6 +586,14 @@ interface SlotReturn {
    * false on unmanaged surfaces.
    */
   requestActivate: () => boolean;
+  /**
+   * Fix 2 — true when this slot may attach its HLS source. Always true on
+   * unmanaged surfaces (legacy behaviour).
+   */
+  loadAllowed: boolean;
+  /** Reserve loading for a live feed<->lightbox handoff. No-op unmanaged. */
+  pinHandoff: () => void;
+  releaseHandoff: () => void;
 }
 
 const FALSE_SNAPSHOT = () => false;
@@ -454,6 +613,18 @@ export function useFeedVideoSlot(id: string): SlotReturn {
     [ctx, id]
   );
   const isActive = useSyncExternalStore(subscribe, getSnapshot, FALSE_SNAPSHOT);
+
+  const subscribeLoad = useCallback(
+    (cb: Listener) => (ctx ? ctx.subscribeSlotLoad(id, cb) : NOOP_SUBSCRIBE()),
+    [ctx, id]
+  );
+  const getLoadSnapshot = useCallback(
+    () => (ctx ? ctx.getSlotLoadSnapshot(id) : true),
+    [ctx, id]
+  );
+  const loadAllowed = useSyncExternalStore(subscribeLoad, getLoadSnapshot, getLoadSnapshot);
+  const pinHandoff = useCallback(() => { ctx?.pinHandoff(id); }, [ctx, id]);
+  const releaseHandoff = useCallback(() => { ctx?.releaseHandoff(id); }, [ctx, id]);
 
   // Mount/unmount-only registration. Because `ctx` is stable, this effect
   // runs exactly once per slot lifetime (plus on id change), not on every
@@ -483,6 +654,9 @@ export function useFeedVideoSlot(id: string): SlotReturn {
     isActive,
     registerEl,
     requestActivate,
+    loadAllowed,
+    pinHandoff,
+    releaseHandoff,
   };
 }
 
