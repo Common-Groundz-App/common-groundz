@@ -1417,7 +1417,7 @@ export function EnhancedCreatePostForm({
               // Newly picked videos keep playing from the local copy even after
               // Mux is ready — no source swap, so no stall. Saved videos have no
               // local copy and play from Mux.
-              item.id ? localPreviewUrlsRef.current.get(item.id) : undefined
+              item.clientKey ? localPreviewUrlsRef.current.get(item.clientKey) : undefined
             }
             overlayForItem={(item) => {
               const id = item.mux_upload_id;
