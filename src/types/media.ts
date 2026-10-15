@@ -12,6 +12,14 @@ export interface MediaItem {
   is_deleted?: boolean;
   session_id?: string;
   id?: string;
+  /**
+   * Composer-local render identity (Phase 4 Step 3). Generated once when an
+   * item enters composer state; keys React tiles, local preview blob URLs and
+   * frozen preview items so adopting the authoritative server `id` after save
+   * never remounts or resets the preview. STRICTLY UI-only: never persisted,
+   * never sent to the server (the save payload lists fields explicitly).
+   */
+  clientKey?: string;
   width?: number;
   height?: number;
   duration?: number;
@@ -51,6 +59,15 @@ export interface VideoExitHandoff {
   muted: boolean;
   entryIndex: number;
   currentIndex: number;
+  /**
+   * Phase 4 Step 3 (additive): stable media IDs of the entry item and the
+   * item displayed at close. When both are present, resume matching uses
+   * these instead of the numeric indices. Absent for ID-less items and for
+   * callers on the legacy numeric path — missing keys must never compare
+   * equal.
+   */
+  entryMediaKey?: string;
+  currentMediaKey?: string;
 }
 
 export type MediaUploadStatus = 'idle' | 'uploading' | 'success' | 'error';

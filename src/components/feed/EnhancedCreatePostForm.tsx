@@ -33,6 +33,7 @@ import { ComposerMediaPreview } from './composer/ComposerMediaPreview';
 import { MuxUploadChip } from './composer/MuxUploadChip';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
 import { composerMuxState, composerPreviewMedia, matchesMediaIdentity, mediaIdentity, newMuxVideoSaveBlocker, preparedComposerMedia } from '@/utils/composerVideoReadiness';
+import { ensureClientKey, reconcileComposerMedia } from '@/utils/mediaIdentity';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
@@ -123,7 +124,10 @@ export function EnhancedCreatePostForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitLockRef = useRef(false);
   const savedPostIdRef = useRef<string | null>(null);
-  const [media, setMedia] = useState<MediaItem[]>(postToEdit?.media ?? []);
+  // Phase 4 Step 3 — every item gets an immutable composer-local clientKey
+  // on entry; it keys tiles/preview registries so server-ID adoption after
+  // save never remounts or resets a preview.
+  const [media, setMedia] = useState<MediaItem[]>(() => (postToEdit?.media ?? []).map(ensureClientKey));
   // Phase 5: live Mux upload status for tiles in this composer session.
   const muxUploadIds = useMemo(
     () =>
@@ -453,14 +457,14 @@ export function EnhancedCreatePostForm({
   // Frozen player items for locally previewed videos (see composerPreviewMedia).
   const frozenPreviewItemsRef = useRef<Map<string, MediaItem>>(new Map());
 
-  const revokeLocalPreview = useCallback((mediaId?: string) => {
-    if (!mediaId) return;
-    const url = localPreviewUrlsRef.current.get(mediaId);
+  const revokeLocalPreview = useCallback((clientKey?: string) => {
+    if (!clientKey) return;
+    const url = localPreviewUrlsRef.current.get(clientKey);
     if (url) {
       try { URL.revokeObjectURL(url); } catch { /* ignore */ }
-      localPreviewUrlsRef.current.delete(mediaId);
+      localPreviewUrlsRef.current.delete(clientKey);
     }
-    frozenPreviewItemsRef.current.delete(mediaId);
+    frozenPreviewItemsRef.current.delete(clientKey);
   }, []);
 
   const revokeAllLocalPreviews = useCallback(() => {
@@ -477,21 +481,22 @@ export function EnhancedCreatePostForm({
 
   const handleMediaUpload = (mediaItem: MediaItem, sourceFile?: File) => {
     if (media.length < MAX_MEDIA_COUNT) {
+      const keyedItem = ensureClientKey(mediaItem);
       // For Mux-backed videos, build a transient blob URL from the original
       // File so the composer can preview with native controls regardless of
-      // whether Mux has finished processing.
+      // whether Mux has finished processing. Keyed by clientKey so adopting
+      // the authoritative server id later never touches this entry.
       if (
         sourceFile &&
-        mediaItem.id &&
-        mediaItem.type === 'video' &&
-        mediaItem.provider === 'mux'
+        keyedItem.type === 'video' &&
+        keyedItem.provider === 'mux'
       ) {
         try {
           const url = URL.createObjectURL(sourceFile);
-          localPreviewUrlsRef.current.set(mediaItem.id, url);
+          localPreviewUrlsRef.current.set(keyedItem.clientKey!, url);
         } catch { /* ignore */ }
       }
-      setMedia((prev) => [...prev, { ...mediaItem, order: prev.length }]);
+      setMedia((prev) => [...prev, { ...keyedItem, order: prev.length }]);
     } else {
       toast({
         title: 'Media limit reached',
@@ -503,7 +508,7 @@ export function EnhancedCreatePostForm({
 
   const removeMedia = (itemToRemove: MediaItem) => {
     const key = mediaIdentity(itemToRemove);
-    revokeLocalPreview(itemToRemove.id);
+    revokeLocalPreview(itemToRemove.clientKey);
     setMedia((prev) =>
       prev
         .filter((item) => !matchesMediaIdentity(item, key))
@@ -769,7 +774,12 @@ export function EnhancedCreatePostForm({
           console.error('mux_sync_post_mappings_threw', e);
         }
 
-        if (mediaToSave.some((m) => m.provider === 'mux') || (postToEdit.media ?? []).some((m) => m.provider === 'mux')) await refreshSavedPostMedia(postToEdit.id);
+        // Adopt the authoritative server media IDs into composer state
+        // (clientKey preserved, so no preview remount/reset — Phase 4 Step 3).
+        const persistedEditMedia = (mediaToSave.some((m) => m.provider === 'mux') || (postToEdit.media ?? []).some((m) => m.provider === 'mux'))
+          ? await refreshSavedPostMedia(postToEdit.id)
+          : null;
+        if (persistedEditMedia) setMedia((prev) => reconcileComposerMedia(prev, persistedEditMedia as MediaItem[]));
 
         // Replace entity relationships: delete-then-insert
         await supabase
@@ -970,6 +980,8 @@ export function EnhancedCreatePostForm({
 
 
       const persistedMedia = mediaToSave.some((m) => m.provider === 'mux') ? await refreshSavedPostMedia(newPost.id) : null;
+      // Adopt authoritative server IDs without disturbing local previews.
+      if (persistedMedia) setMedia((prev) => reconcileComposerMedia(prev, persistedMedia as MediaItem[]));
 
       // ===== Hashtag persistence (non-blocking) =====
       const { all: detectedTags, source: hashtagSource } = extractHashtagsDetailed(title, content);

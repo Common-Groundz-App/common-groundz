@@ -7,6 +7,7 @@ import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { readGlobalVideoMuted, setGlobalVideoMuted } from '@/hooks/useVideoMute';
 import { useFeedVideoManagerControls } from '@/hooks/useFeedVideoManager';
 import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
+import { findByMediaKey } from '@/utils/mediaIdentity';
 
 interface PostMediaDisplayProps {
   media?: MediaItem[];
@@ -39,9 +40,13 @@ export function PostMediaDisplay({
 }: PostMediaDisplayProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  // Phase 4 Step 3 — stable media ID of the item the lightbox was opened on
+  // (null when the item genuinely has no ID). The lightbox resolves its entry
+  // index from this key, so a removed neighbour can't shift the open target.
+  const [activeMediaKey, setActiveMediaKey] = useState<string | null>(null);
   const [videoHandoff, setVideoHandoff] = useState<VideoHandoff | null>(null);
   const [entryExtras, setEntryExtras] = useState<LightboxEntryExtras | null>(null);
-  const [videoResume, setVideoResume] = useState<{ index: number; handoff: VideoExitHandoff } | null>(null);
+  const [videoResume, setVideoResume] = useState<{ index: number; mediaKey?: string | null; handoff: VideoExitHandoff } | null>(null);
   const { setLightboxOpen: setManagerLightboxOpen } = useFeedVideoManagerControls();
   
   if (!media || media.length === 0 || media.every(m => m.is_deleted)) {
@@ -100,8 +105,9 @@ export function PostMediaDisplay({
     return 'h-auto max-h-[500px]';
   };
   
-  const handleImageClick = (index: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => {
+  const handleImageClick = (index: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras, key?: string | null) => {
     setActiveImageIndex(index);
+    setActiveMediaKey(key ?? null);
     // Both state updates happen in the same handler — React batches them so
     // LightboxPreview never mounts a render before entryPosterDataUrl is set.
     setVideoHandoff(handoff ?? null);
@@ -116,6 +122,7 @@ export function PostMediaDisplay({
     setLightboxOpen(false);
     // Reset so a later open of a different post can't inherit stale state.
     setVideoHandoff(null);
+    setActiveMediaKey(null);
     // Drop the dataURL — never retained in a ref. Eligible for GC immediately.
     setEntryExtras(null);
     setManagerLightboxOpen(false);
@@ -123,13 +130,20 @@ export function PostMediaDisplay({
 
   // Reverse handoff: mute is a global preference, so always sync it.
   // Timestamp/play resume only applies when the user closed on the SAME
-  // item they originally opened from the feed (entryIndex === currentIndex).
+  // item they originally opened from the feed. Phase 4 Step 3: when the
+  // handoff carries stable media keys, compare those (missing keys never
+  // compare equal); the numeric index comparison is the legacy fallback for
+  // ID-less items only.
   const handleExitHandoff = useCallback((h: VideoExitHandoff) => {
     if (h.muted !== readGlobalVideoMuted()) {
       setGlobalVideoMuted(h.muted);
     }
-    if (h.entryIndex === h.currentIndex) {
-      setVideoResume({ index: h.entryIndex, handoff: h });
+    const sameByKey = h.entryMediaKey != null && h.currentMediaKey != null
+      ? h.entryMediaKey === h.currentMediaKey
+      : null;
+    const sameItem = sameByKey ?? (h.entryIndex === h.currentIndex);
+    if (sameItem) {
+      setVideoResume({ index: h.entryIndex, mediaKey: h.entryMediaKey ?? null, handoff: h });
     }
   }, []);
 
@@ -153,7 +167,13 @@ export function PostMediaDisplay({
       {lightboxOpen && (
         <LightboxPreview
           media={validMedia}
-          initialIndex={activeImageIndex}
+          initialIndex={(() => {
+            // Resolve the entry position from the stable media ID at open
+            // time; fall back to the clicked position only for ID-less items.
+            const byKey = findByMediaKey(validMedia, activeMediaKey);
+            return byKey >= 0 ? byKey : activeImageIndex;
+          })()}
+          initialMediaKey={activeMediaKey ?? undefined}
           initialVideoState={videoHandoff ?? undefined}
           entryExtras={entryExtras ?? undefined}
           onExitHandoff={handleExitHandoff}

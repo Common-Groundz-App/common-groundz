@@ -3,10 +3,15 @@ import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
 import { FeedVideo } from '@/components/media/FeedVideo';
 import { cn } from '@/lib/utils';
 import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
+import { mediaKey } from '@/utils/mediaIdentity';
 
 interface FeedCollageProps {
   media: MediaItem[];
-  onItemClick: (originalIndex: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
+  /**
+   * `mediaKey` is the clicked item's stable media ID (null when the item
+   * genuinely has none — grandfathered historical media only).
+   */
+  onItemClick: (originalIndex: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras, mediaKey?: string | null) => void;
   source?: 'post' | 'review' | 'entity';
   sourceId?: string;
   /** Composer-only review previews retain the saved media order. */
@@ -37,9 +42,25 @@ interface FeedCollageProps {
    * matching feed video can resume from it. Only the FeedVideo whose
    * originalIndex matches `videoResume.index` receives it.
    */
-  videoResume?: { index: number; handoff: VideoExitHandoff } | null;
+  videoResume?: { index: number; mediaKey?: string | null; handoff: VideoExitHandoff } | null;
   /** Called by FeedVideo once it has applied the resume state. */
   onResumeConsumed?: () => void;
+}
+
+/**
+ * Phase 4 Step 3 — resume matching by stable media ID. When the resume
+ * carries a media key, only the tile whose item has that exact ID receives
+ * it (missing keys never compare equal). ID-less legacy items fall back to
+ * the original positional match.
+ */
+function resumeMatches(
+  videoResume: { index: number; mediaKey?: string | null; handoff: VideoExitHandoff } | null | undefined,
+  item: MediaItem,
+  originalIndex: number
+): boolean {
+  if (!videoResume) return false;
+  if (videoResume.mediaKey != null) return mediaKey(item) === videoResume.mediaKey;
+  return videoResume.index === originalIndex;
 }
 
 type Orientation = 'portrait' | 'landscape' | 'square';
@@ -103,7 +124,7 @@ export function FeedCollage({
           'relative w-full h-full overflow-hidden bg-black',
           !disableItemClick && 'cursor-pointer'
         )}
-        onClick={disableItemClick ? undefined : () => onItemClick(originalIndex)}
+        onClick={disableItemClick ? undefined : () => onItemClick(originalIndex, undefined, undefined, mediaKey(item))}
       >
         {item.type === 'image' ? (
           <img
@@ -120,9 +141,9 @@ export function FeedCollage({
             objectFit={fit}
             srcOverride={previewSrcOverride?.(item)}
             resumeAfterSourceSwap={resumeAfterSourceSwap}
-            onTap={disableItemClick ? undefined : (handoff, extras) => onItemClick(originalIndex, handoff, extras)}
-            resumeState={videoResume?.index === originalIndex ? videoResume.handoff : undefined}
-            onResumeConsumed={videoResume?.index === originalIndex ? onResumeConsumed : undefined}
+            onTap={disableItemClick ? undefined : (handoff, extras) => onItemClick(originalIndex, handoff, extras, mediaKey(item))}
+            resumeState={resumeMatches(videoResume, item, originalIndex) ? videoResume!.handoff : undefined}
+            onResumeConsumed={resumeMatches(videoResume, item, originalIndex) ? onResumeConsumed : undefined}
           />
         )}
         {options?.overlayCount && options.overlayCount > 0 ? (
@@ -219,7 +240,7 @@ interface SingleMediaTileProps {
   disableItemClick?: boolean;
   previewSrcOverride?: (item: MediaItem) => string | undefined;
   resumeAfterSourceSwap?: boolean;
-  videoResume?: { index: number; handoff: VideoExitHandoff } | null;
+  videoResume?: { index: number; mediaKey?: string | null; handoff: VideoExitHandoff } | null;
   onResumeConsumed?: () => void;
 }
 
@@ -436,7 +457,7 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverl
           'relative w-full h-full overflow-hidden bg-black',
           !disableItemClick && 'cursor-pointer'
         )}
-        onClick={disableItemClick ? undefined : () => onItemClick(originalIndex)}
+        onClick={disableItemClick ? undefined : () => onItemClick(originalIndex, undefined, undefined, mediaKey(item))}
       >
 
         {item.type === 'image' ? (
@@ -458,9 +479,9 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverl
             objectFit={fit}
             srcOverride={previewSrcOverride?.(item)}
             resumeAfterSourceSwap={resumeAfterSourceSwap}
-            onTap={disableItemClick ? undefined : (handoff, extras) => onItemClick(originalIndex, handoff, extras)}
-            resumeState={videoResume?.index === originalIndex ? videoResume.handoff : undefined}
-            onResumeConsumed={videoResume?.index === originalIndex ? onResumeConsumed : undefined}
+            onTap={disableItemClick ? undefined : (handoff, extras) => onItemClick(originalIndex, handoff, extras, mediaKey(item))}
+            resumeState={resumeMatches(videoResume, item, originalIndex) ? videoResume!.handoff : undefined}
+            onResumeConsumed={resumeMatches(videoResume, item, originalIndex) ? onResumeConsumed : undefined}
           />
         )}
         {renderTileOverlay?.(item, originalIndex)}

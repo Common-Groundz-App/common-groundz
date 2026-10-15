@@ -61,20 +61,21 @@ export function matchesMediaIdentity(item: MediaItem, key: MediaIdentity): boole
 
 /**
  * Composer-only player input. Items with a local preview get a frozen item
- * (captured once per id) so no player source dependency changes on Ready;
- * others get their prepared version, matched by identity, never by index.
+ * (captured once per composer-local `clientKey`) so no player source
+ * dependency changes on Ready or on server-ID adoption; others get their
+ * prepared version, matched by identity, never by index.
  * Never use the result for validation or the save payload.
  */
 export function composerPreviewMedia(
   media: readonly MediaItem[],
   prepared: readonly MediaItem[],
-  hasLocalPreview: (id: string) => boolean,
+  hasLocalPreview: (clientKey: string) => boolean,
   frozen: Map<string, MediaItem>,
 ): MediaItem[] {
   return media.map((item) => {
-    if (item.id && hasLocalPreview(item.id)) {
-      let f = frozen.get(item.id);
-      if (!f) { f = item; frozen.set(item.id, item); }
+    if (item.clientKey && hasLocalPreview(item.clientKey)) {
+      let f = frozen.get(item.clientKey);
+      if (!f) { f = item; frozen.set(item.clientKey, item); }
       return f.order === item.order ? f : { ...f, order: item.order };
     }
     const key = mediaIdentity(item);

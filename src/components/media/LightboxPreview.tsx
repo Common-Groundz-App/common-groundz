@@ -22,6 +22,7 @@ import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { analytics } from '@/services/analytics';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
+import { mediaKey, findByMediaKey } from '@/utils/mediaIdentity';
 
 /**
  * Phase 2 — lightbox-only Mux playback options.
@@ -57,6 +58,15 @@ interface LightboxPreviewProps {
   media: MediaItem[];
   initialIndex?: number;
   /**
+   * Phase 4 Step 3 — stable media ID of the entry item. When supplied (and
+   * it resolves to an item), the keyed path activates: the displayed item is
+   * tracked by its ID for the whole session, navigation updates the active
+   * key, and if the active item disappears from `media` the lightbox closes
+   * instead of showing whatever shifted into its position. When absent,
+   * the legacy numeric/index path runs completely unchanged.
+   */
+  initialMediaKey?: string;
+  /**
    * Optional playback handoff from a feed video — apply once on the entry
    * item so the lightbox opens at the same timestamp / play state.
    */
@@ -78,16 +88,34 @@ interface LightboxPreviewProps {
   className?: string;
 }
 
-export function LightboxPreview({ 
+export function LightboxPreview({
   media,
   initialIndex = 0,
+  initialMediaKey,
   initialVideoState,
   onExitHandoff,
   entryExtras,
   onClose,
-  className 
+  className
 }: LightboxPreviewProps) {
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [currentIndexState, setCurrentIndexState] = useState(initialIndex);
+  // Phase 4 Step 3 — keyed path state. Active only when a valid entry media
+  // key was supplied. `activeKey` is the ID of the item currently displayed;
+  // it changes on navigation. `entryKey` is the ID of the item that initiated
+  // the lightbox/handoff and never changes.
+  const keyedModeRef = useRef(!!initialMediaKey);
+  const entryKeyRef2 = useRef<string | undefined>(initialMediaKey);
+  const [activeKey, setActiveKey] = useState<string | null>(initialMediaKey ?? null);
+  const activeKeyRef = useRef<string | null>(initialMediaKey ?? null);
+  activeKeyRef.current = activeKey;
+  // In keyed mode with a known active key, the displayed index is DERIVED
+  // from the key on every render — a neighbour removal shifts positions but
+  // never changes which item is shown. Null active key (navigated onto an
+  // ID-less item) or legacy mode uses the numeric state.
+  const keyedIndex = keyedModeRef.current && activeKey != null
+    ? findByMediaKey(media, activeKey)
+    : -1;
+  const currentIndex = keyedIndex >= 0 ? keyedIndex : currentIndexState;
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
   // Tracks when the <video> for the current item is ready to be revealed
   // (HLS attached + loadeddata fired + handoff seek applied). Used to keep a
@@ -141,6 +169,10 @@ export function LightboxPreview({
           muted: v.muted,
           entryIndex: entryIndexRef.current,
           currentIndex: currentIndexRef.current,
+          // Phase 4 Step 3 — stable identity for resume matching. Only
+          // emitted on the keyed path; legacy callers get neither field.
+          entryMediaKey: keyedModeRef.current ? entryKeyRef2.current : undefined,
+          currentMediaKey: keyedModeRef.current ? (activeKeyRef.current ?? undefined) : undefined,
         };
         onExitHandoffRef.current?.(snapshot);
       } catch {
@@ -285,19 +317,47 @@ export function LightboxPreview({
     setLoaded(prev => ({...prev, [key]: true}));
   };
   
+  // Phase 4 Step 3 — navigation updates the ACTIVE media key to the newly
+  // displayed item's ID (null for ID-less items), then derives its index.
+  // Model: stable key → derive index → navigate → replace active key.
+  const goToIndex = (idx: number) => {
+    if (keyedModeRef.current) {
+      setActiveKey(mediaKey(media[idx]));
+    }
+    setCurrentIndexState(idx);
+  };
+
   const nextImage = () => {
-    setCurrentIndex(prev => (prev + 1) % media.length);
+    goToIndex((currentIndex + 1) % media.length);
   };
-  
+
   const prevImage = () => {
-    setCurrentIndex(prev => (prev - 1 + media.length) % media.length);
+    goToIndex((currentIndex - 1 + media.length) % media.length);
   };
+
+  // Phase 4 Step 3 — if the actively displayed item disappears from the
+  // media list while the lightbox is open (e.g. a concurrent edit removed
+  // it), close immediately. Never fall back to whatever shifted into its
+  // old position, and never resume a different video.
+  useEffect(() => {
+    if (!keyedModeRef.current || activeKey == null || closedRef.current) return;
+    if (findByMediaKey(media, activeKey) === -1) {
+      closeWithHandoff();
+    }
+  }, [media, activeKey, closeWithHandoff]);
 
   // Keep live-value refs in sync each render so the stable video ref-callback
   // below can read the latest values without being re-created.
   currentIndexRef.current = currentIndex;
   initialVideoStateRef.current = initialVideoState;
   currentItemRef.current = media && media.length > 0 ? media[currentIndex] : null;
+
+  // Phase 4 Step 3 — "is the entry item the one displayed right now?"
+  // Keyed path compares stable media IDs; legacy path compares positions.
+  const isEntryDisplayed = () =>
+    keyedModeRef.current
+      ? activeKeyRef.current != null && activeKeyRef.current === entryKeyRef2.current
+      : currentIndexRef.current === entryIndexRef.current;
 
   // Stable video ref-callback. Identity never changes, so React only invokes
   // it on real mount/unmount (and on key={imageKey} change). Without this,
@@ -325,7 +385,6 @@ export function LightboxPreview({
     const item = currentItemRef.current;
     if (!item) return;
     const handoff = initialVideoStateRef.current;
-    const idx = currentIndexRef.current;
 
     // Phase 4 — attach source synchronously inside the ref callback, BEFORE
     // the iOS early-play call below. Native HLS (Safari/iOS) is sync (sets
@@ -360,7 +419,7 @@ export function LightboxPreview({
       handoffAppliedRef.current ||
       !handoff ||
       !handoff.wasPlaying ||
-      idx !== entryIndexRef.current
+      !isEntryDisplayed()
     ) {
       return;
     }
@@ -506,7 +565,7 @@ export function LightboxPreview({
             // the entry item. Falls back to a time-based Mux thumbnail
             // (matching the handoff timestamp) and finally to the static
             // Mux poster. Non-Mux items keep their existing poster.
-            const isEntryItem = currentIndex === entryIndexRef.current;
+            const isEntryItem = isEntryDisplayed();
             const entryPoster = isEntryItem ? entryExtras?.entryPosterDataUrl : undefined;
             const posterTime =
               isEntryItem && initialVideoState && initialVideoState.currentTime > 0
@@ -555,9 +614,10 @@ export function LightboxPreview({
                     const v = e.currentTarget;
 
                     if (
+                      closedRef.current ||
                       handoffAppliedRef.current ||
                       !initialVideoState ||
-                      currentIndex !== entryIndexRef.current
+                      !isEntryDisplayed()
                     ) {
                       return;
                     }
@@ -577,12 +637,13 @@ export function LightboxPreview({
                     }
                   }}
                   onLoadedData={() => {
+                    if (closedRef.current) return;
                     handleImageLoad(currentItem, currentIndex);
                     // For non-handoff items (or Supabase no-op handoff), reveal
                     // immediately on first frame. Entry-handoff items wait for
                     // onSeeked so we never flash the pre-seek frame.
                     const isEntryHandoff =
-                      !!initialVideoState && currentIndex === entryIndexRef.current;
+                      !!initialVideoState && isEntryDisplayed();
                     if (!isEntryHandoff) {
                       setVideoReady(true);
                     }
@@ -593,6 +654,7 @@ export function LightboxPreview({
                   }}
                   onSeeked={(e) => {
                     e.stopPropagation();
+                    if (closedRef.current) return;
                     // Always reveal once any seek lands — covers handoff seek
                     // and any subsequent user-initiated seeks.
                     setVideoReady(true);
@@ -600,7 +662,7 @@ export function LightboxPreview({
                     if (
                       handoffAppliedRef.current ||
                       !initialVideoState ||
-                      currentIndex !== entryIndexRef.current
+                      !isEntryDisplayed()
                     ) {
                       return;
                     }
@@ -723,7 +785,7 @@ export function LightboxPreview({
                       onClick={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
-                        setCurrentIndex(idx);
+                        goToIndex(idx);
                       }}
                       aria-label={`Go to image ${idx + 1}`}
                     />
