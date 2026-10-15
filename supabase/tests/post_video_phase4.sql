@@ -96,7 +96,7 @@ BEGIN
     jsonb_build_object('type','image','url',H||'public/post_media/u/3.jpg','order',2)) WHERE id=P;
   SELECT media INTO j FROM public.posts WHERE id=P;
   i1 := j->1->>'id'; i3 := j->2->>'id';
-  UPDATE public.posts SET media = jsonb_build_array((j->1 - 'id') || '{"order":0}', (j->2 - 'id') || '{"order":1}') WHERE id=P;
+  UPDATE public.posts SET media = jsonb_build_array(((j->1) - 'id') || '{"order":0}', ((j->2) - 'id') || '{"order":1}') WHERE id=P;
   SELECT media INTO j2 FROM public.posts WHERE id=P;
   IF j2->0->>'id'=i1 AND j2->1->>'id'=i3 AND ((j2->0)-'order')=((j->1)-'order') AND ((j2->1)-'order')=((j->2)-'order') THEN
     ok:=ok+1; res:=res||E'\nPASS removal keeps the others'' IDs, items otherwise unchanged (old tab without IDs too)';
