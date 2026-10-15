@@ -438,6 +438,11 @@ cross-read between them.
 - [x] Phase 2: post server rules (+ read-only old-posts report) — 31/31 rolled-back DB tests (docs/verification/post-video-phase-2.md)
 - [x] Phase 3: post linking in one save (/create unchanged) — 8/8 Phase 3 + 31/31 Phase 2 rerun DB tests; simultaneous races unverified (docs/verification/post-video-phase-3.md)
 - [ ] Phase 4: stable post video IDs
+  - [x] Step 1 read-only audit (approved)
+  - [x] Step 2 server side complete (2026-10-15): migration live and validated (164 Posts unchanged, historical data preserved, no backfill); Phase 4 DB suite 29/29; Phase 3 regression 8/8; Phase 2 production-safe suite 27 passed / 0 failed / 7 agreed blocked; both Edge Functions deployed (direct mapping inserts retired, server catch-up only); owner smoke test passed (stable video media ID survived photo removal; mapping media_id matched; final status patched/Mux ready; playback verified); app suite 1,097 passed; typecheck clean; Phase 3 compatibility note corrected
+  - [ ] Step 3: stable-identity app/UI work (viewer/lightbox + resume/handoff by media ID, composer adopts server ID after save) — plan only, not implemented
+  - [ ] Step 4: view-tracking groundwork (only if Step 1 showed it needed)
+  - [ ] Step 5: owner close-out check (edit post, remove photo, confirm right video plays and stays linked)
 - [ ] Phase 5: review + timeline-update view counts
 - [ ] Phase 6: recheck (suite + short signed-in check: post, review, update views)
 - Deferred: admin stuck/failed post video count
