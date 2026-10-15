@@ -128,7 +128,8 @@ BEGIN
     ELSE bad:=bad+1; res:=res||E'\nFAIL 5 items: '||SQLERRM; END IF;
   END;
   BEGIN
-    UPDATE public.posts SET media = jsonb_build_array(createv || '{"mux_upload_id":"pp_ready"}'::jsonb, createv || '{"mux_upload_id":"pp_late"}'::jsonb) WHERE id=P;
+    -- Phase 4 Step 2: distinct valid media IDs so the video limit (not duplicate-ID) rule is exercised
+    UPDATE public.posts SET media = jsonb_build_array(createv || '{"id":"11111111-1111-1111-1111-111111111111","mux_upload_id":"pp_ready"}'::jsonb, createv || '{"id":"22222222-2222-2222-2222-222222222222","mux_upload_id":"pp_late"}'::jsonb) WHERE id=P;
     bad:=bad+1; res:=res||E'\nFAIL 2 videos accepted';
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM='post_video_too_many' THEN ok:=ok+1; res:=res||E'\nPASS 2nd video refused';
