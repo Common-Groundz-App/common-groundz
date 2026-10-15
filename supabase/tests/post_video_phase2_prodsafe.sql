@@ -128,7 +128,8 @@ BEGIN
     ELSE bad:=bad+1; res:=res||E'\nFAIL 5 items: '||SQLERRM; END IF;
   END;
   BEGIN
-    UPDATE public.posts SET media = jsonb_build_array(createv || '{"mux_upload_id":"pp_ready"}'::jsonb, createv || '{"mux_upload_id":"pp_late"}'::jsonb) WHERE id=P;
+    -- Phase 4 Step 2: distinct valid media IDs so the video limit (not duplicate-ID) rule is exercised
+    UPDATE public.posts SET media = jsonb_build_array(createv || '{"id":"11111111-1111-1111-1111-111111111111","mux_upload_id":"pp_ready"}'::jsonb, createv || '{"id":"22222222-2222-2222-2222-222222222222","mux_upload_id":"pp_late"}'::jsonb) WHERE id=P;
     bad:=bad+1; res:=res||E'\nFAIL 2 videos accepted';
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM='post_video_too_many' THEN ok:=ok+1; res:=res||E'\nPASS 2nd video refused';
@@ -147,6 +148,9 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '', true);
   -- Phase 3: the save above already created this link
   SELECT id INTO M FROM public.mux_upload_mappings WHERE mux_upload_id='pp_late' AND content_type='post' AND content_id=P AND status='pending';
+  -- DIAG (test-only)
+  res:=res||E'\nDIAG pp_late lookup M='||coalesce(M::text,'NULL')||' media='||(SELECT coalesce(jsonb_agg(jsonb_build_object('id',e->>'id','up',e->>'mux_upload_id')),'[]') FROM public.posts, jsonb_array_elements(media) e WHERE id=P)::text
+    ||' maps='||(SELECT coalesce(jsonb_agg(jsonb_build_object('post',content_id,'mid',media_id,'idx',media_index,'st',status)),'[]') FROM public.mux_upload_mappings WHERE mux_upload_id='pp_late')::text;
   UPDATE public.mux_uploads SET status='ready', asset_id='A_LATE', playback_id='PB_LATE', duration=7, aspect_ratio='9:16' WHERE upload_id='pp_late';
   SELECT media INTO j FROM public.posts WHERE id=P;
 
@@ -222,6 +226,9 @@ BEGIN
   PERFORM set_config('request.jwt.claims', '', true);
   UPDATE public.mux_uploads SET status='ready', asset_id='A_B', playback_id='PB_B', duration=70 WHERE upload_id='pp_b2';
   SELECT id INTO M FROM public.mux_upload_mappings WHERE mux_upload_id='pp_b2' AND content_type='post' AND content_id=P2 AND status='pending';
+  -- DIAG (test-only)
+  res:=res||E'\nDIAG pp_b2 lookup M='||coalesce(M::text,'NULL')||' media='||(SELECT coalesce(jsonb_agg(jsonb_build_object('id',e->>'id','up',e->>'mux_upload_id')),'[]') FROM public.posts, jsonb_array_elements(media) e WHERE id=P2)::text
+    ||' maps='||(SELECT coalesce(jsonb_agg(jsonb_build_object('post',content_id,'mid',media_id,'idx',media_index,'st',status)),'[]') FROM public.mux_upload_mappings WHERE mux_upload_id='pp_b2')::text;
   v := public.patch_content_media_from_mux(M);
   SELECT media->0 INTO j FROM public.posts WHERE id=P2;
   SELECT duration_rule_applies INTO b FROM public.mux_uploads WHERE upload_id='pp_b2';
