@@ -509,9 +509,12 @@ export function EnhancedCreatePostForm({
   const removeMedia = (itemToRemove: MediaItem) => {
     const key = mediaIdentity(itemToRemove);
     revokeLocalPreview(itemToRemove.clientKey);
+    // The tile may be a frozen preview item still carrying a pre-adoption id,
+    // so match by the immutable clientKey first; identity is the fallback.
+    const ck = itemToRemove.clientKey;
     setMedia((prev) =>
       prev
-        .filter((item) => !matchesMediaIdentity(item, key))
+        .filter((item) => (ck ? item.clientKey !== ck : !matchesMediaIdentity(item, key)))
         .map((item, index) => ({ ...item, order: index }))
     );
   };
