@@ -441,3 +441,4 @@ cross-read between them.
 - [ ] Phase 5: review + timeline-update view counts
 - [ ] Phase 6: recheck (suite + short signed-in check: post, review, update views)
 - Deferred: admin stuck/failed post video count
+- [ ] Payments: collect customer payments — blocked: built-in payments need Lovable Cloud; project uses an external Supabase
