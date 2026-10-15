@@ -28,11 +28,12 @@ describe('Phase 4 Step 3 stable media identity', () => {
   });
 
   it('server-ID adoption updates only id and keeps clientKey/order', () => {
-    const local = ensureClientKey(v({ id: 'local', mux_upload_id: 'up1', order: 1 }));
+    const local = ensureClientKey(v({ mux_upload_id: 'up1', order: 1 }));
     const [adopted] = reconcileComposerMedia([local], [v({ id: 'server', mux_upload_id: 'up1' })]);
-    // matched by id first fails, so identity uses id 'local'; ensure upload fallback via id-less copy
+    expect(adopted.id).toBe('server');
     expect(adopted.clientKey).toBe(local.clientKey);
     expect(adopted.order).toBe(1);
+    expect(adopted.url).toBe('u');
   });
 
   it('adopts a changed server id for an id-less upload and keeps the same frozen preview', () => {
