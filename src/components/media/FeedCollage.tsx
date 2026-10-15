@@ -119,7 +119,7 @@ export function FeedCollage({
     const fit = options?.objectFit ?? (item.type === 'video' ? 'contain' : 'cover');
     return (
       <div
-        key={item.id || `${item.url}-${originalIndex}`}
+        key={item.clientKey || item.id || `${item.url}-${originalIndex}`}
         className={cn(
           'relative w-full h-full overflow-hidden bg-black',
           !disableItemClick && 'cursor-pointer'
