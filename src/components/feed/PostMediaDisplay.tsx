@@ -160,6 +160,7 @@ export function PostMediaDisplay({
     <>
       <FeedCollage
         media={validMedia}
+        preserveMediaOrder
         onItemClick={handleImageClick}
         source={source}
         sourceId={sourceId}
