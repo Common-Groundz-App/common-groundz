@@ -138,6 +138,7 @@ export default defineConfig({
   'src/components/media/__tests__/reviewVideoPhase3.test.tsx',
   'src/hooks/__tests__/useVideoViewTracker.phase3.test.tsx',
   'src/hooks/__tests__/entityVideoManager.phase4.test.tsx',
+  'src/hooks/__tests__/feedVideoLoadProvider.test.tsx',
           ],
         },
       },
