@@ -17,41 +17,16 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, muxPosterUrl, muxThumbnailUrl, maybeEmitBrokenReady, type MuxPlaybackOptions } from '@/utils/muxMedia';
+import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, muxPosterUrl, muxThumbnailUrl, maybeEmitBrokenReady } from '@/utils/muxMedia';
 import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { analytics } from '@/services/analytics';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
 import { mediaKey, findByMediaKey } from '@/utils/mediaIdentity';
+import { decideHandoffSeek, handoffTarget } from '@/utils/lightboxHandoffSeek';
 
-/**
- * Phase 2 — lightbox-only Mux playback options.
- *
- * Always biases native HLS ABR to start at the highest rendition. On
- * unconstrained networks we ALSO strip renditions below 720p from the
- * manifest, because iOS native HLS otherwise locks onto a 270p rung for
- * 4K-source assets (heavy bitrate ladder → conservative cold start) and
- * never upshifts, producing a visibly blurry full-screen lightbox.
- *
- * Skipped when the user has Save-Data enabled or is on 2g/slow-2g, so
- * we don't force a 720p floor on someone explicitly minimizing data.
- */
-const getLightboxPlaybackOpts = (): MuxPlaybackOptions => {
-  const opts: MuxPlaybackOptions = { renditionOrder: 'desc' };
-  try {
-    const conn = (navigator as any)?.connection;
-    const saveData = conn?.saveData === true;
-    const eff = conn?.effectiveType;
-    const slow = eff === '2g' || eff === 'slow-2g';
-    if (!saveData && !slow) {
-      opts.minResolution = '720p';
-    }
-  } catch {
-    // navigator.connection unsupported (Safari) — default to 720p floor.
-    opts.minResolution = '720p';
-  }
-  return opts;
-};
+// Lightbox uses the same canonical adaptive Mux URL as feed + prewarm
+// (no forced rendition order / 720p floor); ABR ramps naturally.
 
 
 interface LightboxPreviewProps {
@@ -138,7 +113,12 @@ export function LightboxPreview({
   // native controls WITHOUT auto-playing. Auto-play stays gated on a verified
   // seek and is skipped entirely once the user has acted on the video.
   const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set only by explicit playback overrides (native pause / user scrub),
+  // never by incidental taps on the covering poster.
   const userActedRef = useRef(false);
+  const userSeekedRef = useRef(false);
+  const handoffSeekIssuedRef = useRef(false);
+  const programmaticRef = useRef(false);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   // Phase 4 — attachHls detach handle for the current <video>. Cleared on
   // ref-callback unmount (key change remounts the video).
@@ -273,6 +253,8 @@ export function LightboxPreview({
   // poster overlay covers the next <video> until it's truly ready.
   useEffect(() => {
     setVideoReady(false);
+    handoffSeekIssuedRef.current = false;
+    userSeekedRef.current = false;
     if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
     revealTimerRef.current = setTimeout(() => {
       if (!closedRef.current) setVideoReady(true);
@@ -405,7 +387,7 @@ export function LightboxPreview({
     // Lightbox displays Mux video at large size — bias native HLS ABR to start
     // at the highest available rendition to avoid the cold-start blur.
     // Lower renditions remain available as fallback if network can't sustain.
-    const { src, isHls } = resolveVideoSrc(item, getLightboxPlaybackOpts());
+    const { src, isHls } = resolveVideoSrc(item);
     if (src && !hlsDetachRef.current) {
       if (isHls) {
         const token: AttachToken = { cancelled: false };
@@ -642,6 +624,41 @@ export function LightboxPreview({
               }
             };
 
+            // "Check repeatedly, seek once": called from every readiness
+            // event. Completes immediately when the target is already
+            // reached (incl. nonzero), seeks once when the target is
+            // seekable, otherwise waits for the next event.
+            const tryHandoffSeek = (v: HTMLVideoElement) => {
+              if (
+                closedRef.current ||
+                handoffAppliedRef.current ||
+                !initialVideoState ||
+                !isEntryDisplayed() ||
+                v.readyState < 1
+              ) {
+                return;
+              }
+              if (userSeekedRef.current) {
+                completeHandoff(v);
+                return;
+              }
+              const target = handoffTarget(initialVideoState.currentTime, v.duration);
+              const action = decideHandoffSeek({
+                currentTime: v.currentTime,
+                target,
+                seekable: v.seekable,
+                seekIssued: handoffSeekIssuedRef.current,
+              });
+              if (action === 'complete') {
+                completeHandoff(v);
+              } else if (action === 'seek') {
+                handoffSeekIssuedRef.current = true;
+                programmaticRef.current = true;
+                try { v.currentTime = target; } catch { handoffSeekIssuedRef.current = false; }
+                programmaticRef.current = false;
+              }
+            };
+
 
             return (
               <div style={wrapperStyle}>
@@ -658,7 +675,6 @@ export function LightboxPreview({
                   style={{ cursor: 'auto' }}
                   onLoadedMetadata={(e) => {
                     const v = e.currentTarget;
-
                     if (
                       closedRef.current ||
                       handoffAppliedRef.current ||
@@ -668,41 +684,27 @@ export function LightboxPreview({
                       return;
                     }
                     // Only set muted here if the iOS early-play path did NOT run.
-                    // If it did, we must keep muted=true until onSeeked attempts
-                    // the one-shot unmute, otherwise iOS will pause playback.
+                    // If it did, we must keep muted=true until handoff completes.
                     if (!earlyPlayRanRef.current) {
                       try { v.muted = initialVideoState.muted; } catch { /* ignore */ }
                     }
-                    const dur = v.duration;
-                    if (isFinite(dur) && dur > 0) {
-                      const target = Math.min(
-                        Math.max(0, initialVideoState.currentTime),
-                        Math.max(0, dur - 0.5)
-                      );
-                      // No-op seek: the element is already at the target, so the
-                      // browser may never fire `seeked`. Complete the handoff now.
-                      if (Math.abs(v.currentTime - target) < 0.05) {
-                        completeHandoff(v);
-                        return;
-                      }
-                      try { v.currentTime = target; } catch { /* ignore */ }
-                    } else if (initialVideoState.currentTime <= 0.05) {
-                      // Unknown duration but handoff is at the start: nothing to seek.
-                      completeHandoff(v);
-                    }
+                    tryHandoffSeek(v);
                   }}
-                  onLoadedData={() => {
+                  onDurationChange={(e) => tryHandoffSeek(e.currentTarget)}
+                  onProgress={(e) => tryHandoffSeek(e.currentTarget)}
+                  onCanPlay={(e) => tryHandoffSeek(e.currentTarget)}
+                  onLoadedData={(e) => {
                     if (closedRef.current) return;
                     handleImageLoad(currentItem, currentIndex);
-                    // For non-handoff items (or Supabase no-op handoff), reveal
-                    // immediately on first frame. Entry-handoff items wait for
-                    // onSeeked so we never flash the pre-seek frame.
+                    // For non-handoff items, reveal immediately on first frame.
+                    // Entry-handoff items wait for a verified target.
                     const isEntryHandoff =
                       !!initialVideoState && isEntryDisplayed();
                     if (!isEntryHandoff) {
                       setVideoReady(true);
+                    } else {
+                      tryHandoffSeek(e.currentTarget);
                     }
-
                   }}
                   onPlaying={(e) => {
                     e.stopPropagation();
@@ -710,22 +712,46 @@ export function LightboxPreview({
                   onSeeked={(e) => {
                     e.stopPropagation();
                     if (closedRef.current) return;
-                    // Always reveal once any seek lands — covers handoff seek
-                    // and any subsequent user-initiated seeks.
-                    setVideoReady(true);
-
-                    completeHandoff(e.currentTarget);
+                    const v = e.currentTarget;
+                    if (handoffAppliedRef.current || !initialVideoState || !isEntryDisplayed()) {
+                      setVideoReady(true);
+                      return;
+                    }
+                    // Our handoff seek landed (or the user scrubbed): verify.
+                    if (handoffSeekIssuedRef.current) {
+                      tryHandoffSeek(v);
+                      // Landed off-target (e.g. keyframe snap) → still complete
+                      // once rather than reseeking repeatedly.
+                      if (!handoffAppliedRef.current) completeHandoff(v);
+                    } else {
+                      setVideoReady(true);
+                    }
                   }}
                   onClick={(e) => e.stopPropagation()}
                   onPlay={(e) => e.stopPropagation()}
-                  onPause={(e) => e.stopPropagation()}
+                  onPause={(e) => {
+                    e.stopPropagation();
+                    // Explicit user pause while handoff is pending overrides
+                    // the feed's wasPlaying intent. Programmatic pauses are
+                    // ignored via programmaticRef.
+                    if (!handoffAppliedRef.current && !programmaticRef.current) {
+                      userActedRef.current = true;
+                    }
+                  }}
                   onVolumeChange={(e) => e.stopPropagation()}
                   onTimeUpdate={(e) => {
                     e.stopPropagation();
                   }}
-                  onSeeking={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => { userActedRef.current = true; e.stopPropagation(); }}
-                  onKeyDown={() => { userActedRef.current = true; }}
+                  onSeeking={(e) => {
+                    e.stopPropagation();
+                    // A seek we didn't issue during pending handoff = user scrub:
+                    // honor their position, skip our seek, keep play intent.
+                    if (!handoffAppliedRef.current && !programmaticRef.current && !handoffSeekIssuedRef.current) {
+                      handoffSeekIssuedRef.current = true;
+                      userSeekedRef.current = true;
+                    }
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                 />
                 {isMux && hiResPoster && (

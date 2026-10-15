@@ -35,10 +35,23 @@ describe('feed video loading budget', () => {
     expect([...set]).toEqual(['a']);
   });
 
-  it('scroll direction is only a tie-breaker; nearest wins otherwise', () => {
-    expect([...run({ slots: [g('up', 100), g('down', 300, true)], activeId: null })][0]).toBe('up');
-    const tie = run({ slots: [g('up', 200), g('down', 200, true)], budget: 1 });
-    expect([...tie]).toEqual(['down']);
+  it('upcoming slot wins the single preload seat; nearest is the fallback', () => {
+    const s = run({ slots: [g('cur', 0), g('passed', 100), g('next', 300, true)], activeId: 'cur' });
+    expect([...s].sort()).toEqual(['cur', 'next']);
+    const noAhead = run({ slots: [g('cur', 0), g('a', 100), g('b', 300)], activeId: 'cur' });
+    expect([...noAhead].sort()).toEqual(['a', 'cur']);
+  });
+
+  it('upcoming preempts a passed grace slot without exceeding the cap', () => {
+    const grace = new Map<string, number>();
+    const s = run({ slots: [g('p1', 50), g('p2', 0), g('p3', 200, true)], activeId: 'p2', prevAllowed: new Set(['p1', 'p2']), graceUntil: grace });
+    expect([...s].sort()).toEqual(['p2', 'p3']);
+  });
+
+  it('active slot keeps its seat regardless of playback (budget has no playing input)', () => {
+    const s = run({ slots: [g('paused', 0), g('n', 10, true), g('m', 20, true)], activeId: 'paused' });
+    expect(s.has('paused')).toBe(true);
+    expect(s.size).toBe(2);
   });
 
   it('identity is by stable id, not input order', () => {

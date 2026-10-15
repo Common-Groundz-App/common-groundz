@@ -10,8 +10,11 @@
  *   1. live handoff pins (feed <-> lightbox)
  *   2. the active (playing) slot
  *   3. grace-retained slots (recently allowed, short retention)
- *   4. speculative preload: nearest eligible slot; scroll direction is a
- *      tie-breaker only.
+ *   3a. the nearest UPCOMING eligible slot (in scroll direction) preempts
+ *       grace — so the next video warms while the current one plays;
+ *   4. speculative preload: nearest eligible slot as fallback.
+ * Budget counts attached/reserved slots; it never depends on whether the
+ * active slot is playing (a user-paused active slot keeps its seat).
  * While the lightbox is open only pins (+active, normally null) load.
  */
 
@@ -71,8 +74,8 @@ export function selectFeedVideoLoadSet(input: LoadSelectionInput): Set<string> {
     .filter((s) => Number.isFinite(s.distance) && s.distance <= margin)
     .slice()
     .sort((a, b) => {
-      if (a.distance !== b.distance) return a.distance - b.distance;
       if (a.ahead !== b.ahead) return a.ahead ? -1 : 1;
+      if (a.distance !== b.distance) return a.distance - b.distance;
       return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
     });
 
@@ -93,6 +96,10 @@ export function selectFeedVideoLoadSet(input: LoadSelectionInput): Set<string> {
     }
   });
   desired.forEach((id) => input.graceUntil.delete(id));
+
+  // 3a — upcoming candidate preempts grace (still within the hard cap).
+  const upcoming = candidates.find((c) => c.ahead && !out.includes(c.id));
+  if (upcoming) add(upcoming.id);
 
   // 3 — grace-retained (counts toward budget).
   [...input.graceUntil.entries()]
