@@ -1911,6 +1911,7 @@ export type Database = {
           created_at: string
           id: string
           last_error: string | null
+          media_id: string | null
           media_index: number
           mux_status_snapshot: string | null
           mux_upload_id: string
@@ -1926,6 +1927,7 @@ export type Database = {
           created_at?: string
           id?: string
           last_error?: string | null
+          media_id?: string | null
           media_index: number
           mux_status_snapshot?: string | null
           mux_upload_id: string
@@ -1941,6 +1943,7 @@ export type Database = {
           created_at?: string
           id?: string
           last_error?: string | null
+          media_id?: string | null
           media_index?: number
           mux_status_snapshot?: string | null
           mux_upload_id?: string
@@ -4962,6 +4965,12 @@ export type Database = {
         Args: { p_mapping_id: string }
         Returns: string
       }
+      post_media_assign_ids: {
+        Args: { p_new: Json; p_old: Json }
+        Returns: Json
+      }
+      post_media_identity: { Args: { p_item: Json }; Returns: string }
+      post_media_storage_key: { Args: { p_url: string }; Returns: string }
       post_media_video_count: { Args: { p_media: Json }; Returns: number }
       post_mux_link_items: {
         Args: { p_media: Json; p_post_id: string }
