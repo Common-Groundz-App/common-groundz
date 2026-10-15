@@ -17,7 +17,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, muxPosterUrl, muxThumbnailUrl, maybeEmitBrokenReady, type MuxPlaybackOptions } from '@/utils/muxMedia';
+import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, muxPosterUrl, muxThumbnailUrl, maybeEmitBrokenReady } from '@/utils/muxMedia';
 import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { analytics } from '@/services/analytics';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
@@ -387,7 +387,7 @@ export function LightboxPreview({
     // Lightbox displays Mux video at large size — bias native HLS ABR to start
     // at the highest available rendition to avoid the cold-start blur.
     // Lower renditions remain available as fallback if network can't sustain.
-    const { src, isHls } = resolveVideoSrc(item, getLightboxPlaybackOpts());
+    const { src, isHls } = resolveVideoSrc(item);
     if (src && !hlsDetachRef.current) {
       if (isHls) {
         const token: AttachToken = { cancelled: false };
