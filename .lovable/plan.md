@@ -1,6 +1,6 @@
 # Mobile feed video reliability (iPhone + Android)
 
-Goal: a visible feed video starts playing on phones. Desktop behavior stays the same. This is a testable fix for the shared symptom (a tall video on a phone screen may never reach 60% visible). It is not yet proof of the root cause; device checks confirm it.
+Goal: a visible feed video starts playing on phones, with no regression on desktop. The normal desktop path is unchanged, but the fallback applies at every screen size, so a short desktop window where no video reaches 60% may now activate one. This is a testable fix for the shared symptom (a tall video on a phone screen may never reach 60% visible). It is not yet proof of the root cause. Automated tests check the logic; only real-device checks can confirm mobile playback.
 
 ## What changes
 
@@ -29,7 +29,7 @@ Goal: a visible feed video starts playing on phones. Desktop behavior stays the 
      - activation is requested through FeedVideoManager;
      - a loading slot is requested through the existing Fix 2 coordinator (two-source cap unchanged);
      - if the source is already attached, play is called immediately;
-     - otherwise play is called as soon as the source is attached and ready.
+     - otherwise play is called as soon as the source is attached. It does not wait for `loadeddata`, `canplay` or a decoded frame, because on mobile the play call itself may be what makes the browser load those. Readiness events (`loadeddata`/`canplay`/`playing`) only control when the poster is swapped for the video and the buffering display.
    - We do not assume a delayed play call still counts as the original tap. If play is rejected, the existing muted fallback applies. If that also fails, the Play button stays usable and the failure is not hidden.
    - The saved request is cleared when the user pauses or cancels, another slot becomes active, the item is removed, or the component unmounts.
    - Tapping Play does not open the lightbox (the event does not bubble to the card or tile click).
@@ -40,7 +40,8 @@ Goal: a visible feed video starts playing on phones. Desktop behavior stays the 
    - The hard two-source loading cap, handoff pins and grace.
    - One video playing at a time.
    - Lightbox behavior and Fix 1 ordering.
-   - Desktop behavior.
+   - No desktop regression (normal 60% path unchanged).
+   - Saved paused intent and the Fix 2 generation guards.
    - Composer, Reviews/Timeline, database, analytics, Mux assets.
 
 6. **Diagnostics**
