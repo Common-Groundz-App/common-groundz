@@ -93,3 +93,50 @@ export function MuxUploadChip({ uploadId, status, className }: Props) {
     </div>
   );
 }
+
+/**
+ * Posts composer placeholder chip shown on the video tile before Mux has
+ * confirmed the upload. Byte progress is shown as-is (never held at 99%).
+ */
+export function UploadProgressChip({
+  progress,
+  stage,
+  failed,
+  className,
+}: {
+  progress: number;
+  stage?: string;
+  failed?: boolean;
+  className?: string;
+}) {
+  const sent = !failed && (stage === 'finalizing' || stage === 'done' || progress >= 100);
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={cn(
+        'absolute top-2 left-2 z-10 pointer-events-none select-none',
+        'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium shadow-sm backdrop-blur-sm',
+        failed ? 'bg-destructive/90 text-destructive-foreground' : 'bg-background/80 text-foreground',
+        className,
+      )}
+    >
+      {failed ? (
+        <>
+          <AlertTriangle className="h-3 w-3" />
+          <span>Upload failed — remove or try again</span>
+        </>
+      ) : sent ? (
+        <>
+          <span className="h-3 w-3 rounded-full border-2 border-muted-foreground border-t-transparent motion-safe:animate-spin" aria-hidden="true" />
+          <span>Upload sent — finishing…</span>
+        </>
+      ) : (
+        <>
+          <span className="h-2 w-2 rounded-full bg-primary motion-safe:animate-pulse" aria-hidden="true" />
+          <span>Uploading… {Math.max(0, Math.min(100, Math.round(progress)))}%</span>
+        </>
+      )}
+    </div>
+  );
+}
