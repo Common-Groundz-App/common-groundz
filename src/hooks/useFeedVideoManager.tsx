@@ -276,41 +276,25 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
       manualOverrideIdRef.current = null;
     }
 
-    let bestId: string | null = null;
-    let bestEff = -1;
-    let bestDist = Infinity;
+    const candidates: ActiveCandidate[] = [];
     slotsRef.current.forEach((s, id) => {
-      if (
-        s.effective > bestEff ||
-        (s.effective === bestEff && s.centerDist < bestDist)
-      ) {
-        bestEff = s.effective;
-        bestDist = s.centerDist;
-        bestId = id;
-      }
+      candidates.push({ id, effective: s.effective, centerDist: s.centerDist });
     });
-
     const current = activeIdRef.current;
-    if (current && slotsRef.current.has(current)) {
-      const cur = slotsRef.current.get(current)!;
-      if (cur.effective >= KEEP_THRESHOLD) {
-        if (
-          bestId &&
-          bestId !== current &&
-          bestEff >= ACTIVATE_THRESHOLD &&
-          bestEff - cur.effective >= SWITCH_MARGIN
-        ) {
-          updateActive(bestId);
-        }
-        return;
-      }
+    const sel = selectActiveSlot(
+      candidates,
+      current && slotsRef.current.has(current) ? current : null,
+    );
+    if (sel.id !== current) {
+      const chosen = sel.id ? slotsRef.current.get(sel.id) : null;
+      feedVideoDebug('active', {
+        id: sel.id,
+        fallback: sel.fallback,
+        effective: chosen ? Number(chosen.effective.toFixed(2)) : null,
+        vpH,
+      });
     }
-
-    if (bestId && bestEff >= ACTIVATE_THRESHOLD) {
-      updateActive(bestId);
-    } else {
-      updateActive(null);
-    }
+    updateActive(sel.id);
   }, [updateActive]);
 
   const recompute = useCallback(() => {
