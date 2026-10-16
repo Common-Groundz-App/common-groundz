@@ -49,13 +49,20 @@ interface SlotEntry {
   raw: number;        // raw intersection ratio
   effective: number;  // raw / maxPossibleRatio for oversized videos
   centerDist: number; // |elementCenterY - viewportCenterY|
+  /**
+   * Registration token of the mounted player instance that owns this slot.
+   * A replacement player for the same stable slot (e.g. layout change after
+   * a post edit) takes ownership; late cleanup from the old instance is
+   * ignored so it can never remove its replacement.
+   */
+  owner?: object;
 }
 
 type Listener = () => void;
 
 interface RegistryApi {
-  setSlotEl: (id: string, el: HTMLVideoElement | null) => void;
-  unregisterSlot: (id: string) => void;
+  setSlotEl: (id: string, el: HTMLVideoElement | null, owner?: object) => void;
+  unregisterSlot: (id: string, owner?: object) => void;
   setLightboxOpen: (open: boolean) => void;
   subscribeSlotActive: (id: string, listener: Listener) => () => void;
   getSlotActiveSnapshot: (id: string) => boolean;
@@ -394,11 +401,19 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
 
   // ----- Stable registry callbacks. Captured once; never change identity. -----
 
-  const setSlotEl = useCallback((id: string, el: HTMLVideoElement | null) => {
+  const setSlotEl = useCallback((id: string, el: HTMLVideoElement | null, owner?: object) => {
     let slot = slotsRef.current.get(id);
     if (!slot) {
-      slot = { el: null, raw: 0, effective: 0, centerDist: Infinity };
+      slot = { el: null, raw: 0, effective: 0, centerDist: Infinity, owner };
       slotsRef.current.set(id, slot);
+    }
+    if (owner !== undefined) {
+      if (el) {
+        slot.owner = owner;
+      } else if (slot.owner !== undefined && slot.owner !== owner) {
+        // Detach from a superseded player instance — ignore.
+        return;
+      }
     }
     if (slot.el === el) return;
     if (slot.el && observerRef.current) {
@@ -419,8 +434,11 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
     scheduleLoadRecompute();
   }, [scheduleRecompute, scheduleLoadRecompute, recompute]);
 
-  const unregisterSlot = useCallback((id: string) => {
+  const unregisterSlot = useCallback((id: string, owner?: object) => {
     const slot = slotsRef.current.get(id);
+    // Instance-owned cleanup: a superseded player must not unregister the
+    // replacement that already took over this stable slot.
+    if (slot && owner !== undefined && slot.owner !== undefined && slot.owner !== owner) return;
     if (slot?.el && observerRef.current) {
       try { observerRef.current.unobserve(slot.el); } catch { /* ignore */ }
     }
@@ -631,17 +649,20 @@ export function useFeedVideoSlot(id: string): SlotReturn {
   // Mount/unmount-only registration. Because `ctx` is stable, this effect
   // runs exactly once per slot lifetime (plus on id change), not on every
   // active-state flip.
+  // Per-instance registration token (instance-owned cleanup).
+  const ownerRef = useRef<object>({});
   useEffect(() => {
     if (!ctx) return;
+    const owner = ownerRef.current;
     return () => {
-      ctx.unregisterSlot(id);
+      ctx.unregisterSlot(id, owner);
     };
   }, [ctx, id]);
 
   const registerEl = useCallback(
     (el: HTMLVideoElement | null) => {
       if (!ctx) return;
-      ctx.setSlotEl(id, el);
+      ctx.setSlotEl(id, el, ownerRef.current);
     },
     [ctx, id]
   );

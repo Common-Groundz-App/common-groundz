@@ -32,4 +32,14 @@ describe('provider loading budget wiring', () => {
     act(() => { refs[1].current!.release(); });
     expect(refs[1].current!.load()).toBe(false);
   });
+
+  it('a replacement player for the same stable slot survives the old player cleanup (post-edit layout change)', () => {
+    const r = React.createRef<H>();
+    const { rerender } = render(<FeedVideoManagerProvider><div key="collage"><Slot ref={r} id="vid" /></div></FeedVideoManagerProvider>);
+    // Layout changes from collage to single video: old instance unmounts, new mounts, same id.
+    rerender(<FeedVideoManagerProvider><section key="single"><Slot ref={r} id="vid" /></section></FeedVideoManagerProvider>);
+    act(() => { r.current!.lb(true); r.current!.pin(); });
+    // Pin only applies to a registered slot — proves the new registration was not removed.
+    expect(r.current!.load()).toBe(true);
+  });
 });
