@@ -404,7 +404,6 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
   const setSlotEl = useCallback((id: string, el: HTMLVideoElement | null, owner?: object) => {
     let slot = slotsRef.current.get(id);
     if (!slot) {
-      if (!el) return;
       slot = { el: null, raw: 0, effective: 0, centerDist: Infinity, owner };
       slotsRef.current.set(id, slot);
     }
@@ -650,17 +649,20 @@ export function useFeedVideoSlot(id: string): SlotReturn {
   // Mount/unmount-only registration. Because `ctx` is stable, this effect
   // runs exactly once per slot lifetime (plus on id change), not on every
   // active-state flip.
+  // Per-instance registration token (instance-owned cleanup).
+  const ownerRef = useRef<object>({});
   useEffect(() => {
     if (!ctx) return;
+    const owner = ownerRef.current;
     return () => {
-      ctx.unregisterSlot(id);
+      ctx.unregisterSlot(id, owner);
     };
   }, [ctx, id]);
 
   const registerEl = useCallback(
     (el: HTMLVideoElement | null) => {
       if (!ctx) return;
-      ctx.setSlotEl(id, el);
+      ctx.setSlotEl(id, el, ownerRef.current);
     },
     [ctx, id]
   );
