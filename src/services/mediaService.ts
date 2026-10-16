@@ -564,10 +564,16 @@ async function uploadPostVideoViaMux(
   const { signal, onLatePoster } = options;
   const aborted = () => !!signal?.aborted;
   analytics.trackMuxUploadAttempt({ size: file.size, format: file.type });
+  const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const mark = (step: string, extra?: Record<string, unknown>) => {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    try { console.debug(`[post-video-timing] ${step} +${Math.round(now - t0)}ms`, extra ?? ''); } catch { /* ignore */ }
+  };
 
   type PosterResult = { url: string; width: number; height: number; duration: number } | null;
   const posterTask: Promise<PosterResult> = (async () => {
     try {
+      mark('poster started');
       const poster = await generateVideoPoster(file);
       if (aborted()) return null;
       await ensureBucketPolicies('post_media');
@@ -578,6 +584,7 @@ async function uploadPostVideoViaMux(
       const { data: { publicUrl } } = supabase.storage.from('post_media').getPublicUrl(posterPath);
       if (!publicUrl) throw new Error('Empty poster public URL');
       if (aborted()) { deleteMedia(publicUrl).catch(() => {}); return null; }
+      mark('poster finished');
       return { url: publicUrl, width: poster.width, height: poster.height, duration: poster.duration };
     } catch (err: any) {
       // Non-fatal: Mux provides the trusted thumbnail once Ready.
@@ -589,7 +596,9 @@ async function uploadPostVideoViaMux(
 
   let upload: MuxCreateUploadResponse;
   try {
+    mark('link requested');
     const { data, error } = await supabase.functions.invoke<MuxCreateUploadResponse>('mux-create-upload', { body: {} });
+    mark('link received');
     if (error) throw error;
     if (!data?.upload_id || !data?.upload_url) throw new Error('Invalid mux-create-upload response');
     upload = data;
@@ -602,7 +611,15 @@ async function uploadPostVideoViaMux(
   if (aborted()) { discardPoster(); throw new Error('Upload cancelled'); }
   onProgress?.(0, 'uploading');
   try {
-    await putWithProgress(upload.upload_url, file, (pct) => onProgress?.(pct, 'uploading'), signal);
+    let firstByte = false;
+    await putWithProgress(upload.upload_url, file, (pct) => {
+      if (!firstByte && pct > 0) { firstByte = true; mark('first bytes sent'); }
+      onProgress?.(pct, 'uploading');
+    }, signal, () => {
+      // Every byte has left the browser; Mux has not confirmed yet.
+      mark('all bytes sent');
+      onProgress?.(100, 'finalizing');
+    }, (status) => mark('server response', { status }));
   } catch (err: any) {
     discardPoster();
     if (aborted()) throw new Error('Upload cancelled');
@@ -610,7 +627,8 @@ async function uploadPostVideoViaMux(
     throw new Error("Video upload failed. Check your connection and try again.");
   }
 
-  onProgress?.(0, 'finalizing');
+  mark('upload confirmed');
+  onProgress?.(100, 'finalizing');
   // Bounded wait: the poster is cosmetic; never hold the item hostage to it.
   const TIMED_OUT = Symbol('timeout');
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -619,6 +637,7 @@ async function uploadPostVideoViaMux(
     new Promise<typeof TIMED_OUT>((r) => { timer = setTimeout(() => r(TIMED_OUT), POST_POSTER_GRACE_MS); }),
   ]);
   if (timer) clearTimeout(timer);
+  mark(raced === TIMED_OUT ? 'poster wait timed out' : 'poster wait done');
   const poster = raced === TIMED_OUT ? null : raced;
 
   if (aborted()) { discardPoster(); throw new Error('Upload cancelled'); }
@@ -638,6 +657,7 @@ async function uploadPostVideoViaMux(
     orientation: orientation ?? 'landscape', upload_id: upload.upload_id, is_test: upload.is_test,
   });
 
+  mark('upload step finished');
   onProgress?.(100, 'done');
   return {
     id: generateUUID(),
@@ -663,7 +683,9 @@ function putWithProgress(
   url: string,
   file: File,
   onProgress?: (pct: number) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onSent?: () => void,
+  onResponse?: (status: number) => void,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) { reject(new Error('Mux PUT aborted')); return; }
@@ -675,7 +697,9 @@ function putWithProgress(
         onProgress(Math.round((e.loaded / e.total) * 100));
       }
     };
+    xhr.upload.onload = () => { try { onSent?.(); } catch { /* ignore */ } };
     xhr.onload = () => {
+      try { onResponse?.(xhr.status); } catch { /* ignore */ }
       if (xhr.status >= 200 && xhr.status < 300) resolve();
       else reject(new Error(`Mux PUT failed: ${xhr.status} ${xhr.statusText}`));
     };

@@ -20,6 +20,12 @@ export interface MediaItem {
    * never sent to the server (the save payload lists fields explicitly).
    */
   clientKey?: string;
+  /**
+   * Composer-local upload attempt (Posts video placeholder). Together with
+   * `clientKey` it decides which late upload results may update this item.
+   * UI-only: never persisted, never sent to the server.
+   */
+  uploadAttemptId?: string;
   width?: number;
   height?: number;
   duration?: number;
@@ -91,6 +97,9 @@ export interface MediaUploadState {
   durationUnknown?: boolean;
   /** Coarse upload stage; drives the staged progress UI. */
   stage?: 'preparing' | 'uploading' | 'finalizing' | 'done';
+  /** Posts video placeholder: composer item identity for this upload attempt. */
+  clientKey?: string;
+  attemptId?: string;
 }
 
 export type MediaUploadStage = NonNullable<MediaUploadState['stage']>;

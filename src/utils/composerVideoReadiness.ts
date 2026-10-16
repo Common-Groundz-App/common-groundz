@@ -82,3 +82,19 @@ export function composerPreviewMedia(
     return prepared.find((p) => matchesMediaIdentity(p, key)) ?? item;
   });
 }
+
+/**
+ * Posts video placeholder: merge a finished upload into the exact composer
+ * item for its (clientKey, uploadAttemptId). Anything else is left alone, so
+ * a late result from a removed or replaced attempt never touches a newer item.
+ */
+export function mergePlaceholderResult(prev: readonly MediaItem[], result: MediaItem): MediaItem[] {
+  const ck = result.clientKey;
+  const aid = result.uploadAttemptId;
+  if (!ck || !aid) return [...prev];
+  return prev.map((m) => (m.clientKey === ck && m.uploadAttemptId === aid
+    ? { ...result, clientKey: ck, uploadAttemptId: aid, order: m.order,
+        width: result.width ?? m.width, height: result.height ?? m.height,
+        orientation: result.orientation ?? m.orientation }
+    : m));
+}
