@@ -1,5 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
-import { Volume2, VolumeX, Play, Pause, Film, AlertTriangle, RotateCw } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, Film, AlertTriangle, RotateCw, Loader2 } from 'lucide-react';
+import { feedVideoDebug } from '@/hooks/feedVideoActiveSelection';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useVideoMute, readGlobalVideoMuted, setGlobalVideoMuted, isFeedSessionSoundEnabled } from '@/hooks/useVideoMute';
