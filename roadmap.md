@@ -443,7 +443,7 @@ cross-read between them.
   - [x] Step 3: stable-identity app/UI work implemented — mediaKey/findByMediaKey helper; composer clientKey (UI-only, never persisted) keys tiles/preview registries; server-ID adoption via reconcileComposerMedia without remount; lightbox keyed path (initialMediaKey) with close-on-disappear and legacy numeric path unchanged; resume/handoff by media ID; 1102 tests passed, 3 skipped, tsgo clean. Remaining: focused manual QA, then Phase 4 close-out
   - [x] Fix 1: one shared Post display order (video first) for feed + lightbox; lightbox reveal on no-op seek and 2.5s non-playing safety reveal. Awaiting manual QA
   - [x] Fix 2: loading budget for managed feed videos (max 2 attached: handoff pin > active > grace > nearest preload; poster-only teardown with position snapshot). Suite 1111 passed / 3 skipped, typecheck clean. Awaiting combined Fix 1 + Fix 2 manual QA; signed-in network measurement still to do (preview sign-in unavailable here)
-  - [ ] Fix 3: composer upload handshake optimization (paused until Fix 1 + Fix 2 QA)
+  - [x] Fix 3: composer upload handshake optimization (see below)
   - [ ] Step 4: view-tracking groundwork (only if Step 1 showed it needed)
   - [ ] Step 5: owner close-out check (edit post, remove photo, confirm right video plays and stays linked)
 - [ ] Phase 5: review + timeline-update view counts
