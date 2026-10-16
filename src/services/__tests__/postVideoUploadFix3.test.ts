@@ -160,7 +160,8 @@ describe('Fix 3 — Post Mux upload pipeline', async () => {
     c.abort(); // e.g. composer closed
     await vi.runAllTimersAsync();
     expect(late).not.toHaveBeenCalled();
-    expect(removed.length).toBe(1);
+    expect(removed.length).toBe(0); // aborted before storage: never stored
+    expect(log.some((l) => l.startsWith("posterStored"))).toBe(false);
   });
 
   it('Review path stays sequential (poster before handshake) and sends declared size', async () => {
