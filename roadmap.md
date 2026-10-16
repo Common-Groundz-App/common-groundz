@@ -456,4 +456,4 @@ cross-read between them.
 - [x] Seekable-aware once-only handoff seek; already-reached targets complete immediately; explicit pause/scrub only override intent.
 - [x] Upcoming preload preempts passed grace within the 2-slot cap; direction hysteresis; cold-mount prompt activation; poster instead of loader on budget standby.
 - [ ] Combined Fix 1 + Fix 2 manual QA (user).
-- [ ] Fix 3 composer upload — paused.
+- [x] Fix 3 composer upload (Posts only): poster off critical path, abortable PUT, late poster scoped to active attempt — automated tests pass; real-upload manual QA pending.
