@@ -1071,6 +1071,7 @@ function FeedVideoPlayer({
 
   const handlePause = () => {
     setIsPlaying(false);
+    setIsBuffering(false);
     clearHideTimer();
   };
 
