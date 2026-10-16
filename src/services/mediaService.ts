@@ -176,7 +176,25 @@ export interface UploadMediaOptions {
    * (non-authoritative) so the server can refuse > 100 MB early.
    */
   videoMuxOnly?: boolean;
+  /** Post Mux videos only: cancels this attempt (skips or aborts the PUT). */
+  signal?: AbortSignal;
+  /**
+   * Post Mux videos only: a poster that finished after the item was emitted.
+   * Fires at most once, only for a non-cancelled attempt. Display-only; the
+   * server rebuilds url/thumbnail from Mux on save.
+   */
+  onLatePoster?: (muxUploadId: string, patch: LatePosterPatch) => void;
 }
+
+export interface LatePosterPatch {
+  url: string;
+  thumbnail_url: string;
+  width?: number;
+  height?: number;
+}
+
+/** How long a finished PUT waits for the background poster before emitting. */
+export const POST_POSTER_GRACE_MS = 1500;
 
 export const uploadMedia = async (
   file: File,
@@ -208,7 +226,8 @@ export const uploadMedia = async (
       const cfg = await resolveMuxConfig();
       if (cfg.uploadsEnabled) {
         try {
-          return await uploadVideoViaMux(file, userId, sessionId, onProgress);
+          // Fix 3 (Posts only): poster work runs off the critical path.
+          return await uploadPostVideoViaMux(file, userId, sessionId, onProgress, options);
         } catch (err: any) {
           // Parse FunctionsHttpError: body lives on err.context as an unread Response.
           // Scoped to mux-create-upload call only — fallback strictly on MUX_DISABLED,
@@ -529,16 +548,127 @@ async function uploadVideoViaMux(
 }
 
 /**
+ * Fix 3 — Post composer Mux upload. Poster generation/storage starts in
+ * parallel with the Mux handshake, and the video PUT starts as soon as the
+ * upload URL arrives; the poster never gates byte 0. Readiness stays
+ * server-authoritative (the item is emitted as `preparing`). Review/Timeline
+ * keep `uploadVideoViaMux` unchanged.
+ */
+async function uploadPostVideoViaMux(
+  file: File,
+  userId: string,
+  sessionId: string,
+  onProgress?: (progress: number, stage?: UploadStage) => void,
+  options: UploadMediaOptions = {}
+): Promise<MediaItem> {
+  const { signal, onLatePoster } = options;
+  const aborted = () => !!signal?.aborted;
+  analytics.trackMuxUploadAttempt({ size: file.size, format: file.type });
+
+  type PosterResult = { url: string; width: number; height: number; duration: number } | null;
+  const posterTask: Promise<PosterResult> = (async () => {
+    try {
+      const poster = await generateVideoPoster(file);
+      if (aborted()) return null;
+      await ensureBucketPolicies('post_media');
+      const posterPath = `${userId}/${sessionId}/${generateUUID()}_poster.jpg`;
+      const { error } = await supabase.storage.from('post_media')
+        .upload(posterPath, poster.posterBlob, { cacheControl: '3600', upsert: false, contentType: 'image/jpeg' });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('post_media').getPublicUrl(posterPath);
+      if (!publicUrl) throw new Error('Empty poster public URL');
+      if (aborted()) { deleteMedia(publicUrl).catch(() => {}); return null; }
+      return { url: publicUrl, width: poster.width, height: poster.height, duration: poster.duration };
+    } catch (err: any) {
+      // Non-fatal: Mux provides the trusted thumbnail once Ready.
+      analytics.trackMuxUploadFailure({ stage: 'poster', error: err?.message ?? String(err), size: file.size, format: file.type });
+      return null;
+    }
+  })();
+  const discardPoster = () => { posterTask.then((p) => { if (p) deleteMedia(p.url).catch(() => {}); }); };
+
+  let upload: MuxCreateUploadResponse;
+  try {
+    const { data, error } = await supabase.functions.invoke<MuxCreateUploadResponse>('mux-create-upload', { body: {} });
+    if (error) throw error;
+    if (!data?.upload_id || !data?.upload_url) throw new Error('Invalid mux-create-upload response');
+    upload = data;
+  } catch (err: any) {
+    discardPoster();
+    analytics.trackMuxUploadFailure({ stage: 'create_upload', error: err?.message ?? String(err), size: file.size, format: file.type });
+    throw new Error("Couldn't start video upload. Try again.");
+  }
+
+  if (aborted()) { discardPoster(); throw new Error('Upload cancelled'); }
+  onProgress?.(0, 'uploading');
+  try {
+    await putWithProgress(upload.upload_url, file, (pct) => onProgress?.(pct, 'uploading'), signal);
+  } catch (err: any) {
+    discardPoster();
+    if (aborted()) throw new Error('Upload cancelled');
+    analytics.trackMuxUploadFailure({ stage: 'put', error: err?.message ?? String(err), size: file.size, format: file.type, upload_id: upload.upload_id });
+    throw new Error("Video upload failed. Check your connection and try again.");
+  }
+
+  onProgress?.(0, 'finalizing');
+  // Bounded wait: the poster is cosmetic; never hold the item hostage to it.
+  const TIMED_OUT = Symbol('timeout');
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const raced = await Promise.race([
+    posterTask,
+    new Promise<typeof TIMED_OUT>((r) => { timer = setTimeout(() => r(TIMED_OUT), POST_POSTER_GRACE_MS); }),
+  ]);
+  if (timer) clearTimeout(timer);
+  const poster = raced === TIMED_OUT ? null : raced;
+
+  if (aborted()) { discardPoster(); throw new Error('Upload cancelled'); }
+
+  if (raced === TIMED_OUT) {
+    // Late poster enhances only this attempt, and only if it is still active.
+    posterTask.then((p) => {
+      if (!p) return;
+      if (aborted() || !onLatePoster) { deleteMedia(p.url).catch(() => {}); return; }
+      onLatePoster(upload.upload_id, { url: p.url, thumbnail_url: p.url, width: p.width, height: p.height });
+    });
+  }
+
+  const orientation = poster ? orientationFor(poster.width, poster.height) : undefined;
+  analytics.trackMuxUploadSuccess({
+    size: file.size, duration: poster?.duration ?? 0, format: file.type,
+    orientation: orientation ?? 'landscape', upload_id: upload.upload_id, is_test: upload.is_test,
+  });
+
+  onProgress?.(100, 'done');
+  return {
+    id: generateUUID(),
+    url: poster?.url ?? '',
+    ...(poster ? { thumbnail_url: poster.url, width: poster.width, height: poster.height, duration: poster.duration } : {}),
+    ...(orientation ? { orientation } : {}),
+    type: 'video',
+    caption: '',
+    alt: file.name.split('.')[0],
+    order: 0,
+    session_id: sessionId,
+    provider: 'mux',
+    mux_upload_id: upload.upload_id,
+    mux_status: 'preparing',
+  };
+}
+
+/**
  * PUT a file via XMLHttpRequest so we get real upload progress events
  * (fetch() can't observe request-body progress in browsers).
  */
 function putWithProgress(
   url: string,
   file: File,
-  onProgress?: (pct: number) => void
+  onProgress?: (pct: number) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(new Error('Mux PUT aborted')); return; }
     const xhr = new XMLHttpRequest();
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true });
     xhr.open('PUT', url, true);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) {

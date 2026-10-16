@@ -11,6 +11,7 @@ import {
   ALLOWED_IMAGE_TYPES,
   validateMediaFile,
   MAX_VIDEOS_PER_POST,
+  type LatePosterPatch,
 } from '@/services/mediaService';
 import { formatDuration, formatBytes, generateVideoPoster } from '@/utils/videoPoster';
 import { MediaUploadState, MediaItem } from '@/types/media';
@@ -28,6 +29,8 @@ interface MediaUploaderProps {
    * videos while Mux is still preparing the HLS asset.
    */
   onMediaUploaded: (media: MediaItem, file?: File) => void;
+  /** Posts only: a poster that arrived after the video item was emitted. */
+  onLatePoster?: (muxUploadId: string, patch: LatePosterPatch) => void;
   initialMedia?: MediaItem[];
   className?: string;
   customButton?: React.ReactNode;
@@ -265,6 +268,7 @@ export function UploadRow({
 export function MediaUploader({
   sessionId,
   onMediaUploaded,
+  onLatePoster,
   initialMedia = [],
   className,
   customButton,
@@ -280,6 +284,8 @@ export function MediaUploader({
   truthfulVideoProgress = false,
 }: MediaUploaderProps) {
   const cancelledFilesRef = useRef<WeakSet<File>>(new WeakSet());
+  const abortControllersRef = useRef<Map<File, AbortController>>(new Map());
+  useEffect(() => () => { abortControllersRef.current.forEach((c) => c.abort()); abortControllersRef.current.clear(); }, []);
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploads, setUploads] = useState<MediaUploadState[]>([]);
@@ -469,6 +475,9 @@ export function MediaUploader({
         })();
       }
 
+      const controller = truthfulVideoProgress && !videoMuxOnly && isVideo ? new AbortController() : undefined;
+      if (controller) abortControllersRef.current.set(file, controller);
+      const postOpts = controller ? { signal: controller.signal, onLatePoster } : undefined;
       uploadMedia(file, user.id, sessionId, (progress, stage) => {
         setUploads((prev) =>
           prev.map((u) =>
@@ -477,7 +486,8 @@ export function MediaUploader({
               : u
           )
         );
-      }, videoMuxOnly ? { videoMuxOnly: true } : undefined).then((mediaItem) => {
+      }, videoMuxOnly ? { videoMuxOnly: true } : postOpts).then((mediaItem) => {
+        abortControllersRef.current.delete(file);
         if ((videoMuxOnly || truthfulVideoProgress) && cancelledFilesRef.current.has(file)) {
           // Cancelled while transferring: never added; slot released once.
           // Only the preview image is removed; the Mux video itself is kept.
@@ -537,6 +547,7 @@ export function MediaUploader({
 
   const cancelUpload = (uploadToCancel: MediaUploadState) => {
     if ((videoMuxOnly || truthfulVideoProgress) && uploadToCancel.status === 'uploading') cancelledFilesRef.current.add(uploadToCancel.file);
+    abortControllersRef.current.get(uploadToCancel.file)?.abort();
     revokePoster(uploadToCancel.localPosterUrl);
     setUploads((prev) => prev.filter((u) => u !== uploadToCancel));
   };
