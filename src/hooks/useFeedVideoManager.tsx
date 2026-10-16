@@ -49,13 +49,20 @@ interface SlotEntry {
   raw: number;        // raw intersection ratio
   effective: number;  // raw / maxPossibleRatio for oversized videos
   centerDist: number; // |elementCenterY - viewportCenterY|
+  /**
+   * Registration token of the mounted player instance that owns this slot.
+   * A replacement player for the same stable slot (e.g. layout change after
+   * a post edit) takes ownership; late cleanup from the old instance is
+   * ignored so it can never remove its replacement.
+   */
+  owner?: object;
 }
 
 type Listener = () => void;
 
 interface RegistryApi {
-  setSlotEl: (id: string, el: HTMLVideoElement | null) => void;
-  unregisterSlot: (id: string) => void;
+  setSlotEl: (id: string, el: HTMLVideoElement | null, owner?: object) => void;
+  unregisterSlot: (id: string, owner?: object) => void;
   setLightboxOpen: (open: boolean) => void;
   subscribeSlotActive: (id: string, listener: Listener) => () => void;
   getSlotActiveSnapshot: (id: string) => boolean;
