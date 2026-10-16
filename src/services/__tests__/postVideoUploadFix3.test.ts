@@ -14,6 +14,8 @@ let createDelay = 300;
 let createFails = false;
 let putDelay = 200;
 let putFails = false;
+let putStatus = 200;
+const stages: string[] = [];
 const removed: string[][] = [];
 
 vi.mock('@/integrations/supabase/client', () => ({
@@ -59,7 +61,8 @@ class FakeXHR {
     at('putStart');
     this.timer = setTimeout(() => {
       if (putFails) { this.onerror?.(); return; }
-      this.status = 200; at('putDone'); this.onload?.();
+      this.upload.onload?.(); at('putSent');
+      this.status = putStatus; at('putDone'); this.onload?.();
     }, putDelay);
   }
   abort() { clearTimeout(this.timer); at('putAborted'); this.onabort?.(); }
@@ -68,7 +71,7 @@ class FakeXHR {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
   log.length = 0; removed.length = 0; t0 = Date.now();
-  posterDelay = 800; posterFails = false; createDelay = 300; createFails = false; putDelay = 200; putFails = false;
+  posterDelay = 800; posterFails = false; createDelay = 300; createFails = false; putDelay = 200; putFails = false; putStatus = 200; stages.length = 0;
   (globalThis as any).XMLHttpRequest = FakeXHR;
   (globalThis as any).URL.createObjectURL = () => 'blob:x';
   (globalThis as any).URL.revokeObjectURL = () => {};
@@ -169,5 +172,18 @@ describe('Fix 3 — Post Mux upload pipeline', async () => {
     expect(ms('create')).toBeGreaterThanOrEqual(ms('posterStored'));
     expect(log.find((l) => l.startsWith('create'))).toContain('declared_size');
     expect(item!.thumbnail_url).toBeTruthy();
+  });
+
+  it('reports all-bytes-sent as 100% "finalizing" and never drops back to 0', async () => {
+    const item = await run(svc.uploadMedia(file(), 'u', 's', (p, st) => stages.push(`${st}:${p}`)));
+    expect(item).not.toBeNull();
+    const firstFinal = stages.findIndex((x) => x.startsWith('finalizing'));
+    expect(stages[firstFinal]).toBe('finalizing:100');
+    expect(stages.slice(firstFinal).every((x) => x.endsWith(':100'))).toBe(true);
+  });
+
+  it('a non-2xx reply is a failure, not a confirmed upload', async () => {
+    putStatus = 500;
+    expect(await run(svc.uploadMedia(file(), 'u', 's'))).toBeNull();
   });
 });

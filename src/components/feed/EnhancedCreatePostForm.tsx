@@ -32,7 +32,7 @@ import { getInitialsFromName } from '@/utils/profileUtils';
 import { ComposerMediaPreview } from './composer/ComposerMediaPreview';
 import { MuxUploadChip, UploadProgressChip } from './composer/MuxUploadChip';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
-import { composerMuxState, composerPreviewMedia, matchesMediaIdentity, mediaIdentity, newMuxVideoSaveBlocker, preparedComposerMedia } from '@/utils/composerVideoReadiness';
+import { composerMuxState, composerPreviewMedia, matchesMediaIdentity, mediaIdentity, mergePlaceholderResult, newMuxVideoSaveBlocker, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { ensureClientKey, reconcileComposerMedia } from '@/utils/mediaIdentity';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
