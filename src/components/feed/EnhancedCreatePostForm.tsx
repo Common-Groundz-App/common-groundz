@@ -509,14 +509,7 @@ export function EnhancedCreatePostForm({
     if (mediaItem.uploadAttemptId && mediaItem.clientKey) {
       // Final result for a placeholder: enrich only the exact matching
       // (clientKey, attemptId) item. Removed/replaced attempts are dropped.
-      const ck = mediaItem.clientKey;
-      const aid = mediaItem.uploadAttemptId;
-      setMedia((prev) => prev.map((m) =>
-        m.clientKey === ck && m.uploadAttemptId === aid
-          ? { ...mediaItem, clientKey: ck, uploadAttemptId: aid, order: m.order,
-              width: mediaItem.width ?? m.width, height: mediaItem.height ?? m.height,
-              orientation: mediaItem.orientation ?? m.orientation }
-          : m));
+      setMedia((prev) => mergePlaceholderResult(prev, mediaItem));
       return;
     }
     if (media.length < MAX_MEDIA_COUNT) {
