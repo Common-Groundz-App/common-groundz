@@ -155,9 +155,15 @@ export function LightboxPreview({
     const v = videoElRef.current;
     if (v) {
       try {
+        // Keyed path: if this visit's resume hasn't landed yet, hand back
+        // the remembered state rather than the not-yet-seeked playhead.
+        const pendingKey = keyedModeRef.current ? activeKeyRef.current : null;
+        const pendingState = pendingKey != null && !handoffAppliedRef.current
+          ? sessionStateRef.current.get(pendingKey)
+          : undefined;
         const snapshot: VideoExitHandoff = {
-          currentTime: v.currentTime,
-          wasPlaying: !v.paused && !v.ended,
+          currentTime: pendingState ? pendingState.currentTime : v.currentTime,
+          wasPlaying: pendingState ? pendingState.wasPlaying : (!v.paused && !v.ended),
           muted: v.muted,
           entryIndex: entryIndexRef.current,
           currentIndex: currentIndexRef.current,
@@ -351,7 +357,7 @@ export function LightboxPreview({
       handoffSeekIssuedRef.current = false;
       userActedRef.current = false;
       userSeekedRef.current = false;
-      earlyPlayRanRef.current = true; // iOS early-play is entry-open only
+      earlyPlayRanRef.current = false;
       setActiveKey(mediaKey(media[idx]));
     }
     setCurrentIndexState(idx);
