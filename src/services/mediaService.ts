@@ -176,7 +176,25 @@ export interface UploadMediaOptions {
    * (non-authoritative) so the server can refuse > 100 MB early.
    */
   videoMuxOnly?: boolean;
+  /** Post Mux videos only: cancels this attempt (skips or aborts the PUT). */
+  signal?: AbortSignal;
+  /**
+   * Post Mux videos only: a poster that finished after the item was emitted.
+   * Fires at most once, only for a non-cancelled attempt. Display-only; the
+   * server rebuilds url/thumbnail from Mux on save.
+   */
+  onLatePoster?: (muxUploadId: string, patch: LatePosterPatch) => void;
 }
+
+export interface LatePosterPatch {
+  url: string;
+  thumbnail_url: string;
+  width?: number;
+  height?: number;
+}
+
+/** How long a finished PUT waits for the background poster before emitting. */
+export const POST_POSTER_GRACE_MS = 1500;
 
 export const uploadMedia = async (
   file: File,
@@ -208,7 +226,8 @@ export const uploadMedia = async (
       const cfg = await resolveMuxConfig();
       if (cfg.uploadsEnabled) {
         try {
-          return await uploadVideoViaMux(file, userId, sessionId, onProgress);
+          // Fix 3 (Posts only): poster work runs off the critical path.
+          return await uploadPostVideoViaMux(file, userId, sessionId, onProgress, options);
         } catch (err: any) {
           // Parse FunctionsHttpError: body lives on err.context as an unread Response.
           // Scoped to mux-create-upload call only — fallback strictly on MUX_DISABLED,
