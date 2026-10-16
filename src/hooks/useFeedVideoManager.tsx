@@ -12,6 +12,11 @@ import {
   nextGraceExpiry,
   type LoadSlotGeometry,
 } from '@/hooks/feedVideoLoadBudget';
+import {
+  selectActiveSlot,
+  feedVideoDebug,
+  type ActiveCandidate,
+} from '@/hooks/feedVideoActiveSelection';
 
 /**
  * Phase 1 — Single Active Feed Video Manager (Phase 1.1 stabilization).
