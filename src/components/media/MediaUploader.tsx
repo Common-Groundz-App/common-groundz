@@ -11,6 +11,7 @@ import {
   ALLOWED_IMAGE_TYPES,
   validateMediaFile,
   MAX_VIDEOS_PER_POST,
+  type LatePosterPatch,
 } from '@/services/mediaService';
 import { formatDuration, formatBytes, generateVideoPoster } from '@/utils/videoPoster';
 import { MediaUploadState, MediaItem } from '@/types/media';
@@ -267,6 +268,7 @@ export function UploadRow({
 export function MediaUploader({
   sessionId,
   onMediaUploaded,
+  onLatePoster,
   initialMedia = [],
   className,
   customButton,
@@ -282,6 +284,8 @@ export function MediaUploader({
   truthfulVideoProgress = false,
 }: MediaUploaderProps) {
   const cancelledFilesRef = useRef<WeakSet<File>>(new WeakSet());
+  const abortControllersRef = useRef<Map<File, AbortController>>(new Map());
+  useEffect(() => () => { abortControllersRef.current.forEach((c) => c.abort()); abortControllersRef.current.clear(); }, []);
   const { user } = useAuth();
   const { toast } = useToast();
   const [uploads, setUploads] = useState<MediaUploadState[]>([]);

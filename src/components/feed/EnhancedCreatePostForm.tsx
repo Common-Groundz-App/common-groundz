@@ -479,6 +479,21 @@ export function EnhancedCreatePostForm({
     return () => revokeAllLocalPreviews();
   }, [revokeAllLocalPreviews]);
 
+  // Fix 3: a late poster only fills empty display fields on the matching,
+  // still-unready item. Never touches Mux/trusted fields or the local preview.
+  const handleLatePoster = (muxUploadId: string, patch: { url: string; thumbnail_url: string; width?: number; height?: number }) => {
+    setMedia((prev) => prev.map((m) => {
+      if (m.type !== 'video' || m.mux_upload_id !== muxUploadId || m.mux_status === 'ready' || m.mux_playback_id) return m;
+      return {
+        ...m,
+        ...(m.url ? {} : { url: patch.url }),
+        ...(m.thumbnail_url ? {} : { thumbnail_url: patch.thumbnail_url }),
+        ...(m.width || !patch.width ? {} : { width: patch.width }),
+        ...(m.height || !patch.height ? {} : { height: patch.height }),
+      };
+    }));
+  };
+
   const handleMediaUpload = (mediaItem: MediaItem, sourceFile?: File) => {
     if (media.length < MAX_MEDIA_COUNT) {
       const keyedItem = ensureClientKey(mediaItem);
@@ -1493,6 +1508,7 @@ export function EnhancedCreatePostForm({
               truthfulVideoProgress
               sessionId={sessionId}
               onMediaUploaded={handleMediaUpload}
+              onLatePoster={handleLatePoster}
               initialMedia={media}
               maxMediaCount={MAX_MEDIA_COUNT}
               renderUploadsInline={false}
