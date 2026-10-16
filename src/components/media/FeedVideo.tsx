@@ -283,6 +283,27 @@ function FeedVideoPlayer({
   const [isFocused, setIsFocused] = useState(false);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [forceShow, setForceShow] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+  // Bumped after each source attach so manager playback re-runs.
+  const [attachTick, setAttachTick] = useState(0);
+  // Persistent manual Play request for this slot (not a gesture token).
+  const pendingUserPlayRef = useRef(false);
+  const attemptUserPlayRef = useRef<(v: HTMLVideoElement) => void>(() => {});
+  attemptUserPlayRef.current = (v: HTMLVideoElement) => {
+    if (videoRef.current !== v) return;
+    const p = v.play();
+    if (!p || typeof p.catch !== 'function') return;
+    p.then(() => feedVideoDebug('play', { slot: stableSlotIdRef.current, ok: true }))
+      .catch((err: { name?: string }) => {
+        feedVideoDebug('play', { slot: stableSlotIdRef.current, ok: false, err: err?.name });
+        if (err?.name !== 'NotAllowedError') return;
+        if (!pendingUserPlayRef.current || videoRef.current !== v || v.muted) return;
+        // Existing policy fallback: DOM-only mute for this video; global
+        // preference untouched. Play button stays usable if this fails.
+        try { v.muted = true; } catch { /* ignore */ }
+        v.play().catch(() => { /* leave paused; Play remains available */ });
+      });
+  };
 
   const isActive = isHovered || isFocused || isScrubbing || !isPlaying || forceShow;
 
@@ -709,7 +730,13 @@ function FeedVideoPlayer({
         try { el.muted = true; } catch { /* ignore */ }
       }
     }
-  }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed, resumeTick, userPaused, stableSlotId, markSystemPause, markSystemPlay]);
+  }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed, resumeTick, userPaused, stableSlotId, markSystemPause, markSystemPlay, attachTick]);
+
+  // Pending manual Play is cleared when another slot becomes active.
+  useEffect(() => {
+    if (managed && !slotIsActive) pendingUserPlayRef.current = false;
+  }, [managed, slotIsActive]);
+  useEffect(() => () => { pendingUserPlayRef.current = false; }, [stableSlotId]);
 
   // Phase 2 — capture currentTime on slot deactivation (v3.1 Patch 1).
   // Explicit active → inactive transition tracking. Replaces the older
@@ -949,6 +976,11 @@ function FeedVideoPlayer({
         try { v.removeAttribute('src'); v.load(); } catch { /* ignore */ }
       };
     }
+    feedVideoDebug('attach', { slot: stableSlotIdRef.current, hls: isHls, gen });
+    // Source attached: re-run manager playback (it never waits for
+    // loadeddata/canplay) and honour a pending manual Play immediately.
+    setAttachTick((t) => t + 1);
+    if (pendingUserPlayRef.current && v.paused) attemptUserPlayRef.current(v);
     // Composer-only: resume after a source swap when it was really playing.
     let onSwapReady: (() => void) | null = null;
     if (resumeAfterSourceSwap && swapWasPlayingRef.current) {
@@ -1102,8 +1134,13 @@ function FeedVideoPlayer({
       userPausedRef.current = false;
       setAutoplayEnabled(true);
       if (managed) setManagedUserPaused(false);
-      v.play().catch(() => {});
+      // Persistent play request for this slot: if the source isn't attached
+      // yet (budget/HLS pending), play is attempted as soon as it attaches.
+      // No assumption that a later play() still carries the tap gesture.
+      pendingUserPlayRef.current = true;
+      attemptUserPlayRef.current(v);
     } else {
+      pendingUserPlayRef.current = false;
       userPausedRef.current = true;
       setAutoplayEnabled(false);
       if (managed) setManagedUserPaused(true);
@@ -1247,6 +1284,9 @@ function FeedVideoPlayer({
         onPlay={handlePlay}
         onPause={handlePause}
         onLoadedData={handleLoadedData}
+        onWaiting={() => { if (videoRef.current && !videoRef.current.paused) setIsBuffering(true); }}
+        onPlaying={() => { setIsBuffering(false); pendingUserPlayRef.current = false; feedVideoDebug('playing', { slot: stableSlotId }); }}
+        onCanPlay={() => setIsBuffering(false)}
         onDurationChange={handleDurationChange}
         onTimeUpdate={handleTimeUpdate}
         onError={handleError}
@@ -1263,9 +1303,9 @@ function FeedVideoPlayer({
         </div>
       )}
 
-      {/* Loading skeleton overlay */}
-      {/* Budget standby with a poster shows the poster, not a loader. */}
-      {status === 'loading' && !(hlsLoadGate === false && !!(srcOverride ? item.thumbnail_url : muxPosterUrl(item))) && (
+      {/* Poster-first: a valid poster is never hidden behind a skeleton
+          (standby or buffering). Skeleton only when no poster exists. */}
+      {status === 'loading' && !(srcOverride ? item.thumbnail_url : muxPosterUrl(item)) && (
         <Skeleton className="absolute inset-0 rounded-md" />
       )}
 
@@ -1291,8 +1331,16 @@ function FeedVideoPlayer({
         </div>
       )}
 
-      {/* Center play/pause button — does NOT hijack outer tap */}
-      {status === 'ready' && (
+      {/* Subtle spinner only while an active video is genuinely buffering. */}
+      {isBuffering && status !== 'error' && status !== 'unsupported' && (
+        <div className="absolute top-2 right-2 pointer-events-none" aria-hidden>
+          <Loader2 className="h-4 w-4 animate-spin text-white/80" />
+        </div>
+      )}
+
+      {/* Center play/pause button — does NOT hijack outer tap. Available
+          before loadeddata so a stalled video can be started manually. */}
+      {status !== 'error' && status !== 'unsupported' && (
         <button
           type="button"
           aria-label={isPlaying ? 'Pause video' : 'Play video'}
