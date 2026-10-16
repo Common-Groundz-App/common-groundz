@@ -71,6 +71,38 @@ interface MediaUploaderProps {
   videoMuxOnly?: boolean;
   /** Composer publishing flow: real byte progress and cancel-safe video handoff. */
   truthfulVideoProgress?: boolean;
+  /**
+   * Posts composer only (with truthfulVideoProgress): called right after a
+   * video passes checks with the composer item for this upload attempt, so
+   * the tile and local preview appear before the upload finishes. The final
+   * item later arrives via onMediaUploaded carrying the same clientKey and
+   * uploadAttemptId; callers must merge it into that exact item.
+   */
+  onVideoStarted?: (item: MediaItem, file: File) => void;
+}
+
+/** Fast local width/height read for the placeholder tile (bounded). */
+function readVideoDims(file: File): Promise<{ width?: number; height?: number }> {
+  return new Promise((resolve) => {
+    let done = false;
+    let url = '';
+    const finish = (v: { width?: number; height?: number }) => {
+      if (done) return;
+      done = true;
+      if (url) { try { URL.revokeObjectURL(url); } catch { /* ignore */ } }
+      resolve(v);
+    };
+    try {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.onloadedmetadata = () => finish({ width: video.videoWidth || undefined, height: video.videoHeight || undefined });
+      video.onerror = () => finish({});
+      url = URL.createObjectURL(file);
+      video.src = url;
+    } catch { finish({}); }
+    setTimeout(() => finish({}), 1500);
+  });
 }
 
 /**
@@ -282,6 +314,7 @@ export function MediaUploader({
   videoRefusedMessage,
   videoMuxOnly = false,
   truthfulVideoProgress = false,
+  onVideoStarted,
 }: MediaUploaderProps) {
   const cancelledFilesRef = useRef<WeakSet<File>>(new WeakSet());
   const abortControllersRef = useRef<Map<File, AbortController>>(new Map());
@@ -425,8 +458,13 @@ export function MediaUploader({
         pendingVideoCount += 1;
       }
 
+      const placeholder = truthfulVideoProgress && !videoMuxOnly && isVideo && !!onVideoStarted;
+      const clientKey = placeholder ? crypto.randomUUID() : undefined;
+      const attemptId = placeholder ? crypto.randomUUID() : undefined;
       const newUpload: MediaUploadState = {
         file,
+        clientKey,
+        attemptId,
         progress: 0,
         status: 'uploading',
         stage: 'preparing',
@@ -434,6 +472,19 @@ export function MediaUploader({
         durationUnknown: isVideo && durationUnknown ? true : undefined,
       };
       setUploads((prev) => [...prev, newUpload]);
+
+      if (placeholder && clientKey && attemptId) {
+        const dims = await readVideoDims(file);
+        const orientation = dims.width && dims.height
+          ? (dims.width === dims.height ? 'square' : dims.width > dims.height ? 'landscape' : 'portrait')
+          : undefined;
+        onVideoStarted!({
+          url: '', type: 'video', caption: '', alt: file.name.split('.')[0], order: 0,
+          session_id: sessionId, provider: 'mux', mux_status: 'preparing',
+          clientKey, uploadAttemptId: attemptId,
+          ...(dims.width && dims.height ? { width: dims.width, height: dims.height, orientation } : {}),
+        } as MediaItem, file);
+      }
 
       if (isVideo) {
         // Soft, non-blocking compatibility hint shown inline as a badge.
@@ -495,7 +546,17 @@ export function MediaUploader({
           release(file);
           return;
         }
-        if (mediaItem) {
+        if (mediaItem && placeholder) {
+          // Same composer item as the placeholder; the slot was already taken
+          // by it (counted via initialMedia), so never count it again.
+          onMediaUploaded({ ...mediaItem, clientKey, uploadAttemptId: attemptId }, file);
+          release(file);
+          setUploads((prev) => {
+            const target = prev.find((u) => u.file === file);
+            if (target?.localPosterUrl) revokePoster(target.localPosterUrl);
+            return prev.filter((u) => u.file !== file);
+          });
+        } else if (mediaItem) {
           onMediaUploaded(mediaItem, file);
           release(file);
           setCurrentMediaCount((prev) => prev + 1);
@@ -549,7 +610,8 @@ export function MediaUploader({
     if ((videoMuxOnly || truthfulVideoProgress) && uploadToCancel.status === 'uploading') cancelledFilesRef.current.add(uploadToCancel.file);
     abortControllersRef.current.get(uploadToCancel.file)?.abort();
     revokePoster(uploadToCancel.localPosterUrl);
-    setUploads((prev) => prev.filter((u) => u !== uploadToCancel));
+    // Match by file: the caller may hold an older snapshot of this row.
+    setUploads((prev) => prev.filter((u) => u.file !== uploadToCancel.file));
   };
 
   if (customButton) {
