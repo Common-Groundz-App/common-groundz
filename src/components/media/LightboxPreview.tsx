@@ -133,6 +133,13 @@ export function LightboxPreview({
   const currentItemRef = useRef<MediaItem | null>(null);
   const currentIndexRef = useRef<number>(initialIndex);
   const initialVideoStateRef = useRef<VideoHandoff | undefined>(initialVideoState);
+  // Keyed (Post) path only — per-lightbox-session playback memory, keyed by
+  // stable media key. Seeded from the feed handoff so the entry visit and
+  // later returns share one state model. Cleared when the lightbox unmounts.
+  const sessionStateRef = useRef<Map<string, VideoHandoff>>(
+    new Map(initialMediaKey && initialVideoState ? [[initialMediaKey, initialVideoState]] : [])
+  );
+  useEffect(() => () => { sessionStateRef.current.clear(); }, []);
   // Guards closeWithHandoff so emission/close only happens once even when
   // multiple close paths fire in rapid succession (e.g. ESC during swipe).
   const closedRef = useRef(false);
@@ -317,6 +324,34 @@ export function LightboxPreview({
   // Model: stable key → derive index → navigate → replace active key.
   const goToIndex = (idx: number) => {
     if (keyedModeRef.current) {
+      // Snapshot the departing video BEFORE it unmounts. If its own pending
+      // resume hasn't landed yet, keep the remembered target instead.
+      const leavingKey = activeKeyRef.current;
+      const v = videoElRef.current;
+      if (leavingKey != null && v && handoffAppliedRef.current) {
+        try {
+          sessionStateRef.current.set(leavingKey, {
+            currentTime: v.currentTime,
+            wasPlaying: !v.paused && !v.ended,
+            muted: v.muted,
+          });
+        } catch { /* ignore */ }
+      } else if (leavingKey != null && v && !sessionStateRef.current.has(leavingKey)) {
+        try {
+          sessionStateRef.current.set(leavingKey, {
+            currentTime: v.currentTime,
+            wasPlaying: !v.paused && !v.ended,
+            muted: v.muted,
+          });
+        } catch { /* ignore */ }
+      }
+      // New visit: per-visit handoff bookkeeping starts fresh. Done here
+      // (synchronously) so the next <video> ref-callback sees clean state.
+      handoffAppliedRef.current = false;
+      handoffSeekIssuedRef.current = false;
+      userActedRef.current = false;
+      userSeekedRef.current = false;
+      earlyPlayRanRef.current = true; // iOS early-play is entry-open only
       setActiveKey(mediaKey(media[idx]));
     }
     setCurrentIndexState(idx);
@@ -354,6 +389,17 @@ export function LightboxPreview({
       ? activeKeyRef.current != null && activeKeyRef.current === entryKeyRef2.current
       : currentIndexRef.current === entryIndexRef.current;
 
+  // The pending resume state for the displayed item. Keyed path: the
+  // session memory for the active stable key (no positional fallback).
+  // Legacy path: unchanged — the feed handoff on the entry item only.
+  const getPendingHandoff = (): VideoHandoff | undefined => {
+    if (keyedModeRef.current) {
+      const k = activeKeyRef.current;
+      return k != null ? sessionStateRef.current.get(k) : undefined;
+    }
+    return isEntryDisplayed() ? initialVideoStateRef.current : undefined;
+  };
+
   // Stable video ref-callback. Identity never changes, so React only invokes
   // it on real mount/unmount (and on key={imageKey} change). Without this,
   // every re-render tore down + re-attached the source, causing the spinner
@@ -380,6 +426,9 @@ export function LightboxPreview({
     const item = currentItemRef.current;
     if (!item) return;
     const handoff = initialVideoStateRef.current;
+    const isFirstEntryVisit = keyedModeRef.current
+      ? getPendingHandoff() === handoff
+      : isEntryDisplayed();
 
     // Phase 4 — attach source synchronously inside the ref callback, BEFORE
     // the iOS early-play call below. Native HLS (Safari/iOS) is sync (sets
@@ -414,7 +463,7 @@ export function LightboxPreview({
       handoffAppliedRef.current ||
       !handoff ||
       !handoff.wasPlaying ||
-      !isEntryDisplayed()
+      !isFirstEntryVisit
     ) {
       return;
     }
@@ -560,11 +609,14 @@ export function LightboxPreview({
             // the entry item. Falls back to a time-based Mux thumbnail
             // (matching the handoff timestamp) and finally to the static
             // Mux poster. Non-Mux items keep their existing poster.
-            const isEntryItem = isEntryDisplayed();
+            const pending = getPendingHandoff();
+            const isEntryItem = keyedModeRef.current
+              ? !!pending && pending === initialVideoState
+              : isEntryDisplayed();
             const entryPoster = isEntryItem ? entryExtras?.entryPosterDataUrl : undefined;
             const posterTime =
-              isEntryItem && initialVideoState && initialVideoState.currentTime > 0
-                ? initialVideoState.currentTime
+              pending && pending.currentTime > 0
+                ? pending.currentTime
                 : undefined;
             const muxFallbackPoster = isMux
               ? muxThumbnailUrl(currentItem.mux_playback_id!, { width: 1280, time: posterTime })
@@ -596,21 +648,18 @@ export function LightboxPreview({
             const completeHandoff = (v: HTMLVideoElement) => {
               if (closedRef.current) return;
               setVideoReady(true);
-              if (
-                handoffAppliedRef.current ||
-                !initialVideoState ||
-                !isEntryDisplayed()
-              ) {
+              const h = getPendingHandoff();
+              if (handoffAppliedRef.current || !h) {
                 return;
               }
               handoffAppliedRef.current = true;
-              if (earlyPlayRanRef.current) {
-                if (!initialVideoState.muted) {
+              if (earlyPlayRanRef.current && h === initialVideoState) {
+                if (!h.muted) {
                   try { v.muted = false; } catch { /* ignore */ }
                 }
                 return;
               }
-              if (!initialVideoState.wasPlaying) return;
+              if (!h.wasPlaying) return;
               if (userActedRef.current || !v.paused) return;
               const tryPlay = v.play();
               if (tryPlay && typeof tryPlay.catch === 'function') {
@@ -629,11 +678,11 @@ export function LightboxPreview({
             // reached (incl. nonzero), seeks once when the target is
             // seekable, otherwise waits for the next event.
             const tryHandoffSeek = (v: HTMLVideoElement) => {
+              const h = getPendingHandoff();
               if (
                 closedRef.current ||
                 handoffAppliedRef.current ||
-                !initialVideoState ||
-                !isEntryDisplayed() ||
+                !h ||
                 v.readyState < 1
               ) {
                 return;
@@ -642,7 +691,7 @@ export function LightboxPreview({
                 completeHandoff(v);
                 return;
               }
-              const target = handoffTarget(initialVideoState.currentTime, v.duration);
+              const target = handoffTarget(h.currentTime, v.duration);
               const action = decideHandoffSeek({
                 currentTime: v.currentTime,
                 target,
@@ -675,18 +724,18 @@ export function LightboxPreview({
                   style={{ cursor: 'auto' }}
                   onLoadedMetadata={(e) => {
                     const v = e.currentTarget;
+                    const h = getPendingHandoff();
                     if (
                       closedRef.current ||
                       handoffAppliedRef.current ||
-                      !initialVideoState ||
-                      !isEntryDisplayed()
+                      !h
                     ) {
                       return;
                     }
                     // Only set muted here if the iOS early-play path did NOT run.
                     // If it did, we must keep muted=true until handoff completes.
-                    if (!earlyPlayRanRef.current) {
-                      try { v.muted = initialVideoState.muted; } catch { /* ignore */ }
+                    if (!(earlyPlayRanRef.current && h === initialVideoState)) {
+                      try { v.muted = h.muted; } catch { /* ignore */ }
                     }
                     tryHandoffSeek(v);
                   }}
@@ -698,8 +747,7 @@ export function LightboxPreview({
                     handleImageLoad(currentItem, currentIndex);
                     // For non-handoff items, reveal immediately on first frame.
                     // Entry-handoff items wait for a verified target.
-                    const isEntryHandoff =
-                      !!initialVideoState && isEntryDisplayed();
+                    const isEntryHandoff = !!getPendingHandoff();
                     if (!isEntryHandoff) {
                       setVideoReady(true);
                     } else {
@@ -713,7 +761,7 @@ export function LightboxPreview({
                     e.stopPropagation();
                     if (closedRef.current) return;
                     const v = e.currentTarget;
-                    if (handoffAppliedRef.current || !initialVideoState || !isEntryDisplayed()) {
+                    if (handoffAppliedRef.current || !getPendingHandoff()) {
                       setVideoReady(true);
                       return;
                     }
