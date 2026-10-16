@@ -73,6 +73,7 @@ const nodeIncludes = [
   'src/components/review-composer/__tests__/reviewVideoPhase2.test.ts',
   'src/services/__tests__/reviewVideoDuration.phase4.test.ts',
   'src/hooks/__tests__/feedVideoLoadBudget.test.ts',
+  'src/hooks/__tests__/feedVideoActiveSelection.test.ts',
 ];
 
 
