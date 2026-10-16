@@ -457,3 +457,10 @@ cross-read between them.
 - [x] Upcoming preload preempts passed grace within the 2-slot cap; direction hysteresis; cold-mount prompt activation; poster instead of loader on budget standby.
 - [ ] Combined Fix 1 + Fix 2 manual QA (user).
 - [x] Fix 3 composer upload (Posts only): poster off critical path, abortable PUT, late poster scoped to active attempt — automated tests pass; real-upload manual QA pending.
+
+## Fix 3 follow-up — 100% → preview gap (Posts composer)
+- [x] Timing marks per upload attempt (`[post-video-timing]` in browser console, verbose level)
+- [x] Video tile + local preview appears right after checks; enriched in place by (clientKey, attemptId)
+- [x] Truthful labels: Uploading X% → Upload sent — finishing… → Processing → Ready
+- [x] Remove at any stage cancels that attempt; late results ignored; slot counted once
+- [ ] Real upload timing breakdown + replace check — waiting on user's manual QA
