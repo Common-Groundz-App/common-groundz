@@ -69,9 +69,7 @@ const Ctx = createContext<RegistryApi | null>(null);
 // Sentinel context so nested providers can detect each other (dev-only warn).
 const NestingCtx = createContext<boolean>(false);
 
-const ACTIVATE_THRESHOLD = 0.6;
-const KEEP_THRESHOLD = 0.35;
-const SWITCH_MARGIN = 0.2;
+// Active-slot thresholds live in feedVideoActiveSelection.ts.
 const DEBOUNCE_MS = 200;
 const SETTLE_MS = 50;
 
