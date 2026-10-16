@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils';
 import { getDisplayName } from '@/services/profileService';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { ComposerMediaPreview } from './composer/ComposerMediaPreview';
-import { MuxUploadChip } from './composer/MuxUploadChip';
+import { MuxUploadChip, UploadProgressChip } from './composer/MuxUploadChip';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
 import { composerMuxState, composerPreviewMedia, matchesMediaIdentity, mediaIdentity, newMuxVideoSaveBlocker, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { ensureClientKey, reconcileComposerMedia } from '@/utils/mediaIdentity';
@@ -494,7 +494,31 @@ export function EnhancedCreatePostForm({
     }));
   };
 
+  // Posts video placeholder: the composer item exists from the moment the
+  // file passes checks, with its local preview, so the tile never waits for
+  // the upload to be confirmed.
+  const handleVideoStarted = (item: MediaItem, sourceFile: File) => {
+    if (!item.clientKey) return;
+    try {
+      localPreviewUrlsRef.current.set(item.clientKey, URL.createObjectURL(sourceFile));
+    } catch { /* ignore */ }
+    setMedia((prev) => [...prev, { ...item, order: prev.length }]);
+  };
+
   const handleMediaUpload = (mediaItem: MediaItem, sourceFile?: File) => {
+    if (mediaItem.uploadAttemptId && mediaItem.clientKey) {
+      // Final result for a placeholder: enrich only the exact matching
+      // (clientKey, attemptId) item. Removed/replaced attempts are dropped.
+      const ck = mediaItem.clientKey;
+      const aid = mediaItem.uploadAttemptId;
+      setMedia((prev) => prev.map((m) =>
+        m.clientKey === ck && m.uploadAttemptId === aid
+          ? { ...mediaItem, clientKey: ck, uploadAttemptId: aid, order: m.order,
+              width: mediaItem.width ?? m.width, height: mediaItem.height ?? m.height,
+              orientation: mediaItem.orientation ?? m.orientation }
+          : m));
+      return;
+    }
     if (media.length < MAX_MEDIA_COUNT) {
       const keyedItem = ensureClientKey(mediaItem);
       // For Mux-backed videos, build a transient blob URL from the original
@@ -527,6 +551,8 @@ export function EnhancedCreatePostForm({
     // The tile may be a frozen preview item still carrying a pre-adoption id,
     // so match by the immutable clientKey first; identity is the fallback.
     const ck = itemToRemove.clientKey;
+    // Stop this item's own upload attempt if it is still running.
+    if (ck) inFlightUploads.filter((u) => u.clientKey === ck).forEach((u) => cancelUploadRef.current?.(u));
     setMedia((prev) =>
       prev
         .filter((item) => (ck ? item.clientKey !== ck : !matchesMediaIdentity(item, key)))
@@ -1437,8 +1463,14 @@ export function EnhancedCreatePostForm({
               // local copy and play from Mux.
               item.clientKey ? localPreviewUrlsRef.current.get(item.clientKey) : undefined
             }
-            overlayForItem={(item) => {
+            overlayForItem={(previewItem) => {
+              // The preview item may be frozen; read status from the live item.
+              const item = (previewItem.clientKey && media.find((m) => m.clientKey === previewItem.clientKey)) || previewItem;
               const id = item.mux_upload_id;
+              if (!id && item.uploadAttemptId) {
+                const up = inFlightUploads.find((u) => u.clientKey === item.clientKey);
+                return <UploadProgressChip progress={up?.progress ?? 0} stage={up?.stage} failed={up?.status === 'error'} />;
+              }
               if (!id || item.provider !== 'mux') return null;
               const ui = composerMuxState(muxStatuses[id]);
               return <MuxUploadChip uploadId={id} status={ui} />;
@@ -1488,9 +1520,9 @@ export function EnhancedCreatePostForm({
 
         {/* In-flight uploads — rendered above the toolbar so the toolbar
             icons (Image / Smile / More) stay aligned during upload. */}
-        {inFlightUploads.length > 0 && (
+        {inFlightUploads.some((u) => !u.clientKey) && (
           <div className="space-y-2 mt-3">
-            {inFlightUploads.map((upload, index) => (
+            {inFlightUploads.filter((u) => !u.clientKey).map((upload, index) => (
               <UploadRow
                 key={index}
                 upload={upload}
@@ -1508,6 +1540,7 @@ export function EnhancedCreatePostForm({
               truthfulVideoProgress
               sessionId={sessionId}
               onMediaUploaded={handleMediaUpload}
+              onVideoStarted={handleVideoStarted}
               onLatePoster={handleLatePoster}
               initialMedia={media}
               maxMediaCount={MAX_MEDIA_COUNT}
