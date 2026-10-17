@@ -1,6 +1,6 @@
 # Video program — Phase 6 verification and close-out
 
-Date: 2026-10-17 UTC. **Status: OPEN — automated regression and read-only contract audit completed; owner device QA, isolated database tests and current standalone client typecheck/production build evidence remain pending. Not program complete.**
+Date: 2026-10-17 UTC. **Status: COMPLETE — owner QA passed (2026-10-17 13:22 UTC); remaining exceptions listed below explicitly accepted by the owner. POST & REVIEW VIDEO PROGRAM — COMPLETE.**
 
 ## Scope and environments
 
@@ -166,3 +166,19 @@ Intentionally deferred: Post view-count redesign; watch-duration analytics; cros
 - reviews.video_enabled = false (get_public_flags): PASS
 - RPC non-admin 42501 / admin success / 22023: BLOCKED live (project is external_unmanaged — no authenticated session can be minted; SQL tool role lacks EXECUTE). Static: SECURITY DEFINER, search_path pg_catalog,public, EXECUTE only authenticated+service_role (anon denied), body raises 22023 and 42501.
 - Deleted media live: BLOCKED (no deleted video rows exist); covered by Deno test + unknown-id live rejection.
+
+## Owner QA and formal close-out (2026-10-17 13:22 UTC) — Phase 6 COMPLETE
+Owner ran the device/manual matrix and reported all three batches working correctly:
+- Batch A — Post playback & continuity (P1–P5, L1–L5 for Posts): **PASS** (owner)
+- Batch B — Review & Timeline Update lifecycle in test environment (L1–L5 for R/U, F1): **PASS** (owner)
+- Batch C — Analytics: qualification +1, author self-view 0, card→lightbox dedupe +1 not +2, Review vs Timeline Update attribution, fresh anonymous +1, seek/buffer/pause rules (A1–A3): **PASS** (owner)
+
+Owner-accepted limitations (not passes):
+1. Historical/grandfathered Post rows with NULL `media_id` — left as-is, no backfill.
+2. True-concurrency checks previously BLOCKED (single-connection tooling): Review Phase 1 overlaps, Post save vs reconcile/webhook, simultaneous duplicate view submissions. Sequential evidence + unique indexes/23505 handling only.
+3. Sandbox/auth limits: no authenticated session could be minted (external_unmanaged), so live non-admin/admin/22023 RPC calls, mux-webhook signed probe and live deleted-media rejection were not automated; covered by static review, Deno tests and owner QA.
+4. Historical Post exclusion list (six vs seven entries) and storage/fixture provenance remain as recorded; no fixtures or assets deleted.
+
+Flag read-back (get_public_flags, 13:22 UTC): `reviews.video_enabled=false`, `reviews.composer_page_enabled=true`, `mux.uploads_enabled=true`, `mux.prewarm_enabled=true`, `mux.mode=live`, `notifications.realtime_enabled=true`. No flags changed during close-out. Production Review videos remain OFF.
+
+Not started: Review-video public rollout, 3E cleanup, questionnaire/timeline work, any Phase 7.

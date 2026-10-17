@@ -446,8 +446,9 @@ cross-read between them.
   - [x] Fix 3: composer upload handshake optimization (see below)
   - [ ] Step 4: view-tracking groundwork (only if Step 1 showed it needed)
   - [ ] Step 5: owner close-out check (edit post, remove photo, confirm right video plays and stays linked)
-- [ ] Phase 5: review + timeline-update view counts — implemented, awaiting focused QA (see docs/verification/review-video-phase-5.md)
-- [ ] Phase 6: final video-program verification — automated/read-only audit recorded in docs/verification/phase-6-e2e-closeout.md (2026-10-17): 90 Vitest files, 1,156 passed / 3 skipped / 0 failed; 6 Deno helper tests and 6 separate Edge typechecks pass; production Review videos OFF. Genuine defects corrected: Review display-vs-saved analytics identity, deleted-media rejection, webhook typing, production upload diagnostics; two omitted regression suites enabled. Owner device QA, authenticated endpoint/RPC and concurrency tests, isolated lifecycle SQL reruns, current independent client TypeScript/production build, historical exclusions reconciliation and storage provenance remain pending/blocked. Do not mark program complete before required QA and explicit exception acceptance; no automatic Phase 7.
+- [x] Phase 5: review + timeline-update view counts — verified via Phase 6 owner QA (docs/verification/review-video-phase-5.md)
+- [x] Phase 6: final video-program verification — COMPLETE (2026-10-17): automation, standalone typecheck/build and owner QA batches A/B/C passed; accepted limitations recorded in docs/verification/phase-6-e2e-closeout.md. Production Review videos OFF.
+- [x] POST & REVIEW VIDEO PROGRAM — COMPLETE (2026-10-17). Next items (Review rollout, 3E cleanup, questionnaire/timeline) not started.
 - Deferred: admin stuck/failed post video count
 - [ ] Payments: collect customer payments — blocked: built-in payments need Lovable Cloud; project uses an external Supabase
 
