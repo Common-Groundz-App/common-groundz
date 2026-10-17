@@ -139,6 +139,7 @@ export default defineConfig({
   'src/components/profile/reviews/__tests__/ReviewFormExistingReview.test.tsx',
   'src/components/media/__tests__/reviewVideoPhase3.test.tsx',
   'src/hooks/__tests__/useVideoViewTracker.phase3.test.tsx',
+  'src/hooks/__tests__/useVideoViewTracker.phase5.test.tsx',
   'src/hooks/__tests__/entityVideoManager.phase4.test.tsx',
   'src/hooks/__tests__/feedVideoLoadProvider.test.tsx', 'src/services/__tests__/postVideoUploadFix3.test.ts',
           ],

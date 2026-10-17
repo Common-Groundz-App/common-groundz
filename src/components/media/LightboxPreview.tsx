@@ -10,7 +10,8 @@
  * Regression of any of the above breaks iOS lightbox handoff.
  * Backed by LightboxPreview.handoff.test.tsx.
  */
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useVideoViewTracker, isReviewViewSource, type ViewSource } from '@/hooks/useVideoViewTracker';
 import { createPortal } from 'react-dom';
 import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
@@ -61,6 +62,9 @@ interface LightboxPreviewProps {
   entryExtras?: LightboxEntryExtras;
   onClose: () => void;
   className?: string;
+  /** Phase 5 — review view tracking (review media block only). */
+  viewSource?: ViewSource;
+  viewSourceId?: string;
 }
 
 export function LightboxPreview({
@@ -71,7 +75,9 @@ export function LightboxPreview({
   onExitHandoff,
   entryExtras,
   onClose,
-  className
+  className,
+  viewSource,
+  viewSourceId,
 }: LightboxPreviewProps) {
   const [currentIndexState, setCurrentIndexState] = useState(initialIndex);
   // Phase 4 Step 3 — keyed path state. Active only when a valid entry media
@@ -120,6 +126,22 @@ export function LightboxPreview({
   const handoffSeekIssuedRef = useRef(false);
   const programmaticRef = useRef(false);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
+  // Phase 5 — review/timeline-update view tracking in the viewer. Only active
+  // when the caller supplies viewSource + viewSourceId (review media block);
+  // Posts and all other callers pass nothing and are unaffected.
+  const [trackedVideoEl, setTrackedVideoEl] = useState<HTMLVideoElement | null>(null);
+  const trackedVideoRef = useMemo(() => ({ current: trackedVideoEl }), [trackedVideoEl]);
+  const viewAutoplayRef = useRef<boolean>(false);
+  const trackedItem = media[currentIndex];
+  useVideoViewTracker({
+    videoRef: trackedVideoRef,
+    source: viewSource ?? 'review',
+    sourceId: viewSourceId,
+    mediaPath: trackedItem?.type === 'video' ? (resolveVideoSrc(trackedItem).src ?? '') : '',
+    mediaId: trackedItem?.id,
+    autoplayRef: viewAutoplayRef,
+    enabled: !!viewSource && !!viewSourceId && isReviewViewSource(viewSource) && trackedItem?.type === 'video',
+  });
   // Phase 4 — attachHls detach handle for the current <video>. Cleared on
   // ref-callback unmount (key change remounts the video).
   const hlsDetachRef = useRef<(() => void) | null>(null);
@@ -421,6 +443,7 @@ export function LightboxPreview({
       hlsDetachRef.current = null;
       hlsTokenRef.current = null;
       videoElRef.current = null;
+      setTrackedVideoEl(null);
       return;
     }
 
@@ -428,6 +451,7 @@ export function LightboxPreview({
     if (el === videoElRef.current) return;
 
     videoElRef.current = el;
+    setTrackedVideoEl(el);
 
     const item = currentItemRef.current;
     if (!item) return;

@@ -446,7 +446,7 @@ cross-read between them.
   - [x] Fix 3: composer upload handshake optimization (see below)
   - [ ] Step 4: view-tracking groundwork (only if Step 1 showed it needed)
   - [ ] Step 5: owner close-out check (edit post, remove photo, confirm right video plays and stays linked)
-- [ ] Phase 5: review + timeline-update view counts
+- [ ] Phase 5: review + timeline-update view counts — implemented, awaiting focused QA (see docs/verification/review-video-phase-5.md)
 - [ ] Phase 6: recheck (suite + short signed-in check: post, review, update views)
 - Deferred: admin stuck/failed post video count
 - [ ] Payments: collect customer payments — blocked: built-in payments need Lovable Cloud; project uses an external Supabase

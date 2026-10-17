@@ -17,26 +17,34 @@ function getAnonSessionId(): string {
   }
 }
 
+export type ViewSource = 'post' | 'review' | 'entity' | 'review_update';
+
 interface Options {
   videoRef: RefObject<HTMLVideoElement>;
-  source?: 'post' | 'review' | 'entity';
+  source?: ViewSource;
   sourceId?: string;
   mediaPath: string;
+  /** Stable persisted media id (Phase 5: used by the server to match review media). */
+  mediaId?: string;
   autoplayRef: RefObject<boolean>;
-  /** When false the hook is a no-op (review videos never record views). */
+  /** When false the hook is a no-op. */
   enabled?: boolean;
 }
 
+/** Phase 5 — buffering/seeking exclusion applies to review sources only; Posts unchanged. */
+export const isReviewViewSource = (s: ViewSource) => s === 'review' || s === 'review_update';
+
 /**
- * Tracks a "real" video view (≥ 2.5s of visible playback) and POSTs once
- * per mount to the `track-media-view` edge function. No-ops silently when
- * `sourceId` is missing.
+ * Tracks a "real" video view (≥ 2.5s of visible playback, accumulated
+ * across pauses within one mount/media) and POSTs once to the
+ * `track-media-view` edge function. No-ops silently when `sourceId` is missing.
  */
 export function useVideoViewTracker({
   videoRef,
   source = 'post',
   sourceId,
   mediaPath,
+  mediaId,
   autoplayRef,
   enabled = true,
 }: Options) {
@@ -45,9 +53,11 @@ export function useVideoViewTracker({
     const el = videoRef.current;
     if (!el || !sourceId || !mediaPath) return;
     if (typeof IntersectionObserver === 'undefined') return;
+    const strict = isReviewViewSource(source);
 
     let visible = false;
     let playing = !el.paused;
+    let stalled = false;
     let watchMs = 0;
     let lastTick = 0;
     let raf = 0;
@@ -56,7 +66,7 @@ export function useVideoViewTracker({
 
     const tick = (ts: number) => {
       if (cancelled || sent) return;
-      if (lastTick && visible && playing && !document.hidden) {
+      if (lastTick && visible && playing && !stalled && !document.hidden) {
         watchMs += ts - lastTick;
         if (watchMs >= MIN_WATCH_MS) {
           sent = true;
@@ -81,7 +91,7 @@ export function useVideoViewTracker({
 
     const send = () => {
       stop();
-      const payload = {
+      const payload: Record<string, unknown> = {
         source,
         sourceId,
         mediaPath,
@@ -90,16 +100,22 @@ export function useVideoViewTracker({
         anonSessionId: getAnonSessionId(),
         trackerVersion: 'v1',
       };
+      if (strict && mediaId) payload.mediaId = mediaId;
       // Fire-and-forget; silent on failure.
       supabase.functions.invoke('track-media-view', { body: payload }).catch(() => {});
     };
 
     const onPlay = () => {
       playing = true;
+      stalled = false;
       if (visible) start();
     };
     const onPause = () => {
       playing = false;
+      stop();
+    };
+    const onStall = () => {
+      stalled = true;
       stop();
     };
     const onVisibility = () => {
@@ -123,6 +139,10 @@ export function useVideoViewTracker({
     el.addEventListener('playing', onPlay);
     el.addEventListener('pause', onPause);
     el.addEventListener('ended', onPause);
+    if (strict) {
+      el.addEventListener('waiting', onStall);
+      el.addEventListener('seeking', onStall);
+    }
     document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
@@ -133,7 +153,11 @@ export function useVideoViewTracker({
       el.removeEventListener('playing', onPlay);
       el.removeEventListener('pause', onPause);
       el.removeEventListener('ended', onPause);
+      if (strict) {
+        el.removeEventListener('waiting', onStall);
+        el.removeEventListener('seeking', onStall);
+      }
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [videoRef, source, sourceId, mediaPath, autoplayRef, enabled]);
+  }, [videoRef, source, sourceId, mediaPath, mediaId, autoplayRef, enabled]);
 }

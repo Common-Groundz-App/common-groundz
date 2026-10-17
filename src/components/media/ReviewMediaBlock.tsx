@@ -91,6 +91,7 @@ export function ReviewMediaBlock({
           className={gridClassName}
           playVideos
           onVideoTap={openAt}
+          videoSource={kind}
           videoSourceId={ownerId}
           videoResume={resume}
           onResumeConsumed={() => setResume(null)}
@@ -108,6 +109,8 @@ export function ReviewMediaBlock({
           initialVideoState={handoff ?? undefined}
           entryExtras={extras ?? undefined}
           onExitHandoff={onExit}
+          viewSource={kind}
+          viewSourceId={ownerId}
           onClose={close}
         />
       )}

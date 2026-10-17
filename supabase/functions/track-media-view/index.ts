@@ -1,16 +1,24 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 import { z } from 'npm:zod@3';
+import { resolveReviewVideo } from './reviewMedia.ts';
 
 const BodySchema = z.object({
-  source: z.enum(['post', 'review', 'entity']).default('post'),
+  source: z.enum(['post', 'review', 'entity', 'review_update']).default('post'),
   sourceId: z.string().uuid(),
   mediaPath: z.string().min(1).max(2048),
+  mediaId: z.string().min(1).max(128).optional(),
   wasAutoplay: z.boolean().default(false),
   watchMs: z.number().int().min(0).max(60 * 60 * 1000),
   anonSessionId: z.string().min(8).max(128).optional(),
   trackerVersion: z.string().max(32).optional(),
 });
+
+const reject = (reason: string) =>
+  new Response(JSON.stringify({ ok: false, reason }), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 
 const MIN_WATCH_MS = 2500;
 
@@ -111,9 +119,45 @@ Deno.serve(async (req) => {
       });
     }
 
-    const mediaPath = normalizeMediaPath(body.mediaPath);
-
     const admin = createClient(supabaseUrl, serviceKey);
+
+    let mediaPath = normalizeMediaPath(body.mediaPath);
+
+    // Phase 5 — Review / Timeline-Update views are server-validated.
+    if (body.source === 'review' || body.source === 'review_update') {
+      let authorId: string | null = null;
+      let reviewId: string;
+      let media: unknown;
+      if (body.source === 'review_update') {
+        const { data: upd } = await admin
+          .from('review_updates')
+          .select('id, review_id, user_id, media')
+          .eq('id', body.sourceId)
+          .maybeSingle();
+        if (!upd) return reject('not_found');
+        authorId = upd.user_id;
+        reviewId = upd.review_id;
+        media = upd.media;
+      } else {
+        reviewId = body.sourceId;
+      }
+      const { data: rev } = await admin
+        .from('reviews')
+        .select('id, user_id, visibility, media')
+        .eq('id', reviewId)
+        .maybeSingle();
+      if (!rev) return reject('not_found');
+      if (body.source === 'review') {
+        authorId = rev.user_id;
+        media = rev.media;
+      }
+      // Same rule as the reviews read policy: public, or the owner (owner is excluded below).
+      if (rev.visibility !== 'public' && rev.user_id !== userId) return reject('forbidden');
+      if (userId && (userId === authorId || userId === rev.user_id)) return reject('author');
+      const canonical = resolveReviewVideo(media, body.mediaId, body.mediaPath);
+      if (!canonical) return reject('media');
+      mediaPath = canonical;
+    }
 
     // Pre-check against the correct partial unique index to avoid generating
     // duplicate-key ERROR log noise on repeat views. PostgREST upsert can't

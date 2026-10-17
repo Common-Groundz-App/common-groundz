@@ -7,7 +7,7 @@ import { useVideoMute, readGlobalVideoMuted, setGlobalVideoMuted, isFeedSessionS
 import { useVideoAutoplay, useAutoplaySuppressed } from '@/hooks/useVideoAutoplay';
 import { useFeedVideoSlot } from '@/hooks/useFeedVideoManager';
 import { useVideoMilestones } from '@/hooks/useVideoMilestones';
-import { useVideoViewTracker } from '@/hooks/useVideoViewTracker';
+import { useVideoViewTracker, isReviewViewSource, type ViewSource } from '@/hooks/useVideoViewTracker';
 import { formatDuration } from '@/utils/videoPoster';
 import { extractMediaPath } from '@/utils/mediaPath';
 import { analytics } from '@/services/analytics';
@@ -47,7 +47,7 @@ interface FeedVideoProps {
   onTap?: (handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
   showBadge?: boolean;
   objectFit?: 'contain' | 'cover';
-  source?: 'post' | 'review' | 'entity';
+  source?: ViewSource;
   sourceId?: string;
   /**
    * Composer-only: when set, bypasses Mux status branching and uses this
@@ -327,14 +327,18 @@ function FeedVideoPlayer({
     enabled: !managed && autoplayEnabled && !isScrubbing,
   });
   useVideoMilestones(videoRef, { src: item.url, autoplayRef });
+  // Phase 5: review / review_update videos record server-validated views
+  // (matched by stable media id); composer previews (srcOverride) never do.
+  // Post/entity tracking is unchanged.
+  const reviewTracked = isReviewViewSource(source);
   useVideoViewTracker({
     videoRef,
     source,
     sourceId,
-    mediaPath: extractMediaPath(item.url),
+    mediaPath: reviewTracked ? (resolveVideoSrc(item).src ?? item.url) : extractMediaPath(item.url),
+    mediaId: reviewTracked ? item.id : undefined,
     autoplayRef,
-    // Review video Phase 3: review videos never record views; posts/entity unchanged.
-    enabled: source !== 'review',
+    enabled: reviewTracked ? !srcOverride : true,
   });
 
   // Register the <video> element with the manager (and on unmount).
