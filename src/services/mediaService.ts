@@ -566,6 +566,7 @@ async function uploadPostVideoViaMux(
   analytics.trackMuxUploadAttempt({ size: file.size, format: file.type });
   const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const mark = (step: string, extra?: Record<string, unknown>) => {
+    if (!import.meta.env.DEV) return;
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     try { console.debug(`[post-video-timing] ${step} +${Math.round(now - t0)}ms`, extra ?? ''); } catch { /* ignore */ }
   };
