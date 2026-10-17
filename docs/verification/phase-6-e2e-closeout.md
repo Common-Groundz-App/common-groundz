@@ -158,3 +158,11 @@ Owner returns completed matrix/evidence. Rerun affected automation for any confi
 Only mark **VIDEO PROGRAM — COMPLETE** after required QA and current compiler/build checks pass, with each remaining exception explicitly accepted by the owner. No Phase 7 is started automatically. Current unresolved concurrency/history/compiler/storage-provenance items are not newly accepted exceptions merely because listed here.
 
 Intentionally deferred: Post view-count redesign; watch-duration analytics; cross-player accumulation; admin dashboard/UI; private Mux playback; asset deletion/cleanup; production Review rollout; historical Post repair/backfill. Signed-out authors cannot be recognized and anonymous metrics identify sessions, not people. Existing historical test exclusions and Post qualification limitation remain clearly disclosed for owner acceptance.
+## Steps 1–3 re-run (2026-10-17 12:20 UTC) — Phase 6 still OPEN
+- tsgo tsconfig.app.json: PASS (exit 0) · tsgo tsconfig.node.json: PASS (exit 0) · bun run build: PASS (built 18.19s)
+- track-media-view deployed with review path: PASS (unknown review → `not_found`; real public review + unknown mediaId → `media`, no path fallback)
+- mux-webhook parity: BLOCKED (no safe signed-webhook probe; source fix present)
+- Client fixes in source + build (viewMediaId, is_deleted rejection): PASS
+- reviews.video_enabled = false (get_public_flags): PASS
+- RPC non-admin 42501 / admin success / 22023: BLOCKED live (project is external_unmanaged — no authenticated session can be minted; SQL tool role lacks EXECUTE). Static: SECURITY DEFINER, search_path pg_catalog,public, EXECUTE only authenticated+service_role (anon denied), body raises 22023 and 42501.
+- Deleted media live: BLOCKED (no deleted video rows exist); covered by Deno test + unknown-id live rejection.
