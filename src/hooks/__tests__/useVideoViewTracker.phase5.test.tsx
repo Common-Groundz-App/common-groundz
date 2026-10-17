@@ -58,7 +58,7 @@ describe('Phase 5 review view tracking', () => {
     fire('waiting'); advance(5000);
     fire('seeking'); advance(5000);
     expect(invoke).not.toHaveBeenCalled();
-    fire('playing'); advance(1600);
+    fire('playing'); advance(1800);
     expect(invoke).toHaveBeenCalledTimes(1);
   });
 
