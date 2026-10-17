@@ -39,14 +39,20 @@ I agree with both reviews and have folded in every correction. I also added a fe
   5. Saves the **canonical identity taken from the saved record**: the Mux playback ID, or the storage path relative to the bucket. It never saves the URL the browser sent.
 - Responses for rejected views stay silent and generic (status 200 with a reason code), as the function does today.
 
-**Step 3 — App wiring**
-- Where this applies: review videos are only shown on review cards and in the review timeline, on entity pages and profiles. "Review"-type posts on Home are Posts, so they keep Post tracking and are not changed.
-- The review media block passes `source={kind}` (`review` or `review_update`) through to the shared video player.
-- Remove the line that turns tracking off for reviews (`enabled: source !== 'review'`).
-- New rules for counting time (excluding buffering and seeking, and keeping the total across pauses) apply **only to `review` and `review_update`**. Post tracking keeps its exact current behaviour. If any of these rules already exist in the shared tracker, that is confirmed in the docs rather than changed.
-- If the content or media being watched changes, the timer is reset, so time spent on one video can never count toward another.
-- **Tracking in the full-screen viewer is required.** The review card and the full-screen viewer each track on their own, and both send the same source, id and media identity. Whichever reaches 2.5 seconds first records the view, and the database's uniqueness rule stops the other from counting it again. If the viewer doesn't track yet, it is connected to the existing tracker without changing playback or handoff.
-- Analytics only appear in the existing admin area, if there is a suitable place for them. No new dashboard and no public counters.
+**Step 3 — App wiring (existing screens only)**
+- These screens play review videos today, and all of them go through the shared review media block:
+  - the review card on entity pages and profiles (`review`)
+  - the timeline review card on entity pages (`review` for the review itself, `review_update` for its updates)
+  - the review timeline viewer on profiles (`review` and `review_update`)
+  - the existing full-screen viewer that opens from that same media block
+- "Review"-type Posts on Home are Posts. They stay on `source='post'`, and nothing on Home is touched.
+- The full-screen viewer exists but doesn't record views today. The media block will pass it `source` and `source_id` so it can track using the existing tracker. It only tracks when those values are provided, so Posts and other callers are unaffected. No new viewer is created, and playback, autoplay, mute and handoff stay the same.
+- The review media block passes `source={kind}` to the card player. Remove the line that turns tracking off for reviews (`enabled: source !== 'review'`).
+- New rules for counting time (excluding buffering and seeking, and keeping the total across pauses) apply **only to `review` and `review_update`**. Post tracking keeps its exact current behaviour.
+- If the content or media being watched changes, the timer is reset.
+- The card and the viewer track on their own but share one identity. Whichever reaches 2.5 seconds first records the view, and the database stops the other from counting it again.
+- The canonical storage identity includes **both the bucket and the object path**, so files in different buckets can't collide. Mux videos use their playback ID.
+- No admin dashboard in this phase. The secure admin summary function is the deliverable. Showing it in the admin area is optional later polish.
 
 **Step 4 — Tests and docs**
 - Tracker tests:
