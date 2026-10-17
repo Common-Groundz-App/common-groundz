@@ -19,6 +19,7 @@ interface YelpStyleMediaPreviewProps {
    */
   playVideos?: boolean;
   onVideoTap?: (index: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
+  videoSource?: 'review' | 'review_update';
   videoSourceId?: string;
   videoResume?: { index: number; handoff: VideoExitHandoff } | null;
   onResumeConsumed?: () => void;
@@ -30,6 +31,7 @@ export function YelpStyleMediaPreview({
   className,
   playVideos = false,
   onVideoTap,
+  videoSource = 'review',
   videoSourceId,
   videoResume,
   onResumeConsumed,
@@ -60,7 +62,7 @@ export function YelpStyleMediaPreview({
             className="h-full w-full"
             objectFit="cover"
             showBadge={false}
-            source="review"
+            source={videoSource}
             sourceId={videoSourceId}
             onTap={(handoff, extras) => onVideoTap?.(index, handoff, extras)}
             resumeState={videoResume?.index === index ? videoResume.handoff : undefined}
