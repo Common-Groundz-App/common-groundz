@@ -5,7 +5,7 @@ import { render, act } from '@testing-library/react';
 let ioCb: ((e: any[]) => void) | null = null;
 class IO { constructor(cb: any) { ioCb = cb; } observe() {} disconnect() {} }
 (globalThis as any).IntersectionObserver = IO;
-const invoke = vi.fn(() => Promise.resolve({}));
+const invoke = vi.fn((..._a: any[]) => Promise.resolve({}));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: { functions: { invoke: (...a: any[]) => invoke(...a) } } }));
 
 import { useVideoViewTracker, type ViewSource } from '@/hooks/useVideoViewTracker';
