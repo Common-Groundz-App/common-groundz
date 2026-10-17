@@ -4052,6 +4052,15 @@ export type Database = {
         }
       }
       admin_pending_entity_count: { Args: never; Returns: number }
+      admin_review_video_view_stats: {
+        Args: { _source?: string; _source_id?: string }
+        Returns: {
+          anonymous_sessions: number
+          qualified_views: number
+          registered_viewers: number
+          source: string
+        }[]
+      }
       calculate_entity_trending_score_v2: {
         Args: { p_entity_id: string }
         Returns: number
