@@ -447,7 +447,7 @@ cross-read between them.
   - [ ] Step 4: view-tracking groundwork (only if Step 1 showed it needed)
   - [ ] Step 5: owner close-out check (edit post, remove photo, confirm right video plays and stays linked)
 - [ ] Phase 5: review + timeline-update view counts — implemented, awaiting focused QA (see docs/verification/review-video-phase-5.md)
-- [ ] Phase 6: recheck (suite + short signed-in check: post, review, update views)
+- [ ] Phase 6: final video-program verification — automated/read-only audit recorded in docs/verification/phase-6-e2e-closeout.md (2026-10-17): 90 Vitest files, 1,156 passed / 3 skipped / 0 failed; 6 Deno helper tests and 6 separate Edge typechecks pass; production Review videos OFF. Genuine defects corrected: Review display-vs-saved analytics identity, deleted-media rejection, webhook typing, production upload diagnostics; two omitted regression suites enabled. Owner device QA, authenticated endpoint/RPC and concurrency tests, isolated lifecycle SQL reruns, current independent client TypeScript/production build, historical exclusions reconciliation and storage provenance remain pending/blocked. Do not mark program complete before required QA and explicit exception acceptance; no automatic Phase 7.
 - Deferred: admin stuck/failed post video count
 - [ ] Payments: collect customer payments — blocked: built-in payments need Lovable Cloud; project uses an external Supabase
 
