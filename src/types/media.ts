@@ -12,6 +12,8 @@ export interface MediaItem {
   is_deleted?: boolean;
   session_id?: string;
   id?: string;
+  /** Review display projection only: the original persisted ID for analytics. Never saved. */
+  viewMediaId?: string;
   /**
    * Composer-local render identity (Phase 4 Step 3). Generated once when an
    * item enters composer state; keys React tiles, local preview blob URLs and

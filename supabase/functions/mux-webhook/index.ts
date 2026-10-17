@@ -2,7 +2,7 @@
 // Verifies Mux signature on raw body, deduplicates by event_id, updates mux_uploads.
 // verify_jwt = false (signature is the auth).
 
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 
 function hexToBytes(hex: string): Uint8Array {
   const len = hex.length / 2
@@ -47,7 +47,7 @@ function parseMuxSignature(header: string): { t: string; v1: string } | null {
 }
 
 async function reconcilePendingMappings(
-  admin: ReturnType<typeof createClient>,
+  admin: SupabaseClient,
   ctx: { uploadId?: string; assetId?: string; eventId: string; eventType: string },
 ): Promise<void> {
   const { eventId, eventType, assetId } = ctx

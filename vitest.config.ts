@@ -37,6 +37,8 @@ const nodeIncludes = [
   'src/utils/brandTextHelpers.test.ts',
   'src/utils/renderBranching.test.ts',
   'src/utils/__tests__/mediaIdentity.test.ts',
+  'src/utils/__tests__/postDisplayMedia.test.ts',
+  'src/utils/__tests__/lightboxHandoffSeek.test.ts',
   'src/utils/__tests__/placeholderMerge.test.ts',
   'src/utils/viewportKeyboard.test.ts',
   'src/hooks/useMuxStatus.test.ts',

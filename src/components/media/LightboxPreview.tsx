@@ -138,7 +138,7 @@ export function LightboxPreview({
     source: viewSource ?? 'review',
     sourceId: viewSourceId,
     mediaPath: trackedItem?.type === 'video' ? (resolveVideoSrc(trackedItem).src ?? '') : '',
-    mediaId: trackedItem?.id,
+    mediaId: trackedItem?.viewMediaId,
     autoplayRef: viewAutoplayRef,
     enabled: !!viewSource && !!viewSourceId && isReviewViewSource(viewSource) && trackedItem?.type === 'video',
   });

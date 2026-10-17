@@ -30,3 +30,9 @@ Deno.test('non-array media rejected', () => {
   assertEquals(resolveReviewVideo(null, 'v1', ''), null);
   assertEquals(canonicalVideoIdentity(undefined), null);
 });
+
+Deno.test('deleted persisted media cannot qualify even when ready', () => {
+  const deleted = [{ ...media[1], is_deleted: true }];
+  assertEquals(resolveReviewVideo(deleted, 'v1', 'https://stream.mux.com/PB1.m3u8'), null);
+  assertEquals(resolveReviewVideo(deleted, undefined, 'https://stream.mux.com/PB1.m3u8'), null);
+});

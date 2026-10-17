@@ -2,6 +2,8 @@
 
 Status: **implemented, awaiting focused QA** (not yet marked complete). The review video flag remains OFF in production.
 
+Phase 6 audit correction (2026-10-17): the earlier automatic results did not establish end-to-end correctness. Review display keys were being submitted as persisted media IDs; card/lightbox now use the separately retained original `viewMediaId`. Deleted media is rejected server-side. Regression checks: full app 1,156 passed / 3 skipped / 0 failed; Edge helpers 6 passed; six separate Edge entry-point typechecks passed. Owner device/integration/concurrency QA remains pending; see `phase-6-e2e-closeout.md` for evidence and blockers. Current independent client typecheck/production build have not been rerun in this restricted harness.
+
 ## Metric
 - A qualified view is recorded after at least 2.5 s of eligible playback, added up within one player session. Eligible means: playing, at least 50% visible, tab visible, and not buffering (`waiting`) or seeking. Pausing keeps the time already counted. The timer resets when the content or media changes.
 - The card and the full-screen viewer are separate sessions, and their time is not combined (1.5 s + 1.5 s does not qualify). Both send the same `(source, source_id, canonical media identity)`, so the first one to qualify writes the view and the database uniqueness rules stop the second.

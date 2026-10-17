@@ -41,6 +41,7 @@ vi.mock('@/hooks/useFeedVideoManager', () => ({
 
 import { ReviewMediaBlock } from '@/components/media/ReviewMediaBlock';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
+import { resolveReviewVideo } from '../../../../supabase/functions/track-media-view/reviewMedia';
 
 const photo = (id: string, order: number): MediaItem => ({ id, url: `https://x/${id}.jpg`, type: 'image', order });
 const ready = (upload: string, order: number): MediaItem => ({
@@ -85,6 +86,23 @@ describe('display rule', () => {
 });
 
 describe('stable identity', () => {
+  it.each(['review', 'review_update'] as const)('keeps %s display identity separate from persisted analytics identity', (kind) => {
+    const persisted = [{ ...ready('upload-1', 0), id: 'saved-video-1' }];
+    const projected = visibleReviewMedia(persisted, { kind, ownerId: 'entry-1', ...other }).items[0];
+    expect(projected?.id).toBe(`${kind}:entry-1:upload-1`);
+    expect(projected?.viewMediaId).toBe('saved-video-1');
+    expect(resolveReviewVideo(persisted, projected?.viewMediaId, '')).toBe(`mux:${persisted[0].mux_playback_id}`);
+    expect(persisted[0].id).toBe('saved-video-1');
+  });
+
+  it('ID-less legacy Review media uses canonical matching, never the display key', () => {
+    const persisted = [ready('legacy-upload', 0)];
+    const projected = visibleReviewMedia(persisted, { kind: 'review', ownerId: 'r', ...other }).items[0];
+    expect(projected?.viewMediaId).toBeUndefined();
+    expect(resolveReviewVideo(persisted, projected?.viewMediaId, `https://stream.mux.com/${persisted[0].mux_playback_id}.m3u8`))
+      .toBe(`mux:${persisted[0].mux_playback_id}`);
+  });
+
   it('uses owner + upload id, never position', () => {
     const a = visibleReviewMedia([ready('u1', 0), photo('p', 1)], { kind: 'review', ownerId: 'r1', ...other });
     const b = visibleReviewMedia([photo('p', 0), ready('u1', 1)], { kind: 'review', ownerId: 'r1', ...other });
