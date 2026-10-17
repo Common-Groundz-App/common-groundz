@@ -69,7 +69,7 @@ export function visibleReviewMedia(
       if (state === 'owner_failed_locked' && ownerNotice !== 'failed_editable') ownerNotice = 'failed_locked';
       return true;
     })
-    .map((m) => ({ ...m, id: stableReviewMediaId(ctx.kind, ctx.ownerId, m) }));
+    .map((m) => ({ ...m, viewMediaId: m.id, id: stableReviewMediaId(ctx.kind, ctx.ownerId, m) }));
   return { items, ownerNotice };
 }
 

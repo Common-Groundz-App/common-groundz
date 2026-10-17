@@ -64,7 +64,7 @@
 
 ## Debug/diagnostic logging
 - `[feed-video-mobile]` gated by `FEED_VIDEO_DEBUG` — enabled only in DEV mode or with `?feedvideodebug=1` query parameter. No output in production builds.
-- `[post-video-timing]` uses `console.debug` — suppressed in production by default browser console level.
+- `[post-video-timing]` is gated by `import.meta.env.DEV` (corrected during Phase 6); browser console verbosity alone was not a production logging gate.
 
 ## Code audit — no obsolete paths remain
 - No Post video identity by array index where a stable media ID exists (`media_index` used only for Mux mapping position data in save payloads, never identity).

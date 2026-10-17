@@ -336,7 +336,7 @@ function FeedVideoPlayer({
     source,
     sourceId,
     mediaPath: reviewTracked ? (resolveVideoSrc(item).src ?? item.url) : extractMediaPath(item.url),
-    mediaId: reviewTracked ? item.id : undefined,
+    mediaId: reviewTracked ? item.viewMediaId : undefined,
     autoplayRef,
     enabled: reviewTracked ? !srcOverride : true,
   });

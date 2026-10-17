@@ -8,11 +8,12 @@ export interface PersistedMedia {
   provider?: string;
   mux_status?: string;
   mux_playback_id?: string;
+  is_deleted?: boolean;
 }
 
 /** Canonical dedupe identity from a persisted media record, or null if not a ready video. */
 export function canonicalVideoIdentity(m: PersistedMedia | null | undefined): string | null {
-  if (!m || m.type !== 'video') return null;
+  if (!m || m.type !== 'video' || m.is_deleted) return null;
   if (m.provider === 'mux') {
     if (m.mux_status !== 'ready' || !m.mux_playback_id) return null;
     return `mux:${m.mux_playback_id}`;
