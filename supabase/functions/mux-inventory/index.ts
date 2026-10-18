@@ -55,9 +55,10 @@ Deno.serve(async req => {
     const scan = await scanAssets(get)
     const sets = compareSets(scan.assets, db.uploads)
     const assets = new Map(scan.assets.map(a => [a.id, a]))
+    const savedOnlyIds = references.flatMap(r => r.media ?? []).map(m => m.mux_asset_id).filter((id): id is string => typeof id === 'string' && id.length > 0)
     const observations = []
     const now = Date.now()
-    for (const id of new Set([...sets.mux_present, ...sets.database_recorded])) {
+    for (const id of new Set([...sets.mux_present, ...sets.database_recorded, ...savedOnlyIds])) {
       const present = assets.get(id)
       // Even a complete list absence is not a 404: probe each suspected gap.
       const probe = present ? undefined : await get(`/assets/${encodeURIComponent(id)}`)
@@ -66,8 +67,11 @@ Deno.serve(async req => {
       observations.push({ ...classify(id, present ?? probedAsset, presence, db, scan.complete, now), probe_http_status: present ? 200 : probe?.status })
     }
     return reply({ mode: 'read_only', started_at: started, finished_at: new Date().toISOString(),
-      atomic_snapshot: false, inventory_complete: scan.complete, scan, sets,
+      atomic_snapshot: false, inventory_complete: scan.complete,
+      scan: { complete: scan.complete, pages: 'pages' in scan ? scan.pages : null, failed_page: 'failed_page' in scan ? scan.failed_page : null }, sets,
       upload_rows: uploads.length, observations,
+      uploads_without_asset: db.uploads.filter(u => !u.asset_id).map(u => ({ upload_record_id: u.id, status: u.status,
+        expires_at: u.expires_at, reference_state: references.some(r => r.media?.some(m => m.mux_upload_id === u.upload_id)) ? 'saved_reference' : 'ambiguous_needs_upload_reconciliation' })),
       warnings: ['No durable active-composer ledger; candidates are not deletion authorization.', 'Posts lack deleted_at; historical deleted references remain ambiguous.', 'DB and Mux are separate observations; concurrent changes require a new audit.'],
       flags: (await admin.rpc('get_public_flags')).data })
   } catch { return reply({ error: 'inventory_failed_inconclusive' }, 503) }

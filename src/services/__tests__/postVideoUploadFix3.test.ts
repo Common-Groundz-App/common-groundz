@@ -174,6 +174,19 @@ describe('Fix 3 — Post Mux upload pipeline', async () => {
     expect(item!.thumbnail_url).toBeTruthy();
   });
 
+  it('new Post upload declares kind post without changing the handshake', async () => {
+    await run(svc.uploadMedia(file(), 'u', 's'));
+    expect(log.find(l => l.startsWith('create:'))).toBe('create:{"kind":"post"}@0');
+  });
+
+  it.each(['review', 'review_update'] as const)('Mux-only upload declares exact kind %s and size', async kind => {
+    await run(svc.uploadMedia(file(), 'u', 's', undefined, { videoMuxOnly: true, muxKind: kind }));
+    const entry = log.find(l => l.startsWith('create:'));
+    expect(entry).toBeDefined();
+    const body = JSON.parse(entry?.slice(7).split('@')[0] ?? '{}');
+    expect(body).toEqual({ declared_size: 1000, kind });
+  });
+
   it('reports all-bytes-sent as 100% "finalizing" and never drops back to 0', async () => {
     const item = await run(svc.uploadMedia(file(), 'u', 's', (p, st) => stages.push(`${st}:${p}`)));
     expect(item).not.toBeNull();
