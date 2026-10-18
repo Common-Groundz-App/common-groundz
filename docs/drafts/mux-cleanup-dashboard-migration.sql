@@ -191,9 +191,30 @@ BEGIN
     (SELECT * FROM public.mux_cleanup_runs ORDER BY started_at DESC, id DESC LIMIT p_limit) r), '[]');
 END $$;
 
+-- 8b. Run detail: one run plus the exact audit rows its dry run produced
+CREATE FUNCTION public.admin_mux_cleanup_run_detail(p_run_id uuid)
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE r public.mux_cleanup_runs; v_audit jsonb := '[]'; v_n int := 0;
+BEGIN
+  PERFORM public.mux_cleanup_require_admin();
+  SELECT * INTO r FROM public.mux_cleanup_runs WHERE id = p_run_id;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  IF r.worker_run_id IS NOT NULL THEN  -- sweeps have no worker_run_id: empty list
+    SELECT COALESCE(jsonb_agg(to_jsonb(a) ORDER BY a.created_at DESC, a.id DESC), '[]'), count(*) INTO v_audit, v_n FROM
+      (SELECT id, run_id, mode, action, details, created_at FROM public.mux_cleanup_audit_logs
+        WHERE run_id = r.worker_run_id ORDER BY created_at DESC, id DESC LIMIT 51) a;
+    IF v_n > 50 THEN v_audit := v_audit - 50; END IF;
+  END IF;
+  RETURN jsonb_build_object('run', public.mux_cleanup_run_json(r), 'audit', v_audit, 'audit_truncated', v_n > 50);
+END $$;
+
 -- 9. Manual run wrapper (shared by sweep and dry run)
 -- Recovery boundary covers the worker call, result validation AND success finalization.
 -- Only the ledger INSERT is outside it, so any failure inside leaves a 'failed' row.
+-- Worker contract (checked against installed Phase 3 functions): mux_cleanup_dry_run returns
+-- exactly {run_id, mode, would_delete, rescued, ambiguous}; mux_cleanup_sweep returns exactly
+-- {protected_recorded}. Neither returns a busy/failed result; errors are raised.
+-- Limitation: a dropped connection or aborted transaction leaves no ledger row.
 CREATE FUNCTION public.mux_cleanup_execute_run(p_kind text, p_limit int, p_source text, p_actor uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE v_id uuid; v_res jsonb; v_state text; v_wid text;
@@ -256,11 +277,11 @@ GRANT EXECUTE ON FUNCTION public.mux_cleanup_try_run_lock(), public.mux_cleanup_
   public.mux_cleanup_run_json(public.mux_cleanup_runs) TO service_role;
 REVOKE ALL ON FUNCTION public.admin_mux_cleanup_overview(), public.admin_list_mux_candidates(text,text,text,text,int,int),
   public.admin_mux_candidate_detail(uuid), public.admin_list_mux_observations(text,int,int),
-  public.admin_list_mux_cleanup_runs(int), public.admin_run_mux_sweep(), public.admin_run_mux_dry_run(int)
+  public.admin_list_mux_cleanup_runs(int), public.admin_mux_cleanup_run_detail(uuid), public.admin_run_mux_sweep(), public.admin_run_mux_dry_run(int)
   FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.admin_mux_cleanup_overview(), public.admin_list_mux_candidates(text,text,text,text,int,int),
   public.admin_mux_candidate_detail(uuid), public.admin_list_mux_observations(text,int,int),
-  public.admin_list_mux_cleanup_runs(int), public.admin_run_mux_sweep(), public.admin_run_mux_dry_run(int)
+  public.admin_list_mux_cleanup_runs(int), public.admin_mux_cleanup_run_detail(uuid), public.admin_run_mux_sweep(), public.admin_run_mux_dry_run(int)
   TO authenticated;
 
 COMMIT;
