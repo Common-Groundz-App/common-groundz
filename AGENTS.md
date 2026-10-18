@@ -1,5 +1,8 @@
 # Project architecture rules
 
+- Mux upload creation preallocates the persisted row UUID for server-only correlation metadata; a failed/uncertain insert returns no signed URL and logs correlation only, avoiding a hidden lineage gap without fake upload IDs.
+- Mux cleanup inventory is an admin-only observational Edge endpoint with independent reference/existence dimensions and fail-closed protection; it has no mutation or scheduling capability, so dry-run cannot become accidental cleanup.
+
 - Resolve update destinations from persisted entity and parent slugs during the signed-in existing-review lookup, and consume one-time modal navigation state on the destination; this avoids intermediate ID/query URLs without changing durable deep links.
 - Review and timeline-update Mux videos are validated, made trustworthy and linked by database triggers inside the same save, and only the trusted-server patch may write Mux state; this removes the two-step registration failure window posts have and keeps client-supplied playback data out.- Review composers send kept saved videos back exactly as loaded and new videos with identity fields only, upload videos through Mux only (no storage fallback), and treat the review-video setting as gating new picks only; this keeps trusted Mux state server-owned and makes switching the setting off never alter saved videos.
 - Review/timeline media is drawn only through `ReviewMediaBlock` + `visibleReviewMedia` (stable ids, owner/edit-window display rule); saved videos track with explicit review/update context, while composer previews do not, keeping attribution and Post analytics separate.

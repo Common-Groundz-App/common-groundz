@@ -3,6 +3,7 @@
 // Requires authenticated user. Env-driven origin allowlist + two-layer rate limit.
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { parseUploadBody, uploadAssetSettings, persistCreatedUpload, MAX_DECLARED_BYTES } from './metadata.ts'
 
 const corsBase: Record<string, string> = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -59,9 +60,10 @@ Deno.serve(async (req) => {
   }
   const token = authHeader.slice('Bearer '.length)
 
-  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-  const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
-  const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+  const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
+  const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!SUPABASE_URL || !ANON_KEY || !SERVICE_KEY) return json({ error: 'server_not_configured' }, 500, cors)
 
   const authClient = createClient(SUPABASE_URL, ANON_KEY, {
     global: { headers: { Authorization: authHeader } },
@@ -71,6 +73,13 @@ Deno.serve(async (req) => {
     return json({ error: 'unauthorized' }, 401, cors)
   }
   const userId = claimsRes.claims.sub as string
+
+  let kind: ReturnType<typeof parseUploadBody>['kind']
+  try { kind = parseUploadBody(await req.text()).kind } catch (error) {
+    const code = error instanceof Error ? error.message : 'invalid_body'
+    return json({ error: code, ...(code === 'file_too_large' ? { max_bytes: MAX_DECLARED_BYTES } : {}) },
+      code === 'file_too_large' ? 413 : 400, cors)
+  }
 
   const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -130,26 +139,6 @@ Deno.serve(async (req) => {
     return json({ error: 'MUX_DISABLED', code: 'MUX_DISABLED' }, 503, cors)
   }
 
-  // Optional declared file size (review composers send it). Client-reported, so
-  // this is a guard, not proof of the uploaded byte size. Posts may omit it.
-  const MAX_DECLARED_BYTES = 100 * 1024 * 1024
-  try {
-    const raw = await req.text()
-    if (raw) {
-      const declared = (JSON.parse(raw) as Record<string, unknown>)?.declared_size
-      if (declared !== undefined) {
-        if (typeof declared !== 'number' || !Number.isFinite(declared) || declared <= 0) {
-          return json({ error: 'invalid_declared_size' }, 400, cors)
-        }
-        if (declared > MAX_DECLARED_BYTES) {
-          return json({ error: 'file_too_large', max_bytes: MAX_DECLARED_BYTES }, 413, cors)
-        }
-      }
-    }
-  } catch {
-    return json({ error: 'invalid_json' }, 400, cors)
-  }
-
   // Mux config
   const muxId = Deno.env.get('MUX_TOKEN_ID')
   const muxSecret = Deno.env.get('MUX_TOKEN_SECRET')
@@ -160,31 +149,40 @@ Deno.serve(async (req) => {
 
   // Allowed playback policy — single source of truth
   const TIMEOUT_SECONDS = 3600
+  // Allocate before contacting Mux; mux_uploads.upload_id is NOT NULL, so a
+  // pre-Mux insert would require a schema change or invented upload identity.
+  const uploadRecordId = crypto.randomUUID()
   const MUX_BODY = {
     cors_origin: origin ?? '*',
-    new_asset_settings: {
-      playback_policy: ['public'],
-    },
+    new_asset_settings: uploadAssetSettings(uploadRecordId, kind, isTest),
     timeout: TIMEOUT_SECONDS,
     test: isTest,
   }
 
-  const muxRes = await fetch('https://api.mux.com/video/v1/uploads', {
+  let muxRes: Response
+  try { muxRes = await fetch('https://api.mux.com/video/v1/uploads', {
     method: 'POST',
     headers: {
       'Authorization': 'Basic ' + btoa(`${muxId}:${muxSecret}`),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(MUX_BODY),
-  })
+  }) } catch {
+    console.error(JSON.stringify({ event: 'mux_create_outcome_unknown', upload_record_id: uploadRecordId }))
+    return json({ error: 'mux_create_failed' }, 502, cors)
+  }
 
   if (!muxRes.ok) {
-    const detail = await muxRes.text()
-    console.error('mux_create_failed', muxRes.status, detail)
+    await muxRes.text()
+    console.error(JSON.stringify({ event: 'mux_create_failed', status: muxRes.status, upload_record_id: uploadRecordId }))
     return json({ error: 'mux_create_failed', status: muxRes.status }, 502, cors)
   }
 
-  const muxJson = await muxRes.json()
+  let muxJson
+  try { muxJson = await muxRes.json() } catch {
+    console.error(JSON.stringify({ event: 'mux_create_invalid_response', upload_record_id: uploadRecordId }))
+    return json({ error: 'mux_invalid_response' }, 502, cors)
+  }
   const data = muxJson?.data ?? {}
   const uploadId: string | undefined = data.id
   const uploadUrl: string | undefined = data.url
@@ -196,16 +194,16 @@ Deno.serve(async (req) => {
   const timeoutSec = typeof data.timeout === 'number' ? data.timeout : TIMEOUT_SECONDS
   const expiresAt = new Date(Date.now() + timeoutSec * 1000).toISOString()
 
-  const { error: insertErr } = await admin.from('mux_uploads').insert({
+  const persisted = await persistCreatedUpload({
+    id: uploadRecordId,
     user_id: userId,
     upload_id: uploadId,
     status: 'waiting',
     is_test: isTest,
     expires_at: expiresAt,
-  })
+  }, row => admin.from('mux_uploads').insert(row), event => console.error(JSON.stringify(event)))
 
-  if (insertErr) {
-    console.error('mux_uploads_insert_failed', insertErr)
+  if (!persisted) {
     return json({ error: 'db_insert_failed' }, 500, cors)
   }
 

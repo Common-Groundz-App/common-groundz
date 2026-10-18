@@ -69,6 +69,7 @@ interface MediaUploaderProps {
    * never added). Default false (posts unchanged).
    */
   videoMuxOnly?: boolean;
+  muxKind?: 'post' | 'review' | 'review_update';
   /** Composer publishing flow: real byte progress and cancel-safe video handoff. */
   truthfulVideoProgress?: boolean;
   /**
@@ -313,6 +314,7 @@ export function MediaUploader({
   allowVideo = true,
   videoRefusedMessage,
   videoMuxOnly = false,
+  muxKind,
   truthfulVideoProgress = false,
   onVideoStarted,
 }: MediaUploaderProps) {
@@ -537,7 +539,7 @@ export function MediaUploader({
               : u
           )
         );
-      }, videoMuxOnly ? { videoMuxOnly: true } : postOpts).then((mediaItem) => {
+      }, videoMuxOnly ? { videoMuxOnly: true, muxKind } : postOpts).then((mediaItem) => {
         abortControllersRef.current.delete(file);
         if ((videoMuxOnly || truthfulVideoProgress) && cancelledFilesRef.current.has(file)) {
           // Cancelled while transferring: never added; slot released once.

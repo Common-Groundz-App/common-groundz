@@ -426,7 +426,12 @@ cross-read between them.
   - [ ] Separate decision: Phase 1 overlap unverified
   - [ ] Later decision: posts' unknown-length gap (NaN passes the 60 s check)
   - [ ] Later product decision: Circle reviews are author-only today (no Circle read rule)
-- [ ] Later: Mux asset cleanup (abandoned /create uploads, removed/deleted videos, historical unlinked assets)
+- [ ] Mux asset cleanup (abandoned /create uploads, removed/deleted videos, historical unlinked assets)
+  - [x] Phase 1 pure read-only audit — complete; manual Mux deletions explain historical drift.
+  - [ ] Phase 2A new-upload correlation metadata implemented/deployed; tests pass; real signed-in provider round-trip blocked. See docs/verification/mux-cleanup-phase-2.md.
+  - [ ] Phase 2B classifier implemented/deployed; tests pass; fresh Mux inventory blocked by absent authenticated admin session. Database-only fresh report recorded; awaiting owner review, no historical mutations.
+  - [ ] Phase 3 deletion queue, durable attachment/deletion barrier and pg_cron worker — not authorized; waits for owner review.
+  - [ ] Historical/live deletion activation — separate owner approval; four historical candidates protected.
 - [ ] Later: private / Circle review video playback (signed Mux playback)
 - [x] 3D — cutover of entry points: complete and verified by the owner's signed-in ON/OFF test (all 8 checklist steps passed: write from home and entity page, text-only and photo-removal edits, add/edit timeline update, read-only viewer, `?compose=update` owner vs non-owner, mid-draft switch-off, inline undo/delete, popup restored when OFF). Switch left ON. Evidence: docs/verification/review-composer-3d.md
 - [ ] 3E — remove the legacy popup, the rollout switch and `?compose=update` compatibility: DEFERRED until the next round of new-review-page changes is stable. Until then the legacy popup form (`ReviewForm`) and the legacy inline timeline form in `ReviewTimelineViewer` are FROZEN — rollback path only; no new features or product changes there; all review/timeline work targets the new page composer only; the switch stays available for emergency rollback

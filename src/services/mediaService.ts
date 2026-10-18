@@ -170,6 +170,8 @@ export const isMuxEnabled = (): boolean => ENV_FALLBACK_ENABLED;
 export const VIDEO_UPLOADS_UNAVAILABLE = 'Video uploads are unavailable right now. Try again later.';
 
 export interface UploadMediaOptions {
+  /** Operational metadata only; never authorization or deletion authority. */
+  muxKind?: 'post' | 'review' | 'review_update';
   /**
    * Review composers: videos must go to Mux. No storage fallback; a disabled
    * or failing Mux surfaces as an error. Sends the browser-reported size
@@ -218,7 +220,7 @@ export const uploadMedia = async (
     if (isVideo && options.videoMuxOnly) {
       const cfg = await resolveMuxConfig();
       if (!cfg.uploadsEnabled) throw new Error(VIDEO_UPLOADS_UNAVAILABLE);
-      return await uploadVideoViaMux(file, userId, sessionId, onProgress, file.size);
+      return await uploadVideoViaMux(file, userId, sessionId, onProgress, file.size, options.muxKind);
     }
 
     // ===== Mux upload branch (videos only, runtime-flag gated) =====
@@ -425,7 +427,8 @@ async function uploadVideoViaMux(
   userId: string,
   sessionId: string,
   onProgress?: (progress: number, stage?: UploadStage) => void,
-  declaredSize?: number
+  declaredSize?: number,
+  kind?: UploadMediaOptions['muxKind']
 ): Promise<MediaItem> {
   analytics.trackMuxUploadAttempt({ size: file.size, format: file.type });
 
@@ -474,7 +477,7 @@ async function uploadVideoViaMux(
   try {
     const { data, error } = await supabase.functions.invoke<MuxCreateUploadResponse>(
       'mux-create-upload',
-      { body: typeof declaredSize === 'number' ? { declared_size: declaredSize } : {} }
+      { body: { ...(typeof declaredSize === 'number' ? { declared_size: declaredSize } : {}), ...(kind ? { kind } : {}) } }
     );
     if (error) throw error;
     if (!data?.upload_id || !data?.upload_url) {
@@ -598,7 +601,7 @@ async function uploadPostVideoViaMux(
   let upload: MuxCreateUploadResponse;
   try {
     mark('link requested');
-    const { data, error } = await supabase.functions.invoke<MuxCreateUploadResponse>('mux-create-upload', { body: {} });
+    const { data, error } = await supabase.functions.invoke<MuxCreateUploadResponse>('mux-create-upload', { body: { kind: 'post' } });
     mark('link received');
     if (error) throw error;
     if (!data?.upload_id || !data?.upload_url) throw new Error('Invalid mux-create-upload response');
