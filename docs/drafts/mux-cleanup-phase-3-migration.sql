@@ -293,9 +293,10 @@ CREATE OR REPLACE FUNCTION public.mux_cleanup_posts_trg()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
-    IF NOT COALESCE(OLD.is_deleted, false) THEN
-      PERFORM public.mux_enqueue_removed_media(OLD.media, '[]'::jsonb, 'post', 'post_hard_deleted', OLD.id);
-    END IF;
+    -- Always enqueue, including already-soft-deleted historical Posts whose
+    -- soft delete predates Phase 3. Enqueue is idempotent, so a post that was
+    -- enqueued at soft-delete time keeps its original grace clock.
+    PERFORM public.mux_enqueue_removed_media(OLD.media, '[]'::jsonb, 'post', 'post_hard_deleted', OLD.id);
     RETURN OLD;
   END IF;
   IF TG_OP = 'INSERT' THEN
