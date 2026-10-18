@@ -478,3 +478,4 @@ cross-read between them.
 - [ ] Live deletion worker (separate future package)
 
 - [ ] Phase 3: fix dry-run worker lock order (asset advisory lock before candidate row lock), add lock-order DB test, then apply migration + run 21+ DB checks
+- [ ] Phase 3: protect historical soft-deleted Post purges (protected_ambiguous, not pending_grace) + DB tests T14/T15
