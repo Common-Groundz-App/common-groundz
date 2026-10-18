@@ -30,7 +30,7 @@ Deployed admin-only GET `mux-inventory`: verified JWT + database `has_role` chec
 | Complete app suite | PASS | `bun run test`: 90 files, 1,159 passed, 3 skipped, 0 failed; includes exact Post/Review/update kind request regression checks |
 | Metadata/classifier/analytics helpers | PASS | Deno: 22 passed, 0 failed (6 metadata + 10 classifier + 6 existing review analytics) |
 | Both changed Edge entrypoints | PASS | `deno check --no-lock --node-modules-dir=auto` clean; explicit SDK version used for CORS export unavailable in the project's older client SDK |
-| Preview build | Verification pending refresh | Initial changes reported build OK. Deno auto-resolution temporarily installed a newer SDK and caused client type errors; original locked dependencies restored with frozen forced install. Final harness result must be read after restoration; no client code was weakened to suppress errors |
+| Preview build | PASS | Final harness log **2026-10-18 03:51:27 UTC: build OK**. Deno auto-resolution temporarily installed a newer SDK; original locked dependencies restored with frozen forced install. No client code was weakened to suppress errors |
 | Standalone client typechecks/production build | BLOCKED by execution policy | This environment forbids manual project builds/typechecks; harness validation used instead. These were not represented as standalone runs |
 | Edge deployment | PASS | mux-create-upload submitted SHA-256 `62b827980775af720b20d1737554cc8206213816fa3193fed1aa806d9bb4a77c`; inventory `334774104490d8aede995c30b1ce79d89cab33d154a53e1a9126d2f497a2146d` |
 | Anonymous inventory access | PASS | Deployed GET `/mux-inventory` returns HTTP 401 `unauthorized` |
