@@ -83,7 +83,7 @@ INSERT INTO t_results SELECT 'unresolved_observed',
 -- T8 review hard delete cascades to timeline update videos
 WITH r AS (
   INSERT INTO public.reviews (user_id, entity_id, title, rating, category, media)
-  SELECT (SELECT id FROM auth.users LIMIT 1), (SELECT id FROM public.entities LIMIT 1), 'p3test', 4, 'other',
+  SELECT (SELECT id FROM auth.users LIMIT 1), (SELECT id FROM public.entities WHERE type='movie' AND NOT COALESCE(is_deleted,false) LIMIT 1), 'p3test', 4, 'movie',
          '[{"type":"video","provider":"mux","mux_upload_id":"p3test_up_3"}]'::jsonb
   RETURNING id)
 INSERT INTO public.review_updates (review_id, user_id, comment, media)
