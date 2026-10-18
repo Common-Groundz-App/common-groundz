@@ -476,3 +476,5 @@ cross-read between them.
 - [ ] Owner review → apply migration → run DB tests (blocked on approval)
 - [ ] Cron + 48–72h dry-run observation (separate approval)
 - [ ] Live deletion worker (separate future package)
+
+- [ ] Phase 3: fix dry-run worker lock order (asset advisory lock before candidate row lock), add lock-order DB test, then apply migration + run 21+ DB checks
