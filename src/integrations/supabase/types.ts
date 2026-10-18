@@ -1904,6 +1904,155 @@ export type Database = {
         }
         Relationships: []
       }
+      mux_cleanup_audit_logs: {
+        Row: {
+          action: string
+          candidate_id: string | null
+          created_at: string
+          details: Json | null
+          id: string
+          mode: string
+          mux_asset_id: string
+          run_id: string
+        }
+        Insert: {
+          action: string
+          candidate_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          mode: string
+          mux_asset_id: string
+          run_id: string
+        }
+        Update: {
+          action?: string
+          candidate_id?: string | null
+          created_at?: string
+          details?: Json | null
+          id?: string
+          mode?: string
+          mux_asset_id?: string
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mux_cleanup_audit_logs_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "mux_deletion_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mux_cleanup_observations: {
+        Row: {
+          created_at: string
+          details: Json | null
+          id: string
+          kind: string
+          mux_asset_id: string | null
+          mux_upload_id: string | null
+          source_id: string | null
+          source_kind: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          kind: string
+          mux_asset_id?: string | null
+          mux_upload_id?: string | null
+          source_id?: string | null
+          source_kind: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          kind?: string
+          mux_asset_id?: string | null
+          mux_upload_id?: string | null
+          source_id?: string | null
+          source_kind?: string
+        }
+        Relationships: []
+      }
+      mux_deletion_candidates: {
+        Row: {
+          claim_generation: number
+          created_at: string
+          destructive_claim_token: string | null
+          destructive_claimed_at: string | null
+          discovered_at: string
+          eligible_at: string
+          enqueue_reason: string
+          error_details: Json | null
+          id: string
+          is_destructively_claimed: boolean
+          last_check_result: string | null
+          last_checked_at: string | null
+          lifecycle_attempt: number
+          mux_asset_id: string
+          protection_reason: string | null
+          retry_count: number
+          source_kind: string
+          status: string
+          updated_at: string
+          upload_record_id: string | null
+          worker_lease_expires_at: string | null
+          worker_lease_id: string | null
+        }
+        Insert: {
+          claim_generation?: number
+          created_at?: string
+          destructive_claim_token?: string | null
+          destructive_claimed_at?: string | null
+          discovered_at?: string
+          eligible_at?: string
+          enqueue_reason: string
+          error_details?: Json | null
+          id?: string
+          is_destructively_claimed?: boolean
+          last_check_result?: string | null
+          last_checked_at?: string | null
+          lifecycle_attempt?: number
+          mux_asset_id: string
+          protection_reason?: string | null
+          retry_count?: number
+          source_kind: string
+          status?: string
+          updated_at?: string
+          upload_record_id?: string | null
+          worker_lease_expires_at?: string | null
+          worker_lease_id?: string | null
+        }
+        Update: {
+          claim_generation?: number
+          created_at?: string
+          destructive_claim_token?: string | null
+          destructive_claimed_at?: string | null
+          discovered_at?: string
+          eligible_at?: string
+          enqueue_reason?: string
+          error_details?: Json | null
+          id?: string
+          is_destructively_claimed?: boolean
+          last_check_result?: string | null
+          last_checked_at?: string | null
+          lifecycle_attempt?: number
+          mux_asset_id?: string
+          protection_reason?: string | null
+          retry_count?: number
+          source_kind?: string
+          status?: string
+          updated_at?: string
+          upload_record_id?: string | null
+          worker_lease_expires_at?: string | null
+          worker_lease_id?: string | null
+        }
+        Relationships: []
+      }
       mux_upload_mappings: {
         Row: {
           content_id: string
@@ -4950,6 +5099,45 @@ export type Database = {
         Returns: {
           entities_processed: string[]
           updated_count: number
+        }[]
+      }
+      mux_asset_reference_state: { Args: { p_asset_id: string }; Returns: Json }
+      mux_cleanup_dry_run: { Args: { p_limit?: number }; Returns: Json }
+      mux_cleanup_mode: { Args: never; Returns: string }
+      mux_cleanup_sweep: { Args: { p_limit?: number }; Returns: Json }
+      mux_enqueue_asset_locked: {
+        Args: {
+          p_asset_id: string
+          p_reason: string
+          p_source_id: string
+          p_source_kind: string
+          p_upload_record_id: string
+        }
+        Returns: undefined
+      }
+      mux_enqueue_removed_media: {
+        Args: {
+          p_new: Json
+          p_old: Json
+          p_reason: string
+          p_source_id: string
+          p_source_kind: string
+        }
+        Returns: undefined
+      }
+      mux_lock_assets: { Args: { p_asset_ids: string[] }; Returns: undefined }
+      mux_protect_historical_media: {
+        Args: { p_media: Json; p_source_id: string }
+        Returns: undefined
+      }
+      mux_rescue_attached_media: { Args: { p_media: Json }; Returns: undefined }
+      mux_resolve_media_assets: {
+        Args: { p_media: Json }
+        Returns: {
+          embedded_asset_id: string
+          mux_asset_id: string
+          mux_upload_id: string
+          upload_record_id: string
         }[]
       }
       normalize_identity_name: { Args: { input_name: string }; Returns: string }
