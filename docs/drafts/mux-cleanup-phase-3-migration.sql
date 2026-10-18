@@ -289,14 +289,48 @@ END $$;
 -- ---------------------------------------------------------------------
 -- 7. Content triggers (AFTER; run inside the authoritative transaction)
 -- ---------------------------------------------------------------------
+-- Capture-only path for purging an ALREADY soft-deleted Post. Such assets
+-- have no trustworthy deletion timestamp (the soft delete may predate
+-- Phase 3), so they are recorded as protected_ambiguous, never as normal
+-- deletion candidates. Existing candidates are preserved untouched
+-- (idempotent; grace clocks and protection states are never reset).
+CREATE OR REPLACE FUNCTION public.mux_protect_historical_media(p_media jsonb, p_source_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE r record; v_assets text[];
+BEGIN
+  CREATE TEMP TABLE IF NOT EXISTS pg_temp.mux_hist (mux_upload_id text, mux_asset_id text, upload_record_id uuid, embedded_asset_id text) ON COMMIT DROP;
+  TRUNCATE pg_temp.mux_hist;
+  INSERT INTO pg_temp.mux_hist SELECT * FROM public.mux_resolve_media_assets(p_media);
+
+  FOR r IN SELECT * FROM pg_temp.mux_hist WHERE mux_asset_id IS NULL LOOP
+    INSERT INTO public.mux_cleanup_observations (kind, source_kind, source_id, mux_upload_id, mux_asset_id, details)
+    VALUES ('unresolved_identity', 'post', p_source_id, r.mux_upload_id, r.embedded_asset_id,
+            jsonb_build_object('reason', 'historical_soft_deleted_pre_phase3', 'upload_row_found', r.upload_record_id IS NOT NULL));
+  END LOOP;
+
+  SELECT array_agg(DISTINCT mux_asset_id) INTO v_assets FROM pg_temp.mux_hist WHERE mux_asset_id IS NOT NULL;
+  IF v_assets IS NULL THEN RETURN; END IF;
+  PERFORM public.mux_lock_assets(v_assets);
+  FOR r IN SELECT DISTINCT ON (mux_asset_id) * FROM pg_temp.mux_hist WHERE mux_asset_id IS NOT NULL ORDER BY mux_asset_id LOOP
+    INSERT INTO public.mux_deletion_candidates
+      (mux_asset_id, upload_record_id, source_kind, enqueue_reason, status, protection_reason)
+    VALUES (r.mux_asset_id, r.upload_record_id, 'post', 'post_hard_deleted', 'protected_ambiguous',
+            'historical_soft_deleted_pre_phase3')
+    ON CONFLICT (mux_asset_id) DO NOTHING;  -- existing candidate (any state) is preserved
+  END LOOP;
+END $$;
+
 CREATE OR REPLACE FUNCTION public.mux_cleanup_posts_trg()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
-    -- Always enqueue, including already-soft-deleted historical Posts whose
-    -- soft delete predates Phase 3. Enqueue is idempotent, so a post that was
-    -- enqueued at soft-delete time keeps its original grace clock.
-    PERFORM public.mux_enqueue_removed_media(OLD.media, '[]'::jsonb, 'post', 'post_hard_deleted', OLD.id);
+    IF COALESCE(OLD.is_deleted, false) THEN
+      -- Purge of an already-soft-deleted Post: historical ambiguity, protect.
+      PERFORM public.mux_protect_historical_media(OLD.media, OLD.id);
+    ELSE
+      -- True hard delete of an active Post: normal enqueue with grace.
+      PERFORM public.mux_enqueue_removed_media(OLD.media, '[]'::jsonb, 'post', 'post_hard_deleted', OLD.id);
+    END IF;
     RETURN OLD;
   END IF;
   IF TG_OP = 'INSERT' THEN
