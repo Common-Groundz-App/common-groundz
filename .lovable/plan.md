@@ -11,7 +11,7 @@ Both reviews are right, and they fit together: ChatGPT asks for one small databa
   - unknown run ID returns null.
 - Add its revoke/grant lines, and add it to the rollback script.
 - Worker contract, already checked against the installed functions: the dry run returns exactly one shape (`run_id, mode, would_delete, rescued, ambiguous`) and the sweep returns exactly one shape (`protected_recorded`). Neither has a "busy" or "failed" result; errors are raised. So the wrapper's success rule (an object, plus a valid `run_id` for dry runs) matches the real contract. A short comment in the SQL records this.
-- Transaction ownership: still unmeasured. Before applying, I run the small probe from the earlier Phase 4 plan (a throwaway table plus a forced error, no real data). Its result decides whether the file keeps its own `BEGIN`/`COMMIT` or drops those two lines. Nothing else changes.
+- Transaction handling: no test run on the live database. The file will be applied through the same migration tool already used for this project. Before applying, I tell you exactly how that tool runs the file. If the tool already wraps it in a transaction, the explicit `BEGIN`/`COMMIT` lines come out; if it doesn't, or that can't be confirmed, they stay.
 - Worker and cleanup lifecycle are not touched.
 
 ## 2. Build the Mux Videos screen (frontend only)
@@ -32,7 +32,7 @@ Both reviews are right, and they fit together: ChatGPT asks for one small databa
 A document listing every check with its exact SQL and expected result, grouped by effect:
 - **Read-only:** non-admin refused, limits clamped, mode is `dry_run`, no cron job, schedule state.
 - **Writes synthetic data inside BEGIN/ROLLBACK:** run detail returns linked history, the dry-run cap of 25, `worker_run_id` saved.
-- **Takes locks / calls workers:** the sweep and dry-run wrappers. These use only synthetic records and are rolled back.
+- **Takes locks / calls workers:** the sweep and dry-run wrappers, run inside BEGIN/ROLLBACK. These workers act on the whole cleanup queue, so real existing candidates and uploads can also be evaluated during the call. The report will say so, and will list which real rows were touched before the rollback. Everything rolls back, no Mux video can be deleted, real content is never changed, and any locks last only as long as the test.
 - **Failure path:** a test-only wrapper in the same rolled-back transaction raises inside the protected block. No disabling of triggers, no replacing of production functions, no changes to real content.
 - **Blocked:** the two-session overlap test, because I can't open independent sessions here.
 - **Stated limitation:** a dropped connection or aborted transaction leaves no history entry. Only errors caught inside the protected block are recorded.
