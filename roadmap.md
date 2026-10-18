@@ -479,3 +479,9 @@ cross-read between them.
 
 - [ ] Phase 3: fix dry-run worker lock order (asset advisory lock before candidate row lock), add lock-order DB test, then apply migration + run 21+ DB checks
 - [ ] Phase 3: protect historical soft-deleted Post purges (protected_ambiguous, not pending_grace) + DB tests T14/T15
+
+## Mux cleanup admin dashboard
+- [x] Draft SQL v2 + run-detail lookup + rollback (not applied)
+- [x] Mux Videos sub-tab UI (shows "not installed" until SQL applied)
+- [x] Verification procedure written (not run)
+- [ ] Apply SQL + run checks — waiting on owner approval
