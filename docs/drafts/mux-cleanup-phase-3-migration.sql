@@ -509,6 +509,7 @@ REVOKE ALL ON FUNCTION
   public.mux_lock_assets(text[]), public.mux_resolve_media_assets(jsonb), public.mux_cleanup_mode(),
   public.mux_enqueue_asset_locked(text,uuid,text,text,uuid),
   public.mux_enqueue_removed_media(jsonb,jsonb,text,text,uuid),
+  public.mux_protect_historical_media(jsonb,uuid),
   public.mux_rescue_attached_media(jsonb),
   public.mux_cleanup_posts_trg(), public.mux_cleanup_reviews_trg(),
   public.mux_asset_reference_state(text), public.mux_cleanup_dry_run(int), public.mux_cleanup_sweep(int)

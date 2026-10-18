@@ -143,6 +143,31 @@ SELECT public.mux_cleanup_dry_run(25);
 INSERT INTO t_results VALUES ('lock_order_asset_before_candidate', true,
   'worker completed with asset lock pre-held; two-session deadlock test deferred');
 
+-- T14 Phase-3 soft-delete then hard purge preserves the existing candidate/grace
+INSERT INTO public.mux_uploads (id, upload_id, asset_id, playback_id, status, user_id)
+SELECT gen_random_uuid(), 'p3test_up_7', 'p3test_asset_7', 'p3test_pb_7', 'ready', (SELECT id FROM auth.users LIMIT 1);
+WITH p AS (
+  INSERT INTO public.posts (user_id, content, media)
+  SELECT (SELECT id FROM auth.users LIMIT 1), 'p3test',
+         '[{"type":"video","provider":"mux","mux_upload_id":"p3test_up_7"}]'::jsonb RETURNING id)
+UPDATE public.posts SET is_deleted = true WHERE id = (SELECT id FROM p);
+UPDATE public.mux_deletion_candidates SET eligible_at = '2000-01-01' WHERE mux_asset_id = 'p3test_asset_7';
+DELETE FROM public.posts WHERE content = 'p3test';
+INSERT INTO t_results SELECT 'purge_preserves_soft_delete_candidate',
+  (SELECT status = 'pending_grace' AND eligible_at = '2000-01-01' AND enqueue_reason = 'post_soft_deleted'
+     FROM public.mux_deletion_candidates WHERE mux_asset_id = 'p3test_asset_7'), NULL;
+
+-- T15 historical already-soft-deleted Post (pre-Phase-3, no candidate) purged -> protected_ambiguous
+INSERT INTO public.mux_uploads (id, upload_id, asset_id, playback_id, status, user_id)
+SELECT gen_random_uuid(), 'p3test_up_8', 'p3test_asset_8', 'p3test_pb_8', 'ready', (SELECT id FROM auth.users LIMIT 1);
+INSERT INTO public.posts (user_id, content, media, is_deleted)
+SELECT (SELECT id FROM auth.users LIMIT 1), 'p3test_hist',
+       '[{"type":"video","provider":"mux","mux_upload_id":"p3test_up_8"}]'::jsonb, true;
+DELETE FROM public.posts WHERE content = 'p3test_hist';
+INSERT INTO t_results SELECT 'historical_purge_protected_ambiguous',
+  (SELECT status = 'protected_ambiguous' AND protection_reason = 'historical_soft_deleted_pre_phase3'
+     FROM public.mux_deletion_candidates WHERE mux_asset_id = 'p3test_asset_8'), NULL;
+
 SELECT name, pass, info FROM t_results ORDER BY name;
 ROLLBACK;
 
