@@ -484,4 +484,5 @@ cross-read between them.
 - [x] Draft SQL v2 + run-detail lookup + rollback (not applied)
 - [x] Mux Videos sub-tab UI (shows "not installed" until SQL applied)
 - [x] Verification procedure written (not run)
-- [ ] Apply SQL + run checks — waiting on owner approval
+- [x] Apply SQL + run checks
+- [ ] Owner signed-in screen check
