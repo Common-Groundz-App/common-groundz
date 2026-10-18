@@ -44,18 +44,24 @@ export function compareSets(assets: Asset[], uploads: Upload[]) {
   return { mux_present: [...m].sort(), database_recorded: [...s].sort(), intersection: [...m].filter(id => s.has(id)).sort(), mux_only: [...m].filter(id => !s.has(id)).sort(), database_only: [...s].filter(id => !m.has(id)).sort() }
 }
 
-/** Mux Video assets API uses documented page/limit pagination (not cursors).
+/** Follow Mux next_cursor until exhausted; support page pagination on older API responses.
  * Every page must succeed; a failed or repeated page never proves absence.
  */
-export async function scanAssets(get: (path: string) => Promise<{ status: number; body?: { data?: Asset[] } }>, limit = 100) {
+export async function scanAssets(get: (path: string) => Promise<{ status: number; body?: { data?: Asset[]; next_cursor?: string | null } }>, limit = 100) {
   const assets: Asset[] = []; const seen = new Set<string>()
+  let cursor: string | undefined; const cursors = new Set<string>()
   for (let page = 1; page <= 100; page++) {
-    const res = await get(`/assets?limit=${limit}&page=${page}`)
+    const res = await get(`/assets?limit=${limit}&${cursor ? `cursor=${encodeURIComponent(cursor)}` : `page=${page}`}`)
     if (res.status !== 200 || !Array.isArray(res.body?.data)) return { assets, complete: false, failed_page: page, status: res.status }
     const items = res.body.data
     if (items.some(a => !a.id || seen.has(a.id))) return { assets, complete: false, failed_page: page, status: 200 }
     for (const a of items) { seen.add(a.id); assets.push(a) }
-    if (items.length < limit) return { assets, complete: true, pages: page }
+    const next = res.body.next_cursor
+    if (next) {
+      if (cursors.has(next)) return { assets, complete: false, failed_page: page, status: 200 }
+      cursors.add(next); cursor = next; continue
+    }
+    if (cursor || Object.hasOwn(res.body, 'next_cursor') || items.length < limit) return { assets, complete: true, pages: page }
   }
   return { assets, complete: false, failed_page: 101, status: 0 }
 }

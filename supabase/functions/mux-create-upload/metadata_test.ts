@@ -23,9 +23,9 @@ Deno.test('body shape and 100 MiB guard', () => {
 Deno.test('metadata uses preallocated record ID and server fields only', () => {
   const parsed = parseUploadBody(JSON.stringify({ kind: 'review', user_id: 'private', title: 'private', environment: 'evil' }))
   const settings = uploadAssetSettings(id, parsed.kind, false)
-  assertEquals(settings.meta, { external_id: id, title: 'Common Groundz / live / review' })
-  assertEquals(JSON.parse(settings.passthrough), { v: 1, app: 'common-groundz', environment: 'live', kind: 'review', upload_record_id: id })
-  assertEquals(uploadAssetSettings(id, 'review_update', true).meta.title, 'Common Groundz / test / review_update')
+  assertEquals(settings.meta, { external_id: id })
+  assertEquals(JSON.parse(settings.passthrough), { v: 1, app: 'commongroundz', env: 'live', kind: 'review', upload_record_id: id })
+  assertEquals(JSON.parse(uploadAssetSettings(id, 'review_update', true).passthrough).env, 'test')
   assertEquals(settings.passthrough.length < 255, true)
   assertThrows(() => uploadAssetSettings('invalid', 'post', false))
 })

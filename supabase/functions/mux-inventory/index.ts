@@ -1,6 +1,6 @@
 // Observational only: GET/SELECT, no persistence, deletion, cancellation or jobs.
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
+import { corsHeaders } from 'npm:@supabase/supabase-js@2.118.0/cors'
 import { classify, compareSets, scanAssets, type Asset, type Upload, type Reference, type Mapping } from './classifier.ts'
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 Deno.serve(async req => {

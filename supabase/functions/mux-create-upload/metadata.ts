@@ -28,8 +28,8 @@ export function uploadAssetSettings(recordId: string, kind: MetadataKind, isTest
   const environment = isTest ? 'test' : 'live'
   return {
     playback_policy: ['public'],
-    meta: { external_id: recordId, title: `Common Groundz / ${environment} / ${kind}` },
-    passthrough: JSON.stringify({ v: 1, app: 'common-groundz', environment, kind, upload_record_id: recordId }),
+    meta: { external_id: recordId },
+    passthrough: JSON.stringify({ v: 1, app: 'commongroundz', env: environment, kind, upload_record_id: recordId }),
   }
 }
 

@@ -42,3 +42,8 @@ Deno.test('all pages and incomplete failures are explicit', async () => {
   assertEquals(scan.complete, true); assertEquals(calls, ['/assets?limit=2&page=1', '/assets?limit=2&page=2']); assertEquals(scan.assets.length, 3)
   for (const status of [401,403,429,500,0]) assertEquals((await scanAssets(() => Promise.resolve({ status }))).complete, false)
 })
+Deno.test('cursor continuation is followed even when page is shorter than limit', async () => {
+  const calls: string[] = []
+  const result = await scanAssets(p => { calls.push(p); return Promise.resolve({ status: 200, body: { data: [{ id: calls.length === 1 ? 'a' : 'b' }], next_cursor: calls.length === 1 ? 'next/token' : null } }) })
+  assertEquals(result.complete, true); assertEquals(calls, ['/assets?limit=100&page=1', '/assets?limit=100&cursor=next%2Ftoken'])
+})
