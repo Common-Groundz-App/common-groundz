@@ -470,3 +470,9 @@ cross-read between them.
 - [x] Truthful labels: Uploading X% → Upload sent — finishing… → Processing → Ready
 - [x] Remove at any stage cancels that attempt; late results ignored; slot counted once
 - [ ] Real upload timing breakdown + replace check — waiting on user's manual QA
+
+## Mux cleanup Phase 3
+- [x] Review package prepared (docs/verification/mux-cleanup-phase-3.md) — not applied
+- [ ] Owner review → apply migration → run DB tests (blocked on approval)
+- [ ] Cron + 48–72h dry-run observation (separate approval)
+- [ ] Live deletion worker (separate future package)
