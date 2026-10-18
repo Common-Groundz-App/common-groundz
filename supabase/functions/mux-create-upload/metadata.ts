@@ -39,7 +39,7 @@ export function uploadAssetSettings(recordId: string, kind: MetadataKind, isTest
  */
 export async function persistCreatedUpload(
   row: { id: string; upload_id: string; user_id: string; status: string; is_test: boolean; expires_at: string },
-  insert: (row: typeof row) => PromiseLike<{ error: unknown }>,
+  insert: (input: typeof row) => PromiseLike<{ error: unknown }>,
   log: (event: Record<string, unknown>) => void,
 ): Promise<boolean> {
   try {
