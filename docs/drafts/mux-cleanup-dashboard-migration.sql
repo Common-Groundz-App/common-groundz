@@ -202,10 +202,10 @@ BEGIN
   IF r.worker_run_id IS NOT NULL THEN  -- sweeps have no worker_run_id: empty list
     SELECT COALESCE(jsonb_agg(to_jsonb(a) ORDER BY a.created_at DESC, a.id DESC), '[]'), count(*) INTO v_audit, v_n FROM
       (SELECT id, run_id, mode, action, details, created_at FROM public.mux_cleanup_audit_logs
-        WHERE run_id = r.worker_run_id ORDER BY created_at DESC, id DESC LIMIT 101) a;
-    IF v_n > 100 THEN v_audit := v_audit - 100; END IF;
+        WHERE run_id = r.worker_run_id ORDER BY created_at DESC, id DESC LIMIT 51) a;
+    IF v_n > 50 THEN v_audit := v_audit - 50; END IF;
   END IF;
-  RETURN jsonb_build_object('run', public.mux_cleanup_run_json(r), 'audit', v_audit, 'audit_truncated', v_n > 100);
+  RETURN jsonb_build_object('run', public.mux_cleanup_run_json(r), 'audit', v_audit, 'audit_truncated', v_n > 50);
 END $$;
 
 -- 9. Manual run wrapper (shared by sweep and dry run)
