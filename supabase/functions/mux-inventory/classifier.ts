@@ -32,10 +32,11 @@ export function classify(assetId: string, asset: Asset | undefined, presence: Pr
   else appState = 'unreferenced'
   const derived = presence === 'external_missing' ? (active.length ? 'broken_reference' : 'external_missing_unreferenced')
     : presence === 'inconclusive' ? 'probe_inconclusive'
-    : appState === 'unreferenced' ? 'orphan_candidate'
+    : appState === 'unreferenced' ? 'ambiguous_workflow_orphan_candidate'
     : appState === 'active_referenced' ? 'protected_active' : 'protected_ambiguous_or_recent'
   return { asset_id: assetId, mux_presence: presence, app_reference_state: appState, derived,
-    workflow_evidence: workflow, deletion_eligible: false, active_references: active.map(r => ({ kind: r.kind, content_id: r.content_id })),
+    workflow_evidence: workflow, overall_confidence: appState === 'unreferenced' ? 'ambiguous_active_workflow_unproven' : appState,
+    deletion_eligible: false, active_references: active.map(r => ({ kind: r.kind, content_id: r.content_id })),
     deleted_references: deleted.map(r => ({ kind: r.kind, content_id: r.content_id })), upload_record_ids: uploads.map(u => u.id),
     mux_status: asset?.status ?? null, mux_test: asset?.test ?? null }
 }

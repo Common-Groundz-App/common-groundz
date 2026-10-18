@@ -428,8 +428,8 @@ cross-read between them.
   - [ ] Later product decision: Circle reviews are author-only today (no Circle read rule)
 - [ ] Mux asset cleanup (abandoned /create uploads, removed/deleted videos, historical unlinked assets)
   - [x] Phase 1 pure read-only audit — complete; manual Mux deletions explain historical drift.
-  - [ ] Phase 2A new-upload correlation metadata with strict kind validation — in progress.
-  - [ ] Phase 2B observational inventory + verification report — in progress; no historical mutations.
+  - [ ] Phase 2A new-upload correlation metadata implemented/deployed; tests pass; real signed-in provider round-trip blocked. See docs/verification/mux-cleanup-phase-2.md.
+  - [ ] Phase 2B classifier implemented/deployed; tests pass; fresh Mux inventory blocked by absent authenticated admin session. Database-only fresh report recorded; awaiting owner review, no historical mutations.
   - [ ] Phase 3 deletion queue, durable attachment/deletion barrier and pg_cron worker — not authorized; waits for owner review.
   - [ ] Historical/live deletion activation — separate owner approval; four historical candidates protected.
 - [ ] Later: private / Circle review video playback (signed Mux playback)

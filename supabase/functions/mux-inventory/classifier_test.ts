@@ -5,7 +5,7 @@ const asset: Asset = { id: 'asset', status: 'ready', upload_id: 'upload', playba
 const fixture = (): Snapshot => ({ complete: true, mappings: [], references: [], uploads: [{ id: 'row', upload_id: 'upload', asset_id: 'asset', status: 'ready', created_at: '2026-10-15T00:00:00Z' }] })
 Deno.test('old zero-reference ready asset is a non-deletable observational candidate', () => {
   const r = classify('asset', asset, 'present', fixture(), true, now)
-  assertEquals(r.derived, 'orphan_candidate'); assertEquals(r.deletion_eligible, false); assertEquals(r.workflow_evidence, 'unknown_no_durable_attempt_ledger')
+  assertEquals(r.derived, 'ambiguous_workflow_orphan_candidate'); assertEquals(r.overall_confidence, 'ambiguous_active_workflow_unproven'); assertEquals(r.deletion_eligible, false); assertEquals(r.workflow_evidence, 'unknown_no_durable_attempt_ledger')
 })
 Deno.test('24 hour protection includes ready but unlinked uploads', () => {
   const db = fixture(); db.uploads[0].created_at = '2026-10-17T01:00:00Z'
