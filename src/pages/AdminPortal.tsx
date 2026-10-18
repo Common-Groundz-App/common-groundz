@@ -19,6 +19,8 @@ import { AdminClaimsPanel } from '@/components/admin/AdminClaimsPanel';
 import { AdminProductRelationshipsPanel } from '@/components/admin/AdminProductRelationshipsPanel';
 import { AdminUserManagementPanel } from '@/components/admin/AdminUserManagementPanel';
 import { AdminMediaCleanupPanel } from '@/components/admin/AdminMediaCleanupPanel';
+import { AdminMuxCleanupPanel } from '@/components/admin/AdminMuxCleanupPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AdminFeatureFlagsPanel } from '@/components/admin/AdminFeatureFlagsPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import { PendingEntitiesQueue } from '@/components/admin/moderation/PendingEntitiesQueue';
@@ -133,9 +135,18 @@ const AdminPortal = () => {
   );
 
   const renderMediaCleanupContent = () => (
-    <div className="space-y-6">
-      <AdminMediaCleanupPanel />
-    </div>
+    <Tabs defaultValue="storage" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="storage">Storage Photos</TabsTrigger>
+        <TabsTrigger value="mux">Mux Videos</TabsTrigger>
+      </TabsList>
+      <TabsContent value="storage" className="space-y-6">
+        <AdminMediaCleanupPanel />
+      </TabsContent>
+      <TabsContent value="mux">
+        <AdminMuxCleanupPanel />
+      </TabsContent>
+    </Tabs>
   );
 
   const renderFeatureFlagsContent = () => (
