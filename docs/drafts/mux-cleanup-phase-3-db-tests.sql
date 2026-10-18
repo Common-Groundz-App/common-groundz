@@ -5,9 +5,9 @@
 BEGIN;
 
 -- fixtures
-INSERT INTO public.mux_uploads (id, upload_id, asset_id, playback_id, status, user_id)
+INSERT INTO public.mux_uploads (id, upload_id, asset_id, playback_id, status, user_id, expires_at)
 SELECT gen_random_uuid(), 'p3test_up_' || i, 'p3test_asset_' || i, 'p3test_pb_' || i, 'ready',
-       (SELECT id FROM auth.users LIMIT 1)
+       (SELECT id FROM auth.users LIMIT 1), now() + interval '1 hour'
 FROM generate_series(1,6) i;
 
 CREATE TEMP TABLE t_results (name text, pass boolean, info text);
@@ -82,11 +82,11 @@ INSERT INTO t_results SELECT 'unresolved_observed',
 
 -- T8 review hard delete cascades to timeline update videos
 WITH r AS (
-  INSERT INTO public.reviews (user_id, entity_id, title, rating, media)
-  SELECT (SELECT id FROM auth.users LIMIT 1), (SELECT id FROM public.entities LIMIT 1), 'p3test', 4,
+  INSERT INTO public.reviews (user_id, entity_id, title, rating, category, media)
+  SELECT (SELECT id FROM auth.users LIMIT 1), (SELECT id FROM public.entities LIMIT 1), 'p3test', 4, 'other',
          '[{"type":"video","provider":"mux","mux_upload_id":"p3test_up_3"}]'::jsonb
   RETURNING id)
-INSERT INTO public.review_updates (review_id, user_id, content, media)
+INSERT INTO public.review_updates (review_id, user_id, comment, media)
 SELECT r.id, (SELECT id FROM auth.users LIMIT 1), 'p3test',
        '[{"type":"video","provider":"mux","mux_upload_id":"p3test_up_4"}]'::jsonb FROM r;
 DELETE FROM public.reviews WHERE title='p3test';
@@ -144,8 +144,8 @@ INSERT INTO t_results VALUES ('lock_order_asset_before_candidate', true,
   'worker completed with asset lock pre-held; two-session deadlock test deferred');
 
 -- T14 Phase-3 soft-delete then hard purge preserves the existing candidate/grace
-INSERT INTO public.mux_uploads (id, upload_id, asset_id, playback_id, status, user_id)
-SELECT gen_random_uuid(), 'p3test_up_7', 'p3test_asset_7', 'p3test_pb_7', 'ready', (SELECT id FROM auth.users LIMIT 1);
+INSERT INTO public.mux_uploads (id, upload_id, asset_id, playback_id, status, user_id, expires_at)
+SELECT gen_random_uuid(), 'p3test_up_7', 'p3test_asset_7', 'p3test_pb_7', 'ready', (SELECT id FROM auth.users LIMIT 1), now() + interval '1 hour';
 WITH p AS (
   INSERT INTO public.posts (user_id, content, media)
   SELECT (SELECT id FROM auth.users LIMIT 1), 'p3test',
@@ -158,8 +158,8 @@ INSERT INTO t_results SELECT 'purge_preserves_soft_delete_candidate',
      FROM public.mux_deletion_candidates WHERE mux_asset_id = 'p3test_asset_7'), NULL;
 
 -- T15 historical already-soft-deleted Post (pre-Phase-3, no candidate) purged -> protected_ambiguous
-INSERT INTO public.mux_uploads (id, upload_id, asset_id, playback_id, status, user_id)
-SELECT gen_random_uuid(), 'p3test_up_8', 'p3test_asset_8', 'p3test_pb_8', 'ready', (SELECT id FROM auth.users LIMIT 1);
+INSERT INTO public.mux_uploads (id, upload_id, asset_id, playback_id, status, user_id, expires_at)
+SELECT gen_random_uuid(), 'p3test_up_8', 'p3test_asset_8', 'p3test_pb_8', 'ready', (SELECT id FROM auth.users LIMIT 1), now() + interval '1 hour';
 INSERT INTO public.posts (user_id, content, media, is_deleted)
 SELECT (SELECT id FROM auth.users LIMIT 1), 'p3test_hist',
        '[{"type":"video","provider":"mux","mux_upload_id":"p3test_up_8"}]'::jsonb, true;
