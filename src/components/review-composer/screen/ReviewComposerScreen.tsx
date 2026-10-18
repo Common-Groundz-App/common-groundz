@@ -655,6 +655,7 @@ export function ReviewComposerScreen(props: Props) {
                 truthfulVideoProgress
                 allowVideo={videoPolicy.allowVideo}
                 videoMuxOnly
+                muxKind="review"
                 videoRefusedMessage={videoPolicy.reason ?? undefined}
                 sessionId={uploads.sessionId}
                 onMediaUploaded={handleMediaAdded}

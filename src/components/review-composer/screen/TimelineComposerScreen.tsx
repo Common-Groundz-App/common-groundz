@@ -497,6 +497,7 @@ export function TimelineComposerScreen(props: Props) {
                 truthfulVideoProgress
               allowVideo={videoPolicy.allowVideo}
               videoMuxOnly
+              muxKind="review_update"
               videoRefusedMessage={videoPolicy.reason ?? undefined}
               sessionId={uploads.sessionId}
               onMediaUploaded={handleMediaAdded}
