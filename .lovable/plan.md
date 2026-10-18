@@ -21,6 +21,9 @@ A view of the video cleanup system, plus manual buttons to run the sweeper and t
 3. **Failed runs stay recorded.** The wrapper inserts the run row, then runs the worker inside a protected `BEGIN … EXCEPTION` block. On error, the worker's partial work is rolled back. The run row is then updated to `failed` with a finish time and a cleaned-up error message (SQLSTATE plus a short message), and the call returns `{ok:false, error}`. Limitation: if the connection drops, the whole transaction rolls back and no row remains, so we don't promise a record in that case. If a row is still `running` after 10 minutes, the dashboard shows it as **Stale (no completion recorded)**. Nothing changes the row automatically.
 4. **Reference match types** are limited to the paths that really exist (mux_upload_id, and asset resolution through mux_uploads). Playback IDs aren't used.
 5. **No text snippets** in the inspector.
+6. **Run correlation.** `mux_cleanup_runs.worker_run_id uuid` stores the `run_id` that `mux_cleanup_dry_run()` returns, so one dashboard run links to its exact audit rows. The tested worker itself is unchanged. For sweeps this stays null.
+7. **Shared lock helper.** `mux_cleanup_try_run_lock()` uses a single key convention, so a future cron job can take the same lock as manual runs. No cron is added now.
+8. **Scheduler states.** "Not scheduled" means the scheduler was checked and has no job. "Scheduler unavailable" means it couldn't be checked, which is not proof that no job exists. They are shown as separate states.
 
 ## Delivery steps
 1. Write the migration and rollback SQL as files: the `mux_cleanup_runs` table (service-role only, RLS on, no policies) plus the admin RPCs. Every RPC is SECURITY DEFINER with `search_path = pg_catalog, public`, uses schema-qualified objects, checks `has_role(auth.uid(),'admin')` and fails closed, and clamps limits and offsets. EXECUTE is revoked from PUBLIC/anon and granted to authenticated, with the admin check inside the RPC.
@@ -28,11 +31,13 @@ A view of the video cleanup system, plus manual buttons to run the sweeper and t
 3. Run the database checks inside BEGIN/ROLLBACK:
    - non-admin is refused;
    - limits are clamped;
-   - the lock rejects a second run;
    - a forced worker error leaves a `failed` row;
    - the dry-run cap of 25 holds;
+   - worker_run_id is saved;
    - the mode is still dry_run;
    - there is no cron job.
+   - The two-session mutex test is reported as BLOCKED, because I can't open independent concurrent sessions here.
+   - These are rolled-back checks on production, not isolated verification, and the report will say so.
 4. Build the UI. Then check that the Storage Photos sub-tab still works the same, and stop for your UI testing.
 
 ## Technical details
