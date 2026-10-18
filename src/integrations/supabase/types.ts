@@ -1978,6 +1978,48 @@ export type Database = {
         }
         Relationships: []
       }
+      mux_cleanup_runs: {
+        Row: {
+          batch_limit: number | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          result: Json | null
+          started_at: string
+          status: string
+          trigger_source: string
+          triggered_by: string | null
+          worker_run_id: string | null
+        }
+        Insert: {
+          batch_limit?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          kind: string
+          result?: Json | null
+          started_at?: string
+          status?: string
+          trigger_source?: string
+          triggered_by?: string | null
+          worker_run_id?: string | null
+        }
+        Update: {
+          batch_limit?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          result?: Json | null
+          started_at?: string
+          status?: string
+          trigger_source?: string
+          triggered_by?: string | null
+          worker_run_id?: string | null
+        }
+        Relationships: []
+      }
       mux_deletion_candidates: {
         Row: {
           claim_generation: number
@@ -4121,6 +4163,22 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      admin_list_mux_candidates: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_reason?: string
+          p_search?: string
+          p_source_kind?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
+      admin_list_mux_cleanup_runs: { Args: { p_limit?: number }; Returns: Json }
+      admin_list_mux_observations: {
+        Args: { p_kind?: string; p_limit?: number; p_offset?: number }
+        Returns: Json
+      }
       admin_media_deletion_status: { Args: never; Returns: Json }
       admin_moderate_entity: {
         Args: {
@@ -4200,6 +4258,12 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      admin_mux_candidate_detail: { Args: { p_id: string }; Returns: Json }
+      admin_mux_cleanup_overview: { Args: never; Returns: Json }
+      admin_mux_cleanup_run_detail: {
+        Args: { p_run_id: string }
+        Returns: Json
+      }
       admin_pending_entity_count: { Args: never; Returns: number }
       admin_review_video_view_stats: {
         Args: { _source?: string; _source_id?: string }
@@ -4210,6 +4274,8 @@ export type Database = {
           source: string
         }[]
       }
+      admin_run_mux_dry_run: { Args: { p_batch?: number }; Returns: Json }
+      admin_run_mux_sweep: { Args: never; Returns: Json }
       calculate_entity_trending_score_v2: {
         Args: { p_entity_id: string }
         Returns: number
@@ -5103,8 +5169,23 @@ export type Database = {
       }
       mux_asset_reference_state: { Args: { p_asset_id: string }; Returns: Json }
       mux_cleanup_dry_run: { Args: { p_limit?: number }; Returns: Json }
+      mux_cleanup_execute_run: {
+        Args: {
+          p_actor: string
+          p_kind: string
+          p_limit: number
+          p_source: string
+        }
+        Returns: Json
+      }
       mux_cleanup_mode: { Args: never; Returns: string }
+      mux_cleanup_require_admin: { Args: never; Returns: undefined }
+      mux_cleanup_run_json: {
+        Args: { r: Database["public"]["Tables"]["mux_cleanup_runs"]["Row"] }
+        Returns: Json
+      }
       mux_cleanup_sweep: { Args: { p_limit?: number }; Returns: Json }
+      mux_cleanup_try_run_lock: { Args: never; Returns: boolean }
       mux_enqueue_asset_locked: {
         Args: {
           p_asset_id: string
