@@ -387,19 +387,30 @@ BEGIN
   IF public.mux_cleanup_mode() <> 'dry_run' THEN RAISE EXCEPTION 'only dry_run is available'; END IF;
   p_limit := LEAST(GREATEST(COALESCE(p_limit,25),1),25);
 
-  -- non-blocking lease on due rows
+  -- Universal lock order: asset advisory lock BEFORE any candidate row lock.
+  -- The attachment/rescue/enqueue paths all take asset lock -> candidate row;
+  -- this worker must never reverse that order, or a dry-run could deadlock a
+  -- user's publish/save. So: select due candidates WITHOUT locking them, in
+  -- deterministic mux_asset_id order (same ordering as multi-asset trigger
+  -- paths), then per candidate: asset lock -> conditional lease update
+  -- (atomic; fails harmlessly if another worker leased it) -> re-read and
+  -- revalidate under the lock -> reference check -> audit/update.
   FOR c IN
-    WITH due AS (
-      SELECT id FROM public.mux_deletion_candidates
-       WHERE NOT is_destructively_claimed
-         AND status IN ('pending_grace','eligible') AND eligible_at <= clock_timestamp()
-         AND (worker_lease_expires_at IS NULL OR worker_lease_expires_at < clock_timestamp())
-       ORDER BY eligible_at LIMIT p_limit FOR UPDATE SKIP LOCKED)
-    UPDATE public.mux_deletion_candidates d
-       SET worker_lease_id = v_lease, worker_lease_expires_at = clock_timestamp() + interval '5 minutes'
-      FROM due WHERE d.id = due.id RETURNING d.id, d.mux_asset_id
+    SELECT id, mux_asset_id FROM public.mux_deletion_candidates
+     WHERE NOT is_destructively_claimed
+       AND status IN ('pending_grace','eligible') AND eligible_at <= clock_timestamp()
+       AND (worker_lease_expires_at IS NULL OR worker_lease_expires_at < clock_timestamp())
+     ORDER BY mux_asset_id LIMIT p_limit
   LOOP
     PERFORM public.mux_lock_assets(ARRAY[c.mux_asset_id]);
+    -- atomic conditional lease: no-op if another worker leased it meanwhile
+    UPDATE public.mux_deletion_candidates
+       SET worker_lease_id = v_lease, worker_lease_expires_at = clock_timestamp() + interval '5 minutes'
+     WHERE id = c.id
+       AND NOT is_destructively_claimed
+       AND status IN ('pending_grace','eligible') AND eligible_at <= clock_timestamp()
+       AND (worker_lease_expires_at IS NULL OR worker_lease_expires_at < clock_timestamp());
+    IF NOT FOUND THEN CONTINUE; END IF;  -- leased/changed by someone else: skip
     v_ref := public.mux_asset_reference_state(c.mux_asset_id);
     IF v_ref->>'state' = 'referenced' THEN
       UPDATE public.mux_deletion_candidates SET status='rescued_referenced', last_checked_at=clock_timestamp(),

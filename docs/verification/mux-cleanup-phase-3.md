@@ -23,6 +23,7 @@ Functions: lock, resolver, mode, enqueue, rescue, reference state, dry-run, swee
 
 ## Locking (honest limits)
 - 64-bit `hashtextextended` advisory keys; collisions extremely unlikely, harmless if they occur (extra serialization only).
+- Universal lock order on every path: asset advisory lock BEFORE any candidate row lock/update. The dry-run worker selects due candidates unlocked, in deterministic `mux_asset_id` lexical order, then per candidate: asset lock → atomic conditional lease update → re-read under lock → reference check → audit. A candidate leased/changed by another worker is skipped. This removes the candidate→asset reversal that could deadlock a user publish/save.
 - Within one trigger call assets are locked in sorted order. Across separate statements or cascades in one transaction a global order cannot be guaranteed; Postgres deadlock detection would abort one transaction (retryable). The dry-run worker holds one asset lock at a time and takes no content row locks, so it cannot form a cycle with saves.
 
 ## Tests

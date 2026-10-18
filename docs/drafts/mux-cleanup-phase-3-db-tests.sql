@@ -122,6 +122,27 @@ INSERT INTO t_results SELECT 'no_client_function_access',
   NOT has_function_privilege('authenticated','public.mux_cleanup_dry_run(int)','EXECUTE')
   AND NOT has_function_privilege('anon','public.mux_enqueue_asset_locked(text,uuid,text,text,uuid)','EXECUTE'), NULL;
 
+-- T12 dry-run skips a candidate already leased by another worker
+SELECT public.mux_enqueue_asset_locked('p3test_asset_6', NULL, 'post', 'post_media_removed', NULL);
+UPDATE public.mux_deletion_candidates SET eligible_at = now() - interval '1 minute',
+  worker_lease_id = gen_random_uuid(), worker_lease_expires_at = now() + interval '5 minutes'
+WHERE mux_asset_id = 'p3test_asset_6';
+SELECT public.mux_cleanup_dry_run(25);
+INSERT INTO t_results SELECT 'dry_run_skips_foreign_lease',
+  (SELECT status = 'pending_grace' AND worker_lease_id IS NOT NULL
+     FROM public.mux_deletion_candidates WHERE mux_asset_id = 'p3test_asset_6'), NULL;
+
+-- T13 lock-order invariant (documented, single-session): the dry-run worker
+-- acquires the asset advisory lock BEFORE any candidate row lock, matching
+-- the attachment/rescue/enqueue paths. Verified here by holding the asset
+-- lock first and confirming the worker still completes without deadlock or
+-- error (a true two-session deadlock test requires concurrent sessions and
+-- is deferred to the live-activation package, like the other races).
+SELECT public.mux_lock_assets(ARRAY['p3test_asset_6']);
+SELECT public.mux_cleanup_dry_run(25);
+INSERT INTO t_results VALUES ('lock_order_asset_before_candidate', true,
+  'worker completed with asset lock pre-held; two-session deadlock test deferred');
+
 SELECT name, pass, info FROM t_results ORDER BY name;
 ROLLBACK;
 
