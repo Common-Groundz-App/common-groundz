@@ -146,12 +146,9 @@ INSERT INTO t_results VALUES ('lock_order_asset_before_candidate', true,
 -- T14 Phase-3 soft-delete then hard purge preserves the existing candidate/grace
 INSERT INTO public.mux_uploads (id, upload_id, asset_id, playback_id, status, user_id, expires_at)
 SELECT gen_random_uuid(), 'p3test_up_7', 'p3test_asset_7', 'p3test_pb_7', 'ready', (SELECT id FROM auth.users LIMIT 1), now() + interval '1 hour';
-CREATE TEMP TABLE t_post_id (id uuid);
 INSERT INTO public.posts (user_id, content, media)
 SELECT (SELECT id FROM auth.users LIMIT 1), 'p3test',
-       '[{"type":"video","provider":"mux","mux_upload_id":"p3test_up_7"}]'::jsonb
-RETURNING id \gset
-INSERT INTO t_post_id SELECT id FROM (SELECT 1) x WHERE false;
+       '[{"type":"video","provider":"mux","mux_upload_id":"p3test_up_7"}]'::jsonb;
 UPDATE public.posts SET is_deleted = true WHERE content = 'p3test';
 UPDATE public.mux_deletion_candidates SET eligible_at = '2000-01-01' WHERE mux_asset_id = 'p3test_asset_7';
 DELETE FROM public.posts WHERE content = 'p3test';
