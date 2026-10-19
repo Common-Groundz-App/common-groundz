@@ -1945,6 +1945,35 @@ export type Database = {
           },
         ]
       }
+      mux_cleanup_live_control: {
+        Row: {
+          id: number
+          live_enabled: boolean
+          target_candidate_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          live_enabled?: boolean
+          target_candidate_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          live_enabled?: boolean
+          target_candidate_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mux_cleanup_live_control_target_candidate_id_fkey"
+            columns: ["target_candidate_id"]
+            isOneToOne: false
+            referencedRelation: "mux_deletion_candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mux_cleanup_observations: {
         Row: {
           created_at: string
@@ -5168,6 +5197,7 @@ export type Database = {
         }[]
       }
       mux_asset_reference_state: { Args: { p_asset_id: string }; Returns: Json }
+      mux_cleanup_claim_live: { Args: { p_run_id: string }; Returns: Json }
       mux_cleanup_dry_run: { Args: { p_limit?: number }; Returns: Json }
       mux_cleanup_execute_run: {
         Args: {
@@ -5177,6 +5207,20 @@ export type Database = {
           p_source: string
         }
         Returns: Json
+      }
+      mux_cleanup_finalize_live: {
+        Args: {
+          p_candidate_id: string
+          p_http_status: number
+          p_lease_id: string
+          p_outcome: string
+          p_run_id: string
+        }
+        Returns: Json
+      }
+      mux_cleanup_may_delete: {
+        Args: { p_candidate_id: string; p_lease_id: string }
+        Returns: boolean
       }
       mux_cleanup_mode: { Args: never; Returns: string }
       mux_cleanup_require_admin: { Args: never; Returns: undefined }
