@@ -7,8 +7,8 @@ Status: revised 2026-10-19. Nothing applied, deployed, scheduled or enabled.
 |---|---|---|
 | `mux-cleanup-phase-4-migration.sql` | run lease, claim, pre-DELETE gate, finalize, exact-target allowlist, guard, overview | parses (pglast); not executed |
 | `mux-cleanup-phase-4-rollback.sql` | Stage 1 pause · Stage 2 teardown (refuses while leases live) | parses; not executed |
-| `worker/outcome.ts` | HTTP outcome matrix, metadata contract, budget, Retry-After | 16 Deno tests pass |
-| `worker/run.ts` | worker loop with injected I/O (fencing + RPC error handling) | 14 Deno tests pass |
+| `worker/outcome.ts` | HTTP outcome matrix, metadata contract, budget, Retry-After | 15 Deno tests pass |
+| `worker/run.ts` | worker loop with injected I/O (fencing + RPC error handling) | 15 Deno tests pass |
 | `worker/index.ts` | service-role-only Edge entry, wires I/O only | type-checks; not deployed |
 | `mux-cleanup-phase-4-db-tests-single-session.sql` | L1–L9, C1–C7, R1–R4, G1–G8, F1–F12, P1–P7 | BLOCKED: isolated test DB |
 | `mux-cleanup-phase-4-concurrency-test.py` | C1–C6 with independent connections | compiles; BLOCKED: isolated test DB |
