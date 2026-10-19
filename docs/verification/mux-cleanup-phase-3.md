@@ -1,37 +1,23 @@
-# Mux cleanup Phase 3 — review package (NOT APPLIED)
+# Mux cleanup Phase 3 — COMPLETE (2026-10-19)
 
-Status: prepared for owner review. No migration applied, no Edge Function deployed, no cron scheduled, no Mux deletion possible.
+Status: migration APPLIED, all DB checks PASS, dashboard backend APPLIED and verified, owner QA on the admin screen PASS. Phase 3 is closed.
 
-## Files
-- `docs/drafts/mux-cleanup-phase-3-migration.sql` — schema, guards, triggers, dry-run worker, sweeper, privileges
-- `docs/drafts/mux-cleanup-phase-3-rollback.sql` — refuses if any destructive claim exists; touches no content or Mux data
-- `docs/drafts/mux-cleanup-phase-3-db-tests.sql` — 21 sequential rolled-back DB checks
+## What Phase 3 delivered
+- Tables: `mux_deletion_candidates`, `mux_cleanup_audit_logs`, `mux_cleanup_observations` (service_role only, RLS on, no client policies).
+- Triggers: `mux_cleanup_posts` (insert / soft delete / hard delete / media change), `mux_cleanup_reviews`, `mux_cleanup_review_updates` (insert / hard delete incl. cascade / media change), candidate guards, append-only guards.
+- Functions: lock helpers, canonical resolver (`mux_uploads.asset_id`), mode (hard `dry_run`), enqueue, rescue, reference state, dry-run worker, age-only sweeper. EXECUTE revoked from PUBLIC/anon/authenticated.
+- Dashboard backend: service-only run ledger (`mux_cleanup_runs` with `worker_run_id` correlation), fail-closed admin RPCs (overview, candidate list/detail, observations, run list, run detail, manual dry-run, manual sweep).
 
-## Changed objects (on apply)
-Tables: `mux_deletion_candidates`, `mux_cleanup_audit_logs`, `mux_cleanup_observations` (service_role only, RLS on, no policies).
-Triggers: `mux_cleanup_posts` (insert / soft delete / hard delete / media change), `mux_cleanup_reviews`, `mux_cleanup_review_updates` (insert / hard delete incl. cascade / media change), candidate guards, append-only guards.
-Functions: lock, resolver, mode, enqueue, rescue, reference state, dry-run, sweep. EXECUTE revoked from PUBLIC/anon/authenticated.
+## Verified behavior
+- Active Post hard-delete → candidate with 24h grace; already-soft-deleted historical Post purge → `protected_ambiguous` (`historical_soft_deleted_pre_phase3`); existing candidates preserved idempotently, grace clock never reset.
+- Universal lock order: asset advisory lock (`hashtextextended`, 64-bit) BEFORE candidate row lock; worker processes assets in lexical order.
+- Dry-run promotes `pending_grace → eligible` only after a fresh zero-reference check under the asset lock; referenced → rescued; ambiguous left as is.
+- Age-only unlinked uploads → `protected_ambiguous`, never deletion-eligible (72 real historical uploads confirmed via sweeper).
+- `pending_grace → eligible → dry-run simulated deletion` lifecycle verified live with a real deleted post video; no Mux DELETE possible (mode hard-returns `dry_run`, destructive claims raise 42501).
+- Dashboard verification (docs/verification/mux-cleanup-dashboard.md): A1–A6, B1–B6, D PASS; C1 (two-session overlap) BLOCKED.
 
-## Decisions incorporated
-- Barrier, not row, is immutable: claim flag/token/time/generation cannot change; only `deleting → deleted | reconciled_already_deleted | retryable_error | failed_manual` and `retryable_error → deleting | failed_manual`; terminal states final; rows cannot be deleted. In Phase 3 no claim can be created at all.
-- Identity resolved via `mux_upload_id → mux_uploads.asset_id`; unresolved or mismatched identity is recorded in observations and never blocks a user's delete.
-- Enqueue is idempotent (grace clock kept); only a new removal after rescue starts a fresh lifecycle; protected and claimed rows are never re-armed.
-- `pending_grace → eligible` happens in the dry-run step after a fresh reference check under the asset lock; referenced → rescued, ambiguous → left as is.
-- All age-only unlinked uploads are recorded as `protected_ambiguous` — no abandonment policy approved.
-- Removed/orphaned mappings and mappings to deleted content do not protect forever; live mappings to existing content and in-flight uploads are ambiguous.
-- Dry-run is pure SQL: no Mux call, no credential, no claim; leases are non-blocking; mode function hard-returns `dry_run`.
+## Deferred (intentionally, to live-deletion activation)
+- True parallel/concurrency tests (two-session claim overlap, crash after Mux DELETE) — they concern the destructive claim / Mux DELETE boundary.
 
-## Locking (honest limits)
-- 64-bit `hashtextextended` advisory keys; collisions extremely unlikely, harmless if they occur (extra serialization only).
-- Universal lock order on every path: asset advisory lock BEFORE any candidate row lock/update. The dry-run worker selects due candidates unlocked, in deterministic `mux_asset_id` lexical order, then per candidate: asset lock → atomic conditional lease update → re-read under lock → reference check → audit. A candidate leased/changed by another worker is skipped. This removes the candidate→asset reversal that could deadlock a user publish/save.
-- Within one trigger call assets are locked in sorted order. Across separate statements or cascades in one transaction a global order cannot be guaranteed; Postgres deadlock detection would abort one transaction (retryable). The dry-run worker holds one asset lock at a time and takes no content row locks, so it cannot form a cycle with saves.
-
-## Tests
-| Area | Status |
-|---|---|
-| Deno/app tests | unchanged (no app or Edge code changed) |
-| 21 DB checks | BLOCKED — not run; requires the migration applied to an isolated database. SQL tool here is read-only |
-| Concurrency (save vs claim, stale worker, crash after DELETE) | BLOCKED — no live claims exist yet; deferred to live-activation package |
-
-## Rollout steps after approval
-1. Apply migration; 2. run DB tests in a transaction; 3. separately approve cron; 4. observe 48–72h of audit logs; 5. live worker is a separate future package.
+## Phase 4 (not started, needs separate approval)
+- pg_cron scheduled dry-run (credentials via Supabase Vault), 48–72h audit observation, then a separately approved live deletion worker.
