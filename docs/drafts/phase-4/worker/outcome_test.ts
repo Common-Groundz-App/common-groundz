@@ -40,7 +40,7 @@ Deno.test('metadata contract: exact Phase 2 shape parses', () => {
 Deno.test('metadata contract fails closed on any deviation', () => {
   assertEquals(parseAssetMetadata(body({ ...good, v: 2 })), null)
   assertEquals(parseAssetMetadata(body(good, 'other')), null)            // external_id mismatch
-  assertEquals(parseAssetMetadata(body(good, undefined)), null)          // no meta
+  assertEquals(parseAssetMetadata({ data: { passthrough: JSON.stringify(good) } }), null) // no meta
   assertEquals(parseAssetMetadata(body('not json')), null)
   assertEquals(parseAssetMetadata(body({ ...good, upload_record_id: 'x' }, 'x')), null)
   assertEquals(parseAssetMetadata({ data: {} }), null)                   // legacy asset
