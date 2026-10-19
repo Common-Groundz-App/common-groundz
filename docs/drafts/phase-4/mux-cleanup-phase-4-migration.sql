@@ -154,7 +154,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.mux_cleanup_acquire_run_lease(p_run_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE l public.mux_cleanup_live_run_lease%ROWTYPE; v_token uuid := gen_random_uuid();
+DECLARE l public.mux_cleanup_live_run_lease%ROWTYPE; v_token uuid := gen_random_uuid(); v_prev uuid;
 BEGIN
   IF p_run_id IS NULL THEN RAISE EXCEPTION 'run id required' USING ERRCODE = '22023'; END IF;
   IF public.mux_cleanup_mode() IS DISTINCT FROM 'live' THEN
@@ -169,6 +169,7 @@ BEGIN
     RETURN jsonb_build_object('acquired', false, 'reason', 'run_already_in_progress');
   END IF;
 
+  v_prev := l.holder_run_id;
   IF l.holder_run_id IS NOT NULL THEN   -- expired holder: takeover; its ledger row is closed
     UPDATE public.mux_cleanup_runs SET status = 'failed', finished_at = clock_timestamp(),
            error_message = 'run_lease_expired_taken_over'
@@ -186,7 +187,7 @@ BEGIN
     VALUES (p_run_id, 'live', 'worker', 'running', p_run_id, 10);
 
   RETURN jsonb_build_object('acquired', true, 'run_lease_token', v_token, 'generation', l.generation,
-    'expires_at', l.expires_at, 'took_over_expired', l.generation > 1 AND l.holder_run_id IS NOT NULL);
+    'expires_at', l.expires_at, 'took_over_expired', v_prev IS NOT NULL);
 END $$;
 
 -- Only the current holder with the current token can release. A stale run
