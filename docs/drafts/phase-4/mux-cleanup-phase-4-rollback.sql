@@ -82,10 +82,38 @@ BEGIN
   RETURN NEW;
 END $$;
 
--- Restore the dashboard overview exactly as installed by the dashboard
--- migration (20261018173352) — paste that function body here verbatim
--- before running; it must not reference mux_cleanup_live_run_lease.
--- [RESTORE admin_mux_cleanup_overview() FROM 20261018173352 LINES 45-75]
+-- Restore the dashboard overview exactly as installed by 20261018173352
+-- (copied verbatim; must not reference mux_cleanup_live_run_lease).
+CREATE OR REPLACE FUNCTION public.admin_mux_cleanup_overview()
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE v_counts jsonb; v_sched jsonb; v_jobs jsonb; v_active int; v_total int;
+BEGIN
+  PERFORM public.mux_cleanup_require_admin();
+  SELECT COALESCE(jsonb_object_agg(status, n), '{}') INTO v_counts
+    FROM (SELECT status, count(*) n FROM public.mux_deletion_candidates GROUP BY status) s;
+  BEGIN
+    EXECUTE $q$SELECT COALESCE(jsonb_agg(jsonb_build_object('jobname',jobname,'schedule',schedule,'active',active) ORDER BY jobname),'[]'),
+                      count(*) FILTER (WHERE active), count(*)
+               FROM cron.job WHERE jobname LIKE 'mux-cleanup-%'$q$ INTO v_jobs, v_active, v_total;
+    v_sched := jsonb_build_object('state',
+      CASE WHEN v_total = 0 THEN 'not_scheduled'
+           WHEN v_active > 0 THEN 'active'
+           ELSE 'inactive' END, 'jobs', v_jobs);
+  EXCEPTION WHEN others THEN
+    v_sched := jsonb_build_object('state','scheduler_unavailable');
+  END;
+  RETURN jsonb_build_object(
+    'mode', public.mux_cleanup_mode(),
+    'schedule', v_sched,
+    'counts', v_counts,
+    'total', (SELECT count(*) FROM public.mux_deletion_candidates),
+    'destructive_claims', (SELECT count(*) FROM public.mux_deletion_candidates WHERE is_destructively_claimed),
+    'active_leases', (SELECT count(*) FROM public.mux_deletion_candidates WHERE worker_lease_expires_at > clock_timestamp()),
+    'due_now', (SELECT count(*) FROM public.mux_deletion_candidates WHERE status IN ('pending_grace','eligible') AND eligible_at <= clock_timestamp() AND NOT is_destructively_claimed),
+    'observations', (SELECT count(*) FROM public.mux_cleanup_observations),
+    'last_sweep', (SELECT public.mux_cleanup_run_json(r) FROM public.mux_cleanup_runs r WHERE kind='sweep' ORDER BY started_at DESC, id DESC LIMIT 1),
+    'last_dry_run', (SELECT public.mux_cleanup_run_json(r) FROM public.mux_cleanup_runs r WHERE kind='dry_run' ORDER BY started_at DESC, id DESC LIMIT 1));
+END $$;
 
 DROP TABLE public.mux_cleanup_live_run_lease;
 DO $$ BEGIN
