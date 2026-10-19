@@ -31,14 +31,14 @@ Deno.test('verify GET after 404', () => {
 })
 
 const okBody = (pt: unknown, ext = 'u1') => ({ data: { passthrough: JSON.stringify(pt), meta: { external_id: ext } } })
-const exp = { app: 'common-groundz', env: 'live', uploadRecordId: 'u1' }
+const exp = { app: 'commongroundz', env: 'live', uploadRecordId: 'u1' }
 Deno.test('pre-GET passes only with matching app/env/upload id', () => {
-  assertEquals(classifyPreGet(s(200), okBody({ app: 'common-groundz', env: 'live', upload_record_id: 'u1' }), exp), { proceed: true })
-  assertEquals((classifyPreGet(s(200), okBody({ app: 'common-groundz', env: 'test', upload_record_id: 'u1' }), exp) as any).outcome, 'environment_mismatch')
-  assertEquals((classifyPreGet(s(200), okBody({ app: 'common-groundz', env: 'live', upload_record_id: 'u2' }), exp) as any).outcome, 'environment_mismatch')
-  assertEquals((classifyPreGet(s(200), okBody({ app: 'common-groundz', env: 'live', upload_record_id: 'u1' }, 'zz'), exp) as any).outcome, 'environment_mismatch')
+  assertEquals(classifyPreGet(s(200), okBody({ app: 'commongroundz', env: 'live', upload_record_id: 'u1' }), exp), { proceed: true })
+  assertEquals((classifyPreGet(s(200), okBody({ app: 'commongroundz', env: 'test', upload_record_id: 'u1' }), exp) as any).outcome, 'environment_mismatch')
+  assertEquals((classifyPreGet(s(200), okBody({ app: 'commongroundz', env: 'live', upload_record_id: 'u2' }), exp) as any).outcome, 'environment_mismatch')
+  assertEquals((classifyPreGet(s(200), okBody({ app: 'commongroundz', env: 'live', upload_record_id: 'u1' }, 'zz'), exp) as any).outcome, 'environment_mismatch')
   assertEquals((classifyPreGet(s(200), { data: {} }, exp) as any).outcome, 'environment_mismatch') // legacy assets fail closed
-  assertEquals((classifyPreGet(s(200), okBody({ app: 'common-groundz', env: 'live', upload_record_id: 'u1' }), { ...exp, uploadRecordId: null }) as any).outcome, 'environment_mismatch')
+  assertEquals((classifyPreGet(s(200), okBody({ app: 'commongroundz', env: 'live', upload_record_id: 'u1' }), { ...exp, uploadRecordId: null }) as any).outcome, 'environment_mismatch')
 })
 Deno.test('pre-GET 404 does not finalize by itself', () => assertEquals(classifyPreGet(s(404), null, exp), { proceed: false, alreadyGone: true }))
 

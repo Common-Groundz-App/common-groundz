@@ -13,7 +13,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { canClaimAnother, classifyDelete, classifyPreGet, classifyVerifyGet, parseRetryAfter, type HttpResult, type Outcome, LIMITS } from './outcome.ts'
 
-const APP = 'common-groundz', ENV = 'live'
+const APP = 'commongroundz', ENV = 'live'
 
 function timingSafeEqual(a: string, b: string) {
   if (a.length !== b.length) return false
