@@ -140,3 +140,6 @@ verify_jwt = false
 
 [functions.admin-media-deletions-trigger]
 verify_jwt = false
+
+[functions.mux-cleanup-live]
+verify_jwt = false
