@@ -5046,6 +5046,10 @@ export type Database = {
         Args: { p_presented: string }
         Returns: boolean
       }
+      is_valid_mux_cleanup_cron_secret: {
+        Args: { p_presented: string }
+        Returns: boolean
+      }
       is_valid_trending_cron_secret: {
         Args: { p_presented: string }
         Returns: boolean
@@ -5197,8 +5201,12 @@ export type Database = {
         }[]
       }
       mux_asset_reference_state: { Args: { p_asset_id: string }; Returns: Json }
-      mux_cleanup_claim_live: { Args: { p_run_id: string }; Returns: Json }
+      mux_cleanup_claim_live: {
+        Args: { p_candidate_id?: string; p_run_id: string }
+        Returns: Json
+      }
       mux_cleanup_dry_run: { Args: { p_limit?: number }; Returns: Json }
+      mux_cleanup_due_live: { Args: { p_limit?: number }; Returns: string[] }
       mux_cleanup_execute_run: {
         Args: {
           p_actor: string
