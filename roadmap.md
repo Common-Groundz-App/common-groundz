@@ -488,8 +488,8 @@ cross-read between them.
 - [ ] Owner signed-in screen check
 
 ## Mux cleanup — operational dashboard polish (approved scope)
-- [ ] Telemetry: `mux_cleanup_live_runs` table + start/finish RPCs (service_role only) + admin read RPCs
-- [ ] Cron-health fix (ChatGPT): `admin_mux_live_status` overdue/last-run based ONLY on `trigger_source='cron'` rows; admin runs never mask cron overdue
-- [ ] Worker: record start/finish telemetry for every invocation incl. paused runs; server-derived trigger_source; finite error_category
-- [ ] UI: compact Automatic Mux cleanup panel (orange healthy states), live worker first in Automation health, abnormal counts highlighted only when non-zero, Sweep/Dry Run/Inventory demoted to diagnostics, admin Run now via same worker path
-- [ ] Verify: ON / OFF-paused / successful automatic run / Run now; confirm cleanup behavior unchanged
+- [x] Telemetry: `mux_cleanup_live_runs` table + start/finish RPCs (service_role only) + admin read RPCs
+- [x] Cron-health fix (ChatGPT): `admin_mux_live_status` overdue/last-run based ONLY on `trigger_source='cron'` rows; admin runs never mask cron overdue
+- [x] Worker: record start/finish telemetry for every invocation incl. paused runs; server-derived trigger_source; finite error_category
+- [x] UI: compact Automatic Mux cleanup panel (orange healthy states), live worker first in Automation health, abnormal counts highlighted only when non-zero, Sweep/Dry Run/Inventory demoted to diagnostics, admin Run now via same worker path
+- [ ] Verify: first real cron telemetry row appears after the next :50 run; owner checks ON/OFF/Run now in the dashboard
