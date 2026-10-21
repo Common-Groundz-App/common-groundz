@@ -27,6 +27,7 @@ import ChoiceChips from '@/components/profile/reviews/questionnaire/ChoiceChips'
 import { BASE_ON_RATING_ACTION_LABEL, RECOMMENDATION_INTENT_OPTIONS } from '@/services/review/recommendationResolver';
 import { addReviewUpdate, editLatestReviewUpdate } from '@/services/review/timeline';
 import { deleteMedia } from '@/services/mediaService';
+import { abandonMuxUploads, flushMuxAbandonments, sessionNewMuxIds } from '@/services/muxAbandonment';
 import { useReviewVideoFlags } from '@/hooks/useAppConfig';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
 import { MuxUploadChip } from '@/components/feed/composer/MuxUploadChip';
@@ -162,13 +163,25 @@ export function TimelineComposerScreen(props: Props) {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [guardMode]);
 
+  const sessionMuxByUrl = useRef(new Map<string, string>());
   const handleMediaAdded = (media: MediaItem) => {
     const decision = decideFinishedUpload(uploadSid, media.url, aliveRef.current);
     uploads.recordUpload(sessionKey, media.url);
+    if (media.mux_upload_id) sessionMuxByUrl.current.set(media.url, media.mux_upload_id);
     if (decision === 'add') dispatch({ type: 'MEDIA_ADDED', sessionKey, media });
-    else if (decision === 'delete') void deleteMedia(media.url).catch(() => undefined);
+    else if (decision === 'delete') {
+      void deleteMedia(media.url).catch(() => undefined);
+      if (media.mux_upload_id) void abandonMuxUploads([media.mux_upload_id], aliveRef.current ? 'composer_media_removed' : 'composer_discarded');
+    }
   };
-  const handleMediaRemove = (media: MediaItem) => dispatch({ type: 'MEDIA_REMOVED', sessionKey, ...mediaIdentity(media) });
+  const handleMediaRemove = (media: MediaItem) => {
+    // Session-new uploads only; removing saved media is handled by the committed save.
+    const ids = sessionNewMuxIds([media], state.storedUpdate?.media ?? []).filter((id) => [...sessionMuxByUrl.current.values()].includes(id));
+    if (ids.length) void abandonMuxUploads(ids, 'composer_media_removed');
+    dispatch({ type: 'MEDIA_REMOVED', sessionKey, ...mediaIdentity(media) });
+  };
+  const muxIdsForUrls = (urls: readonly string[]) =>
+    urls.map((u) => sessionMuxByUrl.current.get(u)).filter((id): id is string => !!id);
   const reserveSlots = useCallback((n: number) => registryReserveSlots(uploadSid, n), [uploadSid]);
   const releaseSlot = useCallback(() => registryReleaseSlot(uploadSid), [uploadSid]);
   const onUploadsChange = useCallback((list: MediaUploadState[]) => setIsUploading(list.some((u) => u.status === 'uploading')), []);
@@ -287,11 +300,10 @@ export function TimelineComposerScreen(props: Props) {
       }
     if (!aliveRef.current) return;
     // Photos uploaded here but removed before saving are referenced by nothing.
-    void Promise.allSettled(
-      uploads
-        .committedLeftovers(state.values.media.map((m) => m.url), (state.storedUpdate?.media ?? []).map((m) => m.url))
-        .map((url) => deleteMedia(url)),
-    );
+    const leftovers = uploads.committedLeftovers(state.values.media.map((m) => m.url), (state.storedUpdate?.media ?? []).map((m) => m.url));
+    void Promise.allSettled(leftovers.map((url) => deleteMedia(url)));
+    const leftoverMux = muxIdsForUrls(leftovers);
+    if (leftoverMux.length) void abandonMuxUploads(leftoverMux, 'composer_media_removed');
       dispatch({ type: 'SAVE_RESULT', sessionKey, result });
       toast(isEdit ? { title: 'Timeline update saved' } : { title: 'Update added', description: 'Your timeline update has been added successfully' });
       await guard.release();
@@ -324,6 +336,9 @@ export function TimelineComposerScreen(props: Props) {
     const preexisting = (state.storedUpdate?.media ?? []).map((m) => m.url);
     const candidates = uploads.cleanupCandidates(preexisting);
     void Promise.allSettled(candidates.map((url) => deleteMedia(url)));
+    const discardedMux = muxIdsForUrls(candidates);
+    if (discardedMux.length) void abandonMuxUploads(discardedMux, 'composer_discarded');
+    await flushMuxAbandonments();
     await action();
   };
   const requestLeave = (action: () => void | Promise<void>) => {

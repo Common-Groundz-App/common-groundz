@@ -45,6 +45,7 @@ import { parseEntityTypeAtBoundary } from '@/services/entityType';
 import { createReview, updateReview } from '@/services/review/core';
 import { findOwnReviewForEntity } from '@/services/review/ownReview';
 import { deleteMedia } from '@/services/mediaService';
+import { abandonMuxUploads, flushMuxAbandonments, sessionNewMuxIds } from '@/services/muxAbandonment';
 import { supabase } from '@/integrations/supabase/client';
 import { useReviewVideoFlags } from '@/hooks/useAppConfig';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
@@ -271,13 +272,25 @@ export function ReviewComposerScreen(props: Props) {
 
   // Captures this render's session: a late finish is decided against the
   // session the upload started in, even after the screen has closed.
+  const sessionMuxByUrl = useRef(new Map<string, string>());
   const handleMediaAdded = (media: MediaItem) => {
     const decision = decideFinishedUpload(uploadSid, media.url, aliveRef.current);
     uploads.recordUpload(sessionKey, media.url);
+    if (media.mux_upload_id) sessionMuxByUrl.current.set(media.url, media.mux_upload_id);
     if (decision === 'add') dispatch({ type: 'MEDIA_ADDED', sessionKey, media });
-    else if (decision === 'delete') void deleteMedia(media.url).catch(() => undefined);
+    else if (decision === 'delete') {
+      void deleteMedia(media.url).catch(() => undefined);
+      if (media.mux_upload_id) void abandonMuxUploads([media.mux_upload_id], aliveRef.current ? 'composer_media_removed' : 'composer_discarded');
+    }
   };
-  const handleMediaRemove = (media: MediaItem) => dispatch({ type: 'MEDIA_REMOVED', sessionKey, ...mediaIdentity(media) });
+  const handleMediaRemove = (media: MediaItem) => {
+    // Session-new uploads only; removing saved media is handled by the committed save.
+    const ids = sessionNewMuxIds([media], state.stored?.media ?? []).filter((id) => [...sessionMuxByUrl.current.values()].includes(id));
+    if (ids.length) void abandonMuxUploads(ids, 'composer_media_removed');
+    dispatch({ type: 'MEDIA_REMOVED', sessionKey, ...mediaIdentity(media) });
+  };
+  const muxIdsForUrls = (urls: readonly string[]) =>
+    urls.map((u) => sessionMuxByUrl.current.get(u)).filter((id): id is string => !!id);
   const reserveSlots = useCallback((n: number) => registryReserveSlots(uploadSid, n), [uploadSid]);
   const releaseSlot = useCallback(() => registryReleaseSlot(uploadSid), [uploadSid]);
   const onUploadsChange = useCallback(
@@ -446,11 +459,10 @@ export function ReviewComposerScreen(props: Props) {
     }
     if (!aliveRef.current) return;
     // Photos uploaded here but removed before saving are referenced by nothing.
-    void Promise.allSettled(
-      uploads
-        .committedLeftovers(state.values.media.map((m) => m.url), (state.stored?.media ?? []).map((m) => m.url))
-        .map((url) => deleteMedia(url)),
-    );
+    const leftovers = uploads.committedLeftovers(state.values.media.map((m) => m.url), (state.stored?.media ?? []).map((m) => m.url));
+    void Promise.allSettled(leftovers.map((url) => deleteMedia(url)));
+    const leftoverMux = muxIdsForUrls(leftovers);
+    if (leftoverMux.length) void abandonMuxUploads(leftoverMux, 'composer_media_removed');
     logFunnel({ event: 'review_submitted', source: 'review_form', entityType: (display?.type ?? undefined) as never });
     dispatch({ type: 'SAVE_RESULT', sessionKey, result: { status: 'ok' } });
     await goToEntity(subjectId, isEdit ? 'Your changes were saved' : 'Your review was published');
@@ -467,6 +479,9 @@ export function ReviewComposerScreen(props: Props) {
     const preexisting = (state.stored?.media ?? []).map((m) => m.url);
     const candidates = uploads.cleanupCandidates(preexisting); // [] unless open
     void Promise.allSettled(candidates.map((url) => deleteMedia(url)));
+    const discardedMux = muxIdsForUrls(candidates);
+    if (discardedMux.length) void abandonMuxUploads(discardedMux, 'composer_discarded');
+    await flushMuxAbandonments();
     await action();
   };
   const requestLeave = (action: () => void | Promise<void>) => {
