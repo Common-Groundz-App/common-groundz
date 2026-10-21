@@ -201,6 +201,8 @@ Deno.serve(async (req) => {
     status: 'waiting',
     is_test: isTest,
     expires_at: expiresAt,
+    // Trusted server-written kind; omitted-kind (legacy) clients stay NULL.
+    kind: kind === 'unknown' ? null : kind,
   }, row => admin.from('mux_uploads').insert(row), event => console.error(JSON.stringify(event)))
 
   if (!persisted) {
