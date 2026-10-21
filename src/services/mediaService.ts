@@ -6,6 +6,7 @@ import { ensureBucketPolicies } from '@/services/storageService';
 import { generateVideoPoster } from '@/utils/videoPoster';
 import { analytics } from '@/services/analytics';
 
+import { abandonMuxUploads } from '@/services/muxAbandonment';
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 // Phase 1: only formats with broad cross-browser support.
 // MOV is allowed but may carry HEVC — we surface a soft warning at the composer.
@@ -612,7 +613,9 @@ async function uploadPostVideoViaMux(
     throw new Error("Couldn't start video upload. Try again.");
   }
 
-  if (aborted()) { discardPoster(); throw new Error('Upload cancelled'); }
+  // Removal after the upload ticket exists: the server marks it abandoned.
+  const abandonCancelled = () => { void abandonMuxUploads([upload.upload_id], 'composer_media_removed'); };
+  if (aborted()) { discardPoster(); abandonCancelled(); throw new Error('Upload cancelled'); }
   onProgress?.(0, 'uploading');
   try {
     let firstByte = false;
@@ -626,7 +629,7 @@ async function uploadPostVideoViaMux(
     }, (status) => mark('server response', { status }));
   } catch (err: any) {
     discardPoster();
-    if (aborted()) throw new Error('Upload cancelled');
+    if (aborted()) { abandonCancelled(); throw new Error('Upload cancelled'); }
     analytics.trackMuxUploadFailure({ stage: 'put', error: err?.message ?? String(err), size: file.size, format: file.type, upload_id: upload.upload_id });
     throw new Error("Video upload failed. Check your connection and try again.");
   }
@@ -644,7 +647,7 @@ async function uploadPostVideoViaMux(
   mark(raced === TIMED_OUT ? 'poster wait timed out' : 'poster wait done');
   const poster = raced === TIMED_OUT ? null : raced;
 
-  if (aborted()) { discardPoster(); throw new Error('Upload cancelled'); }
+  if (aborted()) { discardPoster(); abandonCancelled(); throw new Error('Upload cancelled'); }
 
   if (raced === TIMED_OUT) {
     // Late poster enhances only this attempt, and only if it is still active.
