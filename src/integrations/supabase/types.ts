@@ -2221,6 +2221,7 @@ export type Database = {
       }
       mux_uploads: {
         Row: {
+          abandonment_reason: string | null
           aspect_ratio: string | null
           asset_id: string | null
           created_at: string
@@ -2229,7 +2230,9 @@ export type Database = {
           error: string | null
           expires_at: string
           id: string
+          is_abandoned: boolean
           is_test: boolean
+          kind: string | null
           last_event_at: string | null
           max_resolution: string | null
           playback_id: string | null
@@ -2239,6 +2242,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          abandonment_reason?: string | null
           aspect_ratio?: string | null
           asset_id?: string | null
           created_at?: string
@@ -2247,7 +2251,9 @@ export type Database = {
           error?: string | null
           expires_at: string
           id?: string
+          is_abandoned?: boolean
           is_test?: boolean
+          kind?: string | null
           last_event_at?: string | null
           max_resolution?: string | null
           playback_id?: string | null
@@ -2257,6 +2263,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          abandonment_reason?: string | null
           aspect_ratio?: string | null
           asset_id?: string | null
           created_at?: string
@@ -2265,7 +2272,9 @@ export type Database = {
           error?: string | null
           expires_at?: string
           id?: string
+          is_abandoned?: boolean
           is_test?: boolean
+          kind?: string | null
           last_event_at?: string | null
           max_resolution?: string | null
           playback_id?: string | null
@@ -5243,6 +5252,10 @@ export type Database = {
           updated_count: number
         }[]
       }
+      mux_abandon_composer_uploads: {
+        Args: { p_reason: string; p_upload_ids: string[] }
+        Returns: Json
+      }
       mux_asset_reference_state: { Args: { p_asset_id: string }; Returns: Json }
       mux_cleanup_claim_live: {
         Args: { p_candidate_id?: string; p_run_id: string }
@@ -5320,6 +5333,10 @@ export type Database = {
         Args: { p_media: Json; p_source_id: string }
         Returns: undefined
       }
+      mux_reconcile_abandoned_uploads: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       mux_rescue_attached_media: { Args: { p_media: Json }; Returns: undefined }
       mux_resolve_media_assets: {
         Args: { p_media: Json }
@@ -5329,6 +5346,10 @@ export type Database = {
           mux_upload_id: string
           upload_record_id: string
         }[]
+      }
+      mux_upload_saved_reference: {
+        Args: { p_asset_id: string; p_upload_id: string }
+        Returns: boolean
       }
       normalize_identity_name: { Args: { input_name: string }; Returns: string }
       normalize_owned_media_path: { Args: { p: string }; Returns: string }
