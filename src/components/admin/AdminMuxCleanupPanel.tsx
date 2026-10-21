@@ -18,6 +18,7 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Copy, RefreshCw } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 // Read-only dashboard + manual sweep/dry-run. No deletion, mode change, override or scheduling.
 const rpc = (fn: string, args?: Record<string, unknown>) => (supabase.rpc as any)(fn, args);
@@ -89,11 +90,66 @@ export function AdminMuxCleanupPanel() {
         <p className="text-sm text-muted-foreground">Cleanup is in dry-run mode: nothing on this screen can delete a video.</p>
         <Button variant="outline" size="sm" onClick={refreshAll}><RefreshCw className="h-4 w-4" />Refresh</Button>
       </div>
+      <LiveDeletionSwitch />
       <Overview data={overview.data} loading={overview.isLoading} error={overview.error?.message} onRan={refreshAll} />
       <Candidates />
       <Runs />
       <Observations />
     </div>
+  );
+}
+
+function LiveDeletionSwitch() {
+  const qc = useQueryClient();
+  const [confirmOn, setConfirmOn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const q = useQuery({
+    queryKey: ['mux-cleanup', 'live'],
+    queryFn: () => call<{ live_enabled: boolean; updated_at: string | null }>('admin_get_mux_live_deletion'),
+    retry: false,
+  });
+  const set = async (enabled: boolean) => {
+    setBusy(true);
+    try {
+      await call('admin_set_mux_live_deletion', { p_enabled: enabled });
+      toast.success(enabled ? 'Live deletion turned ON' : 'Live deletion turned OFF');
+    } catch (e: any) { toast.error(`Couldn't change live deletion: ${e.message}`); }
+    finally { setBusy(false); setConfirmOn(false); qc.invalidateQueries({ queryKey: ['mux-cleanup'] }); }
+  };
+
+  if (q.isLoading) return <Skeleton className="h-20 w-full" />;
+  if (q.error || !q.data) return <Alert variant="destructive"><AlertTitle>Could not load live deletion state</AlertTitle><AlertDescription>{q.error?.message}</AlertDescription></Alert>;
+  const on = q.data.live_enabled;
+
+  return (
+    <Card>
+      <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Badge variant={on ? 'default' : 'secondary'}>{on ? 'ON' : 'OFF'}</Badge>
+            <span className="font-medium">{on ? 'Live deletion ON — automatic cleanup active' : 'Live deletion OFF — deletions paused'}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">Last changed {ago(q.data.updated_at)}</p>
+        </div>
+        <Switch checked={on} disabled={busy} aria-label="Live Mux deletion"
+          onCheckedChange={(v) => (v ? setConfirmOn(true) : set(false))} />
+      </CardContent>
+      <AlertDialog open={confirmOn} onOpenChange={(o) => !o && setConfirmOn(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Turn on live Mux deletion?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The hourly worker will permanently delete eligible, unreferenced Mux videos from Mux. This cannot be undone. Protected and referenced videos are never deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+            <AlertDialogAction disabled={busy} className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => { e.preventDefault(); set(true); }}>Turn ON</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
   );
 }
 
