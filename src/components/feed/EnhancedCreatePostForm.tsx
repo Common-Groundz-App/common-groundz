@@ -296,11 +296,15 @@ export function EnhancedCreatePostForm({
     }
   }, [isDirty, onCancel]);
 
-  const handleDiscardConfirm = useCallback(() => {
+  const handleDiscardConfirm = useCallback(async () => {
     setDiscardDialogOpen(false);
     if (!isEditMode) clearDraft();
+    // Only uploads made in this session; saved post media is never abandoned.
+    const abandoned = sessionNewMuxIds(media, postToEdit?.media ?? []);
+    if (abandoned.length) void abandonMuxUploads(abandoned, 'composer_discarded');
+    await flushMuxAbandonments();
     onCancel?.();
-  }, [isEditMode, clearDraft, onCancel]);
+  }, [isEditMode, clearDraft, onCancel, media, postToEdit]);
 
 
   // Prefill entity when passed from parent (e.g. "Share your experience").
@@ -541,6 +545,8 @@ export function EnhancedCreatePostForm({
   const removeMedia = (itemToRemove: MediaItem) => {
     const key = mediaIdentity(itemToRemove);
     revokeLocalPreview(itemToRemove.clientKey);
+    const abandoned = sessionNewMuxIds([itemToRemove], postToEdit?.media ?? []);
+    if (abandoned.length) void abandonMuxUploads(abandoned, 'composer_media_removed');
     // The tile may be a frozen preview item still carrying a pre-adoption id,
     // so match by the immutable clientKey first; identity is the fallback.
     const ck = itemToRemove.clientKey;
