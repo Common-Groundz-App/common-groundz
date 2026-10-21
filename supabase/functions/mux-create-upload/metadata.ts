@@ -38,7 +38,7 @@ export function uploadAssetSettings(recordId: string, kind: MetadataKind, isTest
  * Correlation remains on the Direct Upload/asset even without a database row.
  */
 export async function persistCreatedUpload(
-  row: { id: string; upload_id: string; user_id: string; status: string; is_test: boolean; expires_at: string },
+  row: { id: string; upload_id: string; user_id: string; status: string; is_test: boolean; expires_at: string; kind?: UploadKind | null },
   insert: (input: typeof row) => PromiseLike<{ error: unknown }>,
   log: (event: Record<string, unknown>) => void,
 ): Promise<boolean> {
