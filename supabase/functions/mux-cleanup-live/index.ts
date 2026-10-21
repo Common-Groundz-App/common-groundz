@@ -2,6 +2,9 @@
 // against Vault) or a verified admin (auth.getUser + has_role). Live deletion is
 // controlled only by mux_cleanup_live_control (OFF by default); every decision is
 // re-checked in the database. Processes up to 10 due candidates per run.
+// Every invocation — including paused runs — is recorded in mux_cleanup_live_runs
+// so the admin dashboard can tell "cron ran but deletion is paused" apart from
+// "cron never reached the worker". Telemetry never blocks or alters the run.
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors'
 import { classifyDelete } from './outcome.ts'
@@ -68,17 +71,50 @@ Deno.serve(async (req) => {
   }
 
   const runId = crypto.randomUUID()
-  const due = await db.rpc('mux_cleanup_due_live', { p_limit: BATCH })
-  if (due.error) return reply({ run_id: runId, error: 'select_rpc_error' }, 500)
-  const ids = ((due.data ?? []) as unknown[]).map((r) => (typeof r === 'string' ? r : (r as Record<string, string>).mux_cleanup_due_live)).filter(Boolean).slice(0, BATCH)
 
-  const muxAuth = 'Basic ' + btoa(`${muxId}:${muxSecret}`)
-  const results = []
-  for (const id of ids) {
-    const r = await processOne(db, runId, id, muxAuth)
-    results.push(r)
-    if ((r as { reason?: string }).reason === 'live_disabled') break
+  // Telemetry: record the start of every invocation. Failures here never block the run.
+  let runRowId: string | null = null
+  try {
+    const { data } = await db.rpc('mux_live_run_start', { p_worker_run_id: runId, p_trigger_source: caller })
+    runRowId = (data as string) ?? null
+  } catch { /* telemetry never blocks the run */ }
+  const finish = async (status: 'succeeded' | 'paused' | 'failed', selected: number | null, results: unknown, errorCategory: string | null = null) => {
+    if (!runRowId) return
+    try {
+      await db.rpc('mux_live_run_finish', { p_id: runRowId, p_status: status, p_selected: selected, p_results: results ?? null, p_error_category: errorCategory })
+    } catch { /* telemetry never blocks the run */ }
   }
-  console.log('[mux-cleanup-live]', JSON.stringify({ run_id: runId, caller, selected: ids.length, results }))
-  return reply({ run_id: runId, caller, selected: ids.length, results })
+
+  try {
+    // Paused runs are recorded explicitly so the dashboard can distinguish
+    // "worker ran, deletion off" from "worker never ran".
+    const { data: ctl } = await db.from('mux_cleanup_live_control').select('live_enabled').eq('id', 1).maybeSingle()
+    if (ctl?.live_enabled !== true) {
+      await finish('paused', 0, [])
+      console.log('[mux-cleanup-live]', JSON.stringify({ run_id: runId, caller, paused: true }))
+      return reply({ run_id: runId, caller, paused: true, selected: 0, results: [] })
+    }
+
+    const due = await db.rpc('mux_cleanup_due_live', { p_limit: BATCH })
+    if (due.error) {
+      await finish('failed', null, null, 'select_rpc_error')
+      return reply({ run_id: runId, error: 'select_rpc_error' }, 500)
+    }
+    const ids = ((due.data ?? []) as unknown[]).map((r) => (typeof r === 'string' ? r : (r as Record<string, string>).mux_cleanup_due_live)).filter(Boolean).slice(0, BATCH)
+
+    const muxAuth = 'Basic ' + btoa(`${muxId}:${muxSecret}`)
+    const results = []
+    for (const id of ids) {
+      const r = await processOne(db, runId, id, muxAuth)
+      results.push(r)
+      if ((r as { reason?: string }).reason === 'live_disabled') break
+    }
+    await finish('succeeded', ids.length, results)
+    console.log('[mux-cleanup-live]', JSON.stringify({ run_id: runId, caller, selected: ids.length, results }))
+    return reply({ run_id: runId, caller, selected: ids.length, results })
+  } catch (e) {
+    console.error('[mux-cleanup-live] error', (e as Error).message)
+    await finish('failed', null, null, 'worker_exception')
+    return reply({ error: 'internal_error' }, 500)
+  }
 })

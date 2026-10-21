@@ -1974,6 +1974,42 @@ export type Database = {
           },
         ]
       }
+      mux_cleanup_live_runs: {
+        Row: {
+          error_category: string | null
+          finished_at: string | null
+          id: string
+          results: Json | null
+          selected: number | null
+          started_at: string
+          status: string
+          trigger_source: string
+          worker_run_id: string
+        }
+        Insert: {
+          error_category?: string | null
+          finished_at?: string | null
+          id?: string
+          results?: Json | null
+          selected?: number | null
+          started_at?: string
+          status?: string
+          trigger_source: string
+          worker_run_id: string
+        }
+        Update: {
+          error_category?: string | null
+          finished_at?: string | null
+          id?: string
+          results?: Json | null
+          selected?: number | null
+          started_at?: string
+          status?: string
+          trigger_source?: string
+          worker_run_id?: string
+        }
+        Relationships: []
+      }
       mux_cleanup_observations: {
         Row: {
           created_at: string
@@ -4205,6 +4241,7 @@ export type Database = {
         Returns: Json
       }
       admin_list_mux_cleanup_runs: { Args: { p_limit?: number }; Returns: Json }
+      admin_list_mux_live_runs: { Args: { p_limit?: number }; Returns: Json }
       admin_list_mux_observations: {
         Args: { p_kind?: string; p_limit?: number; p_offset?: number }
         Returns: Json
@@ -4294,6 +4331,7 @@ export type Database = {
         Args: { p_run_id: string }
         Returns: Json
       }
+      admin_mux_live_status: { Args: never; Returns: Json }
       admin_pending_entity_count: { Args: never; Returns: number }
       admin_review_video_view_stats: {
         Args: { _source?: string; _source_id?: string }
@@ -5262,6 +5300,20 @@ export type Database = {
           p_source_kind: string
         }
         Returns: undefined
+      }
+      mux_live_run_finish: {
+        Args: {
+          p_error_category?: string
+          p_id: string
+          p_results: Json
+          p_selected: number
+          p_status: string
+        }
+        Returns: undefined
+      }
+      mux_live_run_start: {
+        Args: { p_trigger_source: string; p_worker_run_id: string }
+        Returns: string
       }
       mux_lock_assets: { Args: { p_asset_ids: string[] }; Returns: undefined }
       mux_protect_historical_media: {
