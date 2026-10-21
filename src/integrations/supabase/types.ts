@@ -4168,6 +4168,7 @@ export type Database = {
         Args: { p_update_id: string }
         Returns: Json
       }
+      admin_get_mux_live_deletion: { Args: never; Returns: Json }
       admin_list_media_deletion_candidates: {
         Args: { p_limit?: number; p_status?: string }
         Returns: {
@@ -4305,6 +4306,10 @@ export type Database = {
       }
       admin_run_mux_dry_run: { Args: { p_batch?: number }; Returns: Json }
       admin_run_mux_sweep: { Args: never; Returns: Json }
+      admin_set_mux_live_deletion: {
+        Args: { p_enabled: boolean }
+        Returns: Json
+      }
       calculate_entity_trending_score_v2: {
         Args: { p_entity_id: string }
         Returns: number
