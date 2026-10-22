@@ -35,6 +35,7 @@ import { MuxUploadChip, UploadProgressChip } from './composer/MuxUploadChip';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
 import { composerMuxState, composerPreviewMedia, matchesMediaIdentity, mediaIdentity, mergePlaceholderResult, newMuxVideoSaveBlocker, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { ensureClientKey, reconcileComposerMedia } from '@/utils/mediaIdentity';
+import { ComposerUploadRegistry } from '@/utils/composerUploadRegistry';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
@@ -461,6 +462,15 @@ export function EnhancedCreatePostForm({
   const localPreviewUrlsRef = useRef<Map<string, string>>(new Map());
   // Frozen player items for locally previewed videos (see composerPreviewMedia).
   const frozenPreviewItemsRef = useRef<Map<string, MediaItem>>(new Map());
+  // Lifecycle identity for this session's Mux uploads. Lives outside the
+  // frozen preview items (those stay purely visual) and survives tiles leaving
+  // the media array, so Remove/Discard can abandon uploads whose tiles are
+  // already gone. Abandonment fires only on explicit intent — never on unmount.
+  const uploadRegistryRef = useRef(new ComposerUploadRegistry());
+  // Live media mirror for resolving frozen preview tiles back to their
+  // current authoritative item (which carries mux_upload_id once known).
+  const mediaRef = useRef(media);
+  mediaRef.current = media;
 
   const revokeLocalPreview = useCallback((clientKey?: string) => {
     if (!clientKey) return;
