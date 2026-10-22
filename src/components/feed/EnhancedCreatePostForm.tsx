@@ -815,6 +815,10 @@ export function EnhancedCreatePostForm({
 
         if (error) throw error;
         savedPostIdRef.current = updatedPost.id;
+        // Saved uploads are committed — never treated as discarded later.
+        uploadRegistryRef.current.markCommitted(
+          mediaToSave.map((m) => m.mux_upload_id).filter((id): id is string => !!id),
+        );
 
         // ===== Phase 3C.1: reconcile Mux mappings after a successful edit =====
         // HARD GUARDRAIL: only invoke when this post has Mux media now OR had it
@@ -977,6 +981,10 @@ export function EnhancedCreatePostForm({
       if (error) throw error;
 
       savedPostIdRef.current = newPost.id;
+      // Saved uploads are committed — never treated as discarded later.
+      uploadRegistryRef.current.markCommitted(
+        mediaToSave.map((m) => m.mux_upload_id).filter((id): id is string => !!id),
+      );
       console.log('Post created:', newPost);
 
       if (entities.length > 0 && newPost) {
