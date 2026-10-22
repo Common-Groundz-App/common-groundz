@@ -35,6 +35,7 @@ import { MuxUploadChip, UploadProgressChip } from './composer/MuxUploadChip';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
 import { composerMuxState, composerPreviewMedia, matchesMediaIdentity, mediaIdentity, mergePlaceholderResult, newMuxVideoSaveBlocker, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { ensureClientKey, reconcileComposerMedia } from '@/utils/mediaIdentity';
+import { ComposerUploadRegistry } from '@/utils/composerUploadRegistry';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
@@ -289,23 +290,35 @@ export function EnhancedCreatePostForm({
     return !!(title.trim() || content.trim() || media.length > 0 || entities.length > 0);
   }, [isEditMode, title, content, media, entities, postToEdit]);
 
+  // End the upload session without saving: every uncommitted session upload
+  // is abandoned, including ones whose tiles were already removed (media may
+  // be empty by now) and ones whose upload id has not arrived yet (the
+  // registry abandons those when the id attaches).
+  const abandonUncommittedSessionUploads = useCallback(() => {
+    const fromRegistry = uploadRegistryRef.current.endSession();
+    const fromMedia = sessionNewMuxIds(mediaRef.current, postToEdit?.media ?? []);
+    const ids = [...new Set([...fromRegistry, ...fromMedia])];
+    if (ids.length) void abandonMuxUploads(ids, 'composer_discarded');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postToEdit]);
+
   const handleCloseRequest = useCallback(() => {
     if (isDirty) {
       setDiscardDialogOpen(true);
     } else {
+      abandonUncommittedSessionUploads();
       onCancel?.();
     }
-  }, [isDirty, onCancel]);
+  }, [isDirty, onCancel, abandonUncommittedSessionUploads]);
 
   const handleDiscardConfirm = useCallback(async () => {
     setDiscardDialogOpen(false);
     if (!isEditMode) clearDraft();
     // Only uploads made in this session; saved post media is never abandoned.
-    const abandoned = sessionNewMuxIds(media, postToEdit?.media ?? []);
-    if (abandoned.length) void abandonMuxUploads(abandoned, 'composer_discarded');
+    abandonUncommittedSessionUploads();
     await flushMuxAbandonments();
     onCancel?.();
-  }, [isEditMode, clearDraft, onCancel, media, postToEdit]);
+  }, [isEditMode, clearDraft, onCancel, abandonUncommittedSessionUploads]);
 
 
   // Prefill entity when passed from parent (e.g. "Share your experience").
@@ -461,6 +474,15 @@ export function EnhancedCreatePostForm({
   const localPreviewUrlsRef = useRef<Map<string, string>>(new Map());
   // Frozen player items for locally previewed videos (see composerPreviewMedia).
   const frozenPreviewItemsRef = useRef<Map<string, MediaItem>>(new Map());
+  // Lifecycle identity for this session's Mux uploads. Lives outside the
+  // frozen preview items (those stay purely visual) and survives tiles leaving
+  // the media array, so Remove/Discard can abandon uploads whose tiles are
+  // already gone. Abandonment fires only on explicit intent — never on unmount.
+  const uploadRegistryRef = useRef(new ComposerUploadRegistry());
+  // Live media mirror for resolving frozen preview tiles back to their
+  // current authoritative item (which carries mux_upload_id once known).
+  const mediaRef = useRef(media);
+  mediaRef.current = media;
 
   const revokeLocalPreview = useCallback((clientKey?: string) => {
     if (!clientKey) return;
@@ -504,6 +526,7 @@ export function EnhancedCreatePostForm({
   // the upload to be confirmed.
   const handleVideoStarted = (item: MediaItem, sourceFile: File) => {
     if (!item.clientKey) return;
+    uploadRegistryRef.current.register(item.clientKey, item.uploadAttemptId);
     try {
       localPreviewUrlsRef.current.set(item.clientKey, URL.createObjectURL(sourceFile));
     } catch { /* ignore */ }
@@ -515,10 +538,21 @@ export function EnhancedCreatePostForm({
       // Final result for a placeholder: enrich only the exact matching
       // (clientKey, attemptId) item. Removed/replaced attempts are dropped.
       setMedia((prev) => mergePlaceholderResult(prev, mediaItem));
+      // The upload id only becomes known now. If the tile was already removed
+      // (or the session ended), the registry asks us to abandon it at once.
+      if (mediaItem.mux_upload_id) {
+        const late = uploadRegistryRef.current.attachUploadId(mediaItem.clientKey, mediaItem.mux_upload_id);
+        if (late) void abandonMuxUploads([late], 'composer_media_removed');
+      }
       return;
     }
     if (media.length < MAX_MEDIA_COUNT) {
       const keyedItem = ensureClientKey(mediaItem);
+      uploadRegistryRef.current.register(keyedItem.clientKey!, keyedItem.uploadAttemptId);
+      if (keyedItem.mux_upload_id) {
+        const late = uploadRegistryRef.current.attachUploadId(keyedItem.clientKey!, keyedItem.mux_upload_id);
+        if (late) void abandonMuxUploads([late], 'composer_media_removed');
+      }
       // For Mux-backed videos, build a transient blob URL from the original
       // File so the composer can preview with native controls regardless of
       // whether Mux has finished processing. Keyed by clientKey so adopting
@@ -546,11 +580,16 @@ export function EnhancedCreatePostForm({
   const removeMedia = (itemToRemove: MediaItem) => {
     const key = mediaIdentity(itemToRemove);
     revokeLocalPreview(itemToRemove.clientKey);
-    const abandoned = sessionNewMuxIds([itemToRemove], postToEdit?.media ?? []);
-    if (abandoned.length) void abandonMuxUploads(abandoned, 'composer_media_removed');
     // The tile may be a frozen preview item still carrying a pre-adoption id,
     // so match by the immutable clientKey first; identity is the fallback.
     const ck = itemToRemove.clientKey;
+    // Cleanup identity comes from the LIVE item and the session registry —
+    // never from the frozen preview snapshot, which may predate the upload id.
+    const live = ck ? mediaRef.current.find((m) => m.clientKey === ck) : undefined;
+    const abandoned = new Set(sessionNewMuxIds([live ?? itemToRemove], postToEdit?.media ?? []));
+    const registryId = ck ? uploadRegistryRef.current.markRemoved(ck) : null;
+    if (registryId) abandoned.add(registryId);
+    if (abandoned.size) void abandonMuxUploads([...abandoned], 'composer_media_removed');
     // Stop this item's own upload attempt if it is still running.
     if (ck) inFlightUploads.filter((u) => u.clientKey === ck).forEach((u) => cancelUploadRef.current?.(u));
     setMedia((prev) =>
@@ -776,6 +815,10 @@ export function EnhancedCreatePostForm({
 
         if (error) throw error;
         savedPostIdRef.current = updatedPost.id;
+        // Saved uploads are committed — never treated as discarded later.
+        uploadRegistryRef.current.markCommitted(
+          mediaToSave.map((m) => m.mux_upload_id).filter((id): id is string => !!id),
+        );
 
         // ===== Phase 3C.1: reconcile Mux mappings after a successful edit =====
         // HARD GUARDRAIL: only invoke when this post has Mux media now OR had it
@@ -938,6 +981,10 @@ export function EnhancedCreatePostForm({
       if (error) throw error;
 
       savedPostIdRef.current = newPost.id;
+      // Saved uploads are committed — never treated as discarded later.
+      uploadRegistryRef.current.markCommitted(
+        mediaToSave.map((m) => m.mux_upload_id).filter((id): id is string => !!id),
+      );
       console.log('Post created:', newPost);
 
       if (entities.length > 0 && newPost) {
