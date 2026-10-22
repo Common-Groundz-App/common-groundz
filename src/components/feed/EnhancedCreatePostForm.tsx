@@ -514,6 +514,7 @@ export function EnhancedCreatePostForm({
   // the upload to be confirmed.
   const handleVideoStarted = (item: MediaItem, sourceFile: File) => {
     if (!item.clientKey) return;
+    uploadRegistryRef.current.register(item.clientKey, item.uploadAttemptId);
     try {
       localPreviewUrlsRef.current.set(item.clientKey, URL.createObjectURL(sourceFile));
     } catch { /* ignore */ }
@@ -525,6 +526,12 @@ export function EnhancedCreatePostForm({
       // Final result for a placeholder: enrich only the exact matching
       // (clientKey, attemptId) item. Removed/replaced attempts are dropped.
       setMedia((prev) => mergePlaceholderResult(prev, mediaItem));
+      // The upload id only becomes known now. If the tile was already removed
+      // (or the session ended), the registry asks us to abandon it at once.
+      if (mediaItem.mux_upload_id) {
+        const late = uploadRegistryRef.current.attachUploadId(mediaItem.clientKey, mediaItem.mux_upload_id);
+        if (late) void abandonMuxUploads([late], 'composer_media_removed');
+      }
       return;
     }
     if (media.length < MAX_MEDIA_COUNT) {
