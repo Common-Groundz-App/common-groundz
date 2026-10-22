@@ -290,23 +290,35 @@ export function EnhancedCreatePostForm({
     return !!(title.trim() || content.trim() || media.length > 0 || entities.length > 0);
   }, [isEditMode, title, content, media, entities, postToEdit]);
 
+  // End the upload session without saving: every uncommitted session upload
+  // is abandoned, including ones whose tiles were already removed (media may
+  // be empty by now) and ones whose upload id has not arrived yet (the
+  // registry abandons those when the id attaches).
+  const abandonUncommittedSessionUploads = useCallback(() => {
+    const fromRegistry = uploadRegistryRef.current.endSession();
+    const fromMedia = sessionNewMuxIds(mediaRef.current, postToEdit?.media ?? []);
+    const ids = [...new Set([...fromRegistry, ...fromMedia])];
+    if (ids.length) void abandonMuxUploads(ids, 'composer_discarded');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postToEdit]);
+
   const handleCloseRequest = useCallback(() => {
     if (isDirty) {
       setDiscardDialogOpen(true);
     } else {
+      abandonUncommittedSessionUploads();
       onCancel?.();
     }
-  }, [isDirty, onCancel]);
+  }, [isDirty, onCancel, abandonUncommittedSessionUploads]);
 
   const handleDiscardConfirm = useCallback(async () => {
     setDiscardDialogOpen(false);
     if (!isEditMode) clearDraft();
     // Only uploads made in this session; saved post media is never abandoned.
-    const abandoned = sessionNewMuxIds(media, postToEdit?.media ?? []);
-    if (abandoned.length) void abandonMuxUploads(abandoned, 'composer_discarded');
+    abandonUncommittedSessionUploads();
     await flushMuxAbandonments();
     onCancel?.();
-  }, [isEditMode, clearDraft, onCancel, media, postToEdit]);
+  }, [isEditMode, clearDraft, onCancel, abandonUncommittedSessionUploads]);
 
 
   // Prefill entity when passed from parent (e.g. "Share your experience").
