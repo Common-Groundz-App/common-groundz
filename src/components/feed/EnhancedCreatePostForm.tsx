@@ -536,6 +536,11 @@ export function EnhancedCreatePostForm({
     }
     if (media.length < MAX_MEDIA_COUNT) {
       const keyedItem = ensureClientKey(mediaItem);
+      uploadRegistryRef.current.register(keyedItem.clientKey!, keyedItem.uploadAttemptId);
+      if (keyedItem.mux_upload_id) {
+        const late = uploadRegistryRef.current.attachUploadId(keyedItem.clientKey!, keyedItem.mux_upload_id);
+        if (late) void abandonMuxUploads([late], 'composer_media_removed');
+      }
       // For Mux-backed videos, build a transient blob URL from the original
       // File so the composer can preview with native controls regardless of
       // whether Mux has finished processing. Keyed by clientKey so adopting
@@ -563,11 +568,16 @@ export function EnhancedCreatePostForm({
   const removeMedia = (itemToRemove: MediaItem) => {
     const key = mediaIdentity(itemToRemove);
     revokeLocalPreview(itemToRemove.clientKey);
-    const abandoned = sessionNewMuxIds([itemToRemove], postToEdit?.media ?? []);
-    if (abandoned.length) void abandonMuxUploads(abandoned, 'composer_media_removed');
     // The tile may be a frozen preview item still carrying a pre-adoption id,
     // so match by the immutable clientKey first; identity is the fallback.
     const ck = itemToRemove.clientKey;
+    // Cleanup identity comes from the LIVE item and the session registry —
+    // never from the frozen preview snapshot, which may predate the upload id.
+    const live = ck ? mediaRef.current.find((m) => m.clientKey === ck) : undefined;
+    const abandoned = new Set(sessionNewMuxIds([live ?? itemToRemove], postToEdit?.media ?? []));
+    const registryId = ck ? uploadRegistryRef.current.markRemoved(ck) : null;
+    if (registryId) abandoned.add(registryId);
+    if (abandoned.size) void abandonMuxUploads([...abandoned], 'composer_media_removed');
     // Stop this item's own upload attempt if it is still running.
     if (ck) inFlightUploads.filter((u) => u.clientKey === ck).forEach((u) => cancelUploadRef.current?.(u));
     setMedia((prev) =>
