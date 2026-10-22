@@ -40,6 +40,7 @@ const nodeIncludes = [
   'src/utils/__tests__/postDisplayMedia.test.ts',
   'src/utils/__tests__/lightboxHandoffSeek.test.ts',
   'src/utils/__tests__/placeholderMerge.test.ts',
+  'src/utils/__tests__/composerUploadRegistry.test.ts',
   'src/utils/viewportKeyboard.test.ts',
   'src/hooks/useMuxStatus.test.ts',
   'src/components/comments/useMentionAutocomplete.test.ts',
