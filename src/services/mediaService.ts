@@ -179,7 +179,7 @@ export interface UploadMediaOptions {
    * (non-authoritative) so the server can refuse > 100 MB early.
    */
   videoMuxOnly?: boolean;
-  /** Post Mux videos only: cancels this attempt (skips or aborts the PUT). */
+  /** Mux videos (post + review/timeline): cancels this attempt (skips or aborts the PUT). */
   signal?: AbortSignal;
   /**
    * Post Mux videos only: a poster that finished after the item was emitted.
@@ -221,7 +221,7 @@ export const uploadMedia = async (
     if (isVideo && options.videoMuxOnly) {
       const cfg = await resolveMuxConfig();
       if (!cfg.uploadsEnabled) throw new Error(VIDEO_UPLOADS_UNAVAILABLE);
-      return await uploadVideoViaMux(file, userId, sessionId, onProgress, file.size, options.muxKind);
+      return await uploadVideoViaMux(file, userId, sessionId, onProgress, file.size, options.muxKind, options.signal);
     }
 
     // ===== Mux upload branch (videos only, runtime-flag gated) =====
