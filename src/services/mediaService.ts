@@ -179,7 +179,7 @@ export interface UploadMediaOptions {
    * (non-authoritative) so the server can refuse > 100 MB early.
    */
   videoMuxOnly?: boolean;
-  /** Post Mux videos only: cancels this attempt (skips or aborts the PUT). */
+  /** Mux videos (post + review/timeline): cancels this attempt (skips or aborts the PUT). */
   signal?: AbortSignal;
   /**
    * Post Mux videos only: a poster that finished after the item was emitted.
@@ -221,7 +221,7 @@ export const uploadMedia = async (
     if (isVideo && options.videoMuxOnly) {
       const cfg = await resolveMuxConfig();
       if (!cfg.uploadsEnabled) throw new Error(VIDEO_UPLOADS_UNAVAILABLE);
-      return await uploadVideoViaMux(file, userId, sessionId, onProgress, file.size, options.muxKind);
+      return await uploadVideoViaMux(file, userId, sessionId, onProgress, file.size, options.muxKind, options.signal);
     }
 
     // ===== Mux upload branch (videos only, runtime-flag gated) =====
@@ -429,8 +429,11 @@ async function uploadVideoViaMux(
   sessionId: string,
   onProgress?: (progress: number, stage?: UploadStage) => void,
   declaredSize?: number,
-  kind?: UploadMediaOptions['muxKind']
+  kind?: UploadMediaOptions['muxKind'],
+  signal?: AbortSignal
 ): Promise<MediaItem> {
+  const aborted = () => !!signal?.aborted;
+  if (aborted()) throw new Error('Upload cancelled');
   analytics.trackMuxUploadAttempt({ size: file.size, format: file.type });
 
   // ---- Step 1: poster (REQUIRED) ----
@@ -473,6 +476,12 @@ async function uploadVideoViaMux(
     throw new Error("Couldn't prepare video preview. Try again.");
   }
 
+  // Cancelled during poster work: stop before minting an upload ticket.
+  if (aborted()) {
+    deleteMedia(posterUrl).catch(() => {});
+    throw new Error('Upload cancelled');
+  }
+
   // ---- Step 2: create Mux direct upload ----
   let upload: MuxCreateUploadResponse;
   try {
@@ -497,15 +506,21 @@ async function uploadVideoViaMux(
     throw new Error("Couldn't start video upload. Try again.");
   }
 
+  // Removal after the upload ticket exists: the server marks it abandoned, so
+  // a Mux asset that still appears later enters the existing cleanup queue.
+  const abandonCancelled = () => { void abandonMuxUploads([upload.upload_id], 'composer_media_removed'); };
+  if (aborted()) { deleteMedia(posterUrl).catch(() => {}); abandonCancelled(); throw new Error('Upload cancelled'); }
+
   onProgress?.(0, 'uploading');
 
   // ---- Step 3: PUT the file to Mux ----
   try {
     await putWithProgress(upload.upload_url, file, (pct) => {
       onProgress?.(pct, 'uploading');
-    });
+    }, signal);
   } catch (err: any) {
     deleteMedia(posterUrl).catch(() => {});
+    if (aborted()) { abandonCancelled(); throw new Error('Upload cancelled'); }
     analytics.trackMuxUploadFailure({
       stage: 'put',
       error: err?.message ?? String(err),
@@ -515,6 +530,9 @@ async function uploadVideoViaMux(
     });
     throw new Error("Video upload failed. Check your connection and try again.");
   }
+
+  // Cancelled after the PUT completed: Mux may still create the asset.
+  if (aborted()) { deleteMedia(posterUrl).catch(() => {}); abandonCancelled(); throw new Error('Upload cancelled'); }
 
   onProgress?.(0, 'finalizing');
 

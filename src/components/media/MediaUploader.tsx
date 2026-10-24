@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { detectHEVCRisk } from '@/utils/codecSupport';
 import { MediaCompatibilityBadge } from '@/components/media/MediaCompatibilityBadge';
+import { abandonMuxUploads } from '@/services/muxAbandonment';
 
 interface MediaUploaderProps {
   sessionId: string;
@@ -528,7 +529,11 @@ export function MediaUploader({
         })();
       }
 
-      const controller = truthfulVideoProgress && !videoMuxOnly && isVideo ? new AbortController() : undefined;
+      // A fresh attempt for a file that was cancelled before clears the stale
+      // cancellation, so the new upload (B) is never dropped or abandoned by
+      // the old attempt's (A) cancel marker.
+      cancelledFilesRef.current.delete(file);
+      const controller = isVideo && (truthfulVideoProgress || videoMuxOnly) ? new AbortController() : undefined;
       if (controller) abortControllersRef.current.set(file, controller);
       const postOpts = controller ? { signal: controller.signal, onLatePoster } : undefined;
       uploadMedia(file, user.id, sessionId, (progress, stage) => {
@@ -539,11 +544,13 @@ export function MediaUploader({
               : u
           )
         );
-      }, videoMuxOnly ? { videoMuxOnly: true, muxKind } : postOpts).then((mediaItem) => {
+      }, videoMuxOnly ? { videoMuxOnly: true, muxKind, signal: controller?.signal } : postOpts).then((mediaItem) => {
         abortControllersRef.current.delete(file);
         if ((videoMuxOnly || truthfulVideoProgress) && cancelledFilesRef.current.has(file)) {
           // Cancelled while transferring: never added; slot released once.
-          // Only the preview image is removed; the Mux video itself is kept.
+          // The preview image is removed, and if Mux still created an upload
+          // ticket it is reported abandoned so the cleanup queue can catch it.
+          if (mediaItem?.mux_upload_id) void abandonMuxUploads([mediaItem.mux_upload_id], 'composer_media_removed');
           if (mediaItem?.url) void deleteMedia(mediaItem.url).catch(() => undefined);
           release(file);
           return;
