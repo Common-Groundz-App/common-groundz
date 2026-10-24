@@ -506,15 +506,21 @@ async function uploadVideoViaMux(
     throw new Error("Couldn't start video upload. Try again.");
   }
 
+  // Removal after the upload ticket exists: the server marks it abandoned, so
+  // a Mux asset that still appears later enters the existing cleanup queue.
+  const abandonCancelled = () => { void abandonMuxUploads([upload.upload_id], 'composer_media_removed'); };
+  if (aborted()) { deleteMedia(posterUrl).catch(() => {}); abandonCancelled(); throw new Error('Upload cancelled'); }
+
   onProgress?.(0, 'uploading');
 
   // ---- Step 3: PUT the file to Mux ----
   try {
     await putWithProgress(upload.upload_url, file, (pct) => {
       onProgress?.(pct, 'uploading');
-    });
+    }, signal);
   } catch (err: any) {
     deleteMedia(posterUrl).catch(() => {});
+    if (aborted()) { abandonCancelled(); throw new Error('Upload cancelled'); }
     analytics.trackMuxUploadFailure({
       stage: 'put',
       error: err?.message ?? String(err),
@@ -524,6 +530,9 @@ async function uploadVideoViaMux(
     });
     throw new Error("Video upload failed. Check your connection and try again.");
   }
+
+  // Cancelled after the PUT completed: Mux may still create the asset.
+  if (aborted()) { deleteMedia(posterUrl).catch(() => {}); abandonCancelled(); throw new Error('Upload cancelled'); }
 
   onProgress?.(0, 'finalizing');
 
