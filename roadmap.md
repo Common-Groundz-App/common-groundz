@@ -2,8 +2,8 @@
 
 ## Silent Mux abandonment (approved 2026-10-24)
 - [x] Explicit abandonment across Post/Review/Timeline create/edit — owner verified complete
-- [ ] Apply both reason constraints and bounded silent reconciliation through existing run-start hook
-- [ ] Verify TTL, saved skip, explicit reason preservation, idempotence, rescue and historical protection
+- [x] Apply both reason constraints and bounded silent reconciliation through existing run-start hook
+- [x] Verify TTL for all three kinds, saved skip, explicit reason preservation, idempotence, real attachment rescue and exact historical protection; rollback-only database suite passed, no fixtures remain
 
 ## Phase 3B — questionnaire specification (spec only, no code)
 - [x] Recommendation-intent contract frozen (v4 + reviewer amendments)
