@@ -5337,6 +5337,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
+      mux_reconcile_silently_abandoned_uploads: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       mux_rescue_attached_media: { Args: { p_media: Json }; Returns: undefined }
       mux_resolve_media_assets: {
         Args: { p_media: Json }
