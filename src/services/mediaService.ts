@@ -429,8 +429,11 @@ async function uploadVideoViaMux(
   sessionId: string,
   onProgress?: (progress: number, stage?: UploadStage) => void,
   declaredSize?: number,
-  kind?: UploadMediaOptions['muxKind']
+  kind?: UploadMediaOptions['muxKind'],
+  signal?: AbortSignal
 ): Promise<MediaItem> {
+  const aborted = () => !!signal?.aborted;
+  if (aborted()) throw new Error('Upload cancelled');
   analytics.trackMuxUploadAttempt({ size: file.size, format: file.type });
 
   // ---- Step 1: poster (REQUIRED) ----
