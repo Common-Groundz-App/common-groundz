@@ -476,6 +476,12 @@ async function uploadVideoViaMux(
     throw new Error("Couldn't prepare video preview. Try again.");
   }
 
+  // Cancelled during poster work: stop before minting an upload ticket.
+  if (aborted()) {
+    deleteMedia(posterUrl).catch(() => {});
+    throw new Error('Upload cancelled');
+  }
+
   // ---- Step 2: create Mux direct upload ----
   let upload: MuxCreateUploadResponse;
   try {
