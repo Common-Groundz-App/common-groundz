@@ -1,3 +1,5 @@
+import { useUnavailableComposerVideo, scrollToUnavailableMedia } from '@/hooks/useUnavailableComposerVideo';
+import { UnavailableComposerVideo } from '@/components/feed/composer/UnavailableComposerVideo';
 import { VideoRecheckLink } from '@/components/feed/composer/VideoRecheckLink';
 /**
  * Step 3B — the full-page composer for new review / edit review.
@@ -165,6 +167,7 @@ export function ReviewComposerScreen(props: Props) {
   }, [storedReviewId]);
   const videoPolicy = videoPickPolicy({ ...videoFlags, visibility: state.values.visibility });
   const visibilityLocked = visibilityLockReason(state.values.media, updatesHaveVideo);
+  const unavailableVideo = useUnavailableComposerVideo(state.values.media);
   const videoBlocker = videoSaveBlocker(state.values.media, storedMedia, muxStatuses);
   const videoOverlay = (m: MediaItem) => {
     const id = m.type === 'video' ? m.mux_upload_id : undefined;
@@ -385,7 +388,7 @@ export function ReviewComposerScreen(props: Props) {
   const saveLock = useRef(false);
   useEffect(() => { if (state.status === 'ready') saveLock.current = false; }, [state.status]);
   const handleSave = async () => {
-    if (saveLock.current || !canSubmit(state) || isUploading || videoBlocker) return;
+    if (saveLock.current || !canSubmit(state) || isUploading || videoBlocker || unavailableVideo.blocked) return;
     const v = validateForSubmit(state);
     dispatch({ type: 'VALIDATED', sessionKey, errors: v.errors });
     if (!v.ok) {
@@ -426,6 +429,12 @@ export function ReviewComposerScreen(props: Props) {
       const result = isEdit ? fromUpdateReviewError(error) : fromCreateReviewError(error);
       uploads.send({ type: 'SAVE_FAILED' });
       dispatch({ type: 'SAVE_RESULT', sessionKey, result });
+      if (unavailableVideo.handleError(error)) {
+        const mediaStep = caps.steps.findIndex((sections) => (sections as readonly SectionId[]).includes('media'));
+        if (mediaStep >= 0) setStep(mediaStep);
+        scrollToUnavailableMedia();
+        return;
+      }
       if (result.status === 'existing_review' && subjectId) runExistingCheck(subjectId);
       if (result.status === 'media_retired') toast(MEDIA_RETIRED_TOAST);
       const videoMsg = result.status === 'error' ? reviewVideoErrorMessage(error) : null;
@@ -644,11 +653,17 @@ export function ReviewComposerScreen(props: Props) {
                   <span className="text-lg">🖼️</span>
                   <span>Your media ({state.values.media.length}/4)</span>
                 </Label>
-                {state.values.media.some((m) => isNewMuxVideo(m, storedMedia)) ? (
+                {unavailableVideo.blocked || state.values.media.some((m) => isNewMuxVideo(m, storedMedia)) ? (
                   <ComposerMediaPreview
                     preserveMediaOrder
                     media={preparedComposerMedia(state.values.media, storedMedia, muxStatuses)}
                     onRemove={handleMediaRemove}
+                    recoveryForItem={(item) => unavailableVideo.isUnavailable(item) ? <UnavailableComposerVideo
+                      item={item} media={state.values.media} sessionId={uploads.sessionId} kind="review"
+                      allowVideo={videoPolicy.allowVideo} disabled={state.status !== 'ready' || isUploading}
+                      onRemove={() => handleMediaRemove(item)} onUploadsChange={onUploadsChange}
+                      onUploaded={(next) => { handleMediaRemove(item); handleMediaAdded(next); }}
+                    /> : null}
                     overlayForItem={videoOverlay}
                   />
                 ) : (<CompactMediaGrid
@@ -742,7 +757,7 @@ export function ReviewComposerScreen(props: Props) {
           Back
         </Button>
         {isLast ? (
-          <Button type="button" onClick={handleSave} disabled={!canSubmit(state) || isUploading || subjectBlocked || !!videoBlocker}>
+          <Button type="button" onClick={handleSave} disabled={!canSubmit(state) || isUploading || subjectBlocked || !!videoBlocker || unavailableVideo.blocked}>
             {state.status === 'saving' ? 'Saving…' : caps.submitLabel}
           </Button>
         ) : (

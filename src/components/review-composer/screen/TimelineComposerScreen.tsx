@@ -1,3 +1,5 @@
+import { useUnavailableComposerVideo, scrollToUnavailableMedia } from '@/hooks/useUnavailableComposerVideo';
+import { UnavailableComposerVideo } from '@/components/feed/composer/UnavailableComposerVideo';
 import { VideoRecheckLink } from '@/components/feed/composer/VideoRecheckLink';
 /**
  * Step 3C — full-page composer for adding / editing a timeline update.
@@ -192,6 +194,7 @@ export function TimelineComposerScreen(props: Props) {
   const videoIds = useMemo(() => muxUploadIds(state.values.media), [state.values.media]);
   const muxStatuses = useMuxStatus(videoIds);
   const videoPolicy = videoPickPolicy({ ...videoFlags, visibility: review.visibility, timeline: true });
+  const unavailableVideo = useUnavailableComposerVideo(state.values.media);
   const videoBlocker = videoSaveBlocker(state.values.media, storedMedia, muxStatuses);
   const videoOverlay = (m: MediaItem) => {
     const id = m.type === 'video' ? m.mux_upload_id : undefined;
@@ -228,7 +231,7 @@ export function TimelineComposerScreen(props: Props) {
   const saveLock = useRef(false);
   useEffect(() => { if (state.status === 'ready') saveLock.current = false; }, [state.status]);
   const handleSave = async () => {
-    if (saveLock.current || !canSubmit(state) || isUploading || videoBlocker) return;
+    if (saveLock.current || !canSubmit(state) || isUploading || videoBlocker || unavailableVideo.blocked) return;
     if (isEdit && !updateId) return;
     const v = validateForSubmit(state);
     dispatch({ type: 'VALIDATED', sessionKey, errors: v.errors });
@@ -240,6 +243,7 @@ export function TimelineComposerScreen(props: Props) {
     dispatch({ type: 'SAVE_STARTED', sessionKey });
     uploads.send({ type: 'SAVING' });
 
+    saveErrorRef.current = null;
     let write: Promise<unknown>;
     if (isEdit) {
       const built = buildEditTimelinePayload({
@@ -276,7 +280,8 @@ export function TimelineComposerScreen(props: Props) {
     let outcome: unknown;
     try {
       outcome = await Promise.race([write, new Promise((resolve) => setTimeout(() => resolve(TIMEOUT), SAVE_TIMEOUT_MS))]);
-    } catch {
+    } catch (error) {
+      saveErrorRef.current = error;
       outcome = { status: 'error' };
     }
     // Left while saving: background only — no navigation, toast or form change.
@@ -312,6 +317,7 @@ export function TimelineComposerScreen(props: Props) {
     }
     uploads.send({ type: 'SAVE_FAILED' });
     dispatch({ type: 'SAVE_RESULT', sessionKey, result });
+    if (result.status === 'error' && unavailableVideo.handleError(saveErrorRef.current)) { scrollToUnavailableMedia(); return; }
     if (result.status === 'media_retired') toast(MEDIA_RETIRED_TOAST);
     const videoMsg = result.status === 'error' ? reviewVideoErrorMessage(saveErrorRef.current) : null;
     if (videoMsg) {
@@ -487,11 +493,17 @@ export function TimelineComposerScreen(props: Props) {
                 <span className="text-lg">🖼️</span>
                 <span>Your media ({state.values.media.length}/4)</span>
               </Label>
-              {state.values.media.some((m) => isNewMuxVideo(m, storedMedia)) ? (
+              {unavailableVideo.blocked || state.values.media.some((m) => isNewMuxVideo(m, storedMedia)) ? (
                   <ComposerMediaPreview
                     preserveMediaOrder
                     media={preparedComposerMedia(state.values.media, storedMedia, muxStatuses)}
                     onRemove={handleMediaRemove}
+                    recoveryForItem={(item) => unavailableVideo.isUnavailable(item) ? <UnavailableComposerVideo
+                      item={item} media={state.values.media} sessionId={uploads.sessionId} kind="review_update"
+                      allowVideo={videoPolicy.allowVideo} disabled={state.status !== 'ready' || isUploading}
+                      onRemove={() => handleMediaRemove(item)} onUploadsChange={onUploadsChange}
+                      onUploaded={(next) => { handleMediaRemove(item); handleMediaAdded(next); }}
+                    /> : null}
                     overlayForItem={videoOverlay}
                   />
                 ) : (<CompactMediaGrid
@@ -540,7 +552,7 @@ export function TimelineComposerScreen(props: Props) {
       </div>
 
       <footer className="mt-8 flex items-center justify-end gap-3">
-        <Button type="button" onClick={handleSave} disabled={!canSubmit(state) || isUploading || !state.values.text.trim() || !!videoBlocker}>
+        <Button type="button" onClick={handleSave} disabled={!canSubmit(state) || isUploading || !state.values.text.trim() || !!videoBlocker || unavailableVideo.blocked}>
           {state.status === 'saving' ? 'Saving…' : caps.submitLabel}
         </Button>
       </footer>

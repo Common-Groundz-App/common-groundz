@@ -1,3 +1,5 @@
+import { useUnavailableComposerVideo, scrollToUnavailableMedia } from '@/hooks/useUnavailableComposerVideo';
+import { UnavailableComposerVideo } from './composer/UnavailableComposerVideo';
 import { VideoRecheckLink } from '@/components/feed/composer/VideoRecheckLink';
 import { abandonMuxUploads, flushMuxAbandonments, sessionNewMuxIds } from '@/services/muxAbandonment';
 
@@ -130,6 +132,7 @@ export function EnhancedCreatePostForm({
   // on entry; it keys tiles/preview registries so server-ID adoption after
   // save never remounts or resets a preview.
   const [media, setMedia] = useState<MediaItem[]>(() => (postToEdit?.media ?? []).map(ensureClientKey));
+  const unavailableVideo = useUnavailableComposerVideo(media);
   // Phase 5: live Mux upload status for tiles in this composer session.
   const muxUploadIds = useMemo(
     () =>
@@ -663,7 +666,7 @@ export function EnhancedCreatePostForm({
   const handleSubmit = async () => {
     if (!requireAuth({ action: 'create_post', surface: 'create_post_form' })) return;
 
-    if (isSubmitting || submitLockRef.current) return;
+    if (isSubmitting || submitLockRef.current || unavailableVideo.blocked) return;
     if (savedPostIdRef.current) { await refreshSavedPostMedia(savedPostIdRef.current); onSuccess(); return; }
     const blocker = newMuxVideoSaveBlocker(media, postToEdit?.media ?? [], muxStatuses);
     if (blocker || inFlightUploads.some((u) => u.status === 'uploading')) {
@@ -1193,6 +1196,7 @@ export function EnhancedCreatePostForm({
         onSuccess();
         return;
       }
+      if (unavailableVideo.handleError(error)) { scrollToUnavailableMedia(); return; }
       console.error('Error creating post:', error);
       toast({
         title: 'Error',
@@ -1238,7 +1242,7 @@ export function EnhancedCreatePostForm({
   // Computed properties
   const videoBlocker = newMuxVideoSaveBlocker(media, postToEdit?.media ?? [], muxStatuses);
   const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting ||
-    inFlightUploads.some((u) => u.status === 'uploading') || !!videoBlocker;
+    inFlightUploads.some((u) => u.status === 'uploading') || !!videoBlocker || unavailableVideo.blocked;
 
   // Live-detected hashtags for the composer chip row (read-only preview)
   const detectedHashtagsForChips = useMemo(() => {
@@ -1494,6 +1498,7 @@ export function EnhancedCreatePostForm({
           </CollapsibleContent>
         </Collapsible>
 
+        <div id="composer-section-media" tabIndex={-1} className="outline-none">
         {/* Media preview */}
         {media.length > 0 && (
           <ComposerMediaPreview
@@ -1504,6 +1509,16 @@ export function EnhancedCreatePostForm({
               frozenPreviewItemsRef.current,
             )}
             onRemove={removeMedia}
+            recoveryForItem={(previewItem) => {
+              const item = media.find((m) => m.clientKey === previewItem.clientKey && !!m.clientKey) ?? previewItem;
+              return unavailableVideo.isUnavailable(item) ? <UnavailableComposerVideo
+                item={item} media={media} sessionId={sessionId} kind="post"
+                disabled={isSubmitting || inFlightUploads.some((u) => u.status === 'uploading')}
+                onRemove={() => removeMedia(item)} onUploadsChange={handleUploadsChange}
+                onVideoStarted={(next, file) => { removeMedia(item); handleVideoStarted(next, file); }}
+                onUploaded={handleMediaUpload} onLatePoster={handleLatePoster}
+              /> : null;
+            }}
             previewSrcOverride={(item) =>
               // Newly picked videos keep playing from the local copy even after
               // Mux is ready — no source swap, so no stall. Saved videos have no
@@ -1526,6 +1541,8 @@ export function EnhancedCreatePostForm({
         )}
 
         {videoBlocker && <div className="mt-3 space-y-1"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><VideoRecheckLink active={!!videoBlocker} /></div>}
+
+        </div>
 
         {/* Location chip */}
         {location && (
