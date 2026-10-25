@@ -47,5 +47,15 @@ describe('real Post submit-handler recovery', () => {
     expect(screen.queryByText('Video no longer available')).toBeNull();
     expect(text).toHaveValue('still blocked after text edit');
     submits().forEach((button) => expect(button).toBeEnabled());
+    mock.write.mockResolvedValue({ data: null, error: { code: 'P0001', message: 'unrelated_save_failure' } });
+    fireEvent.click(submits()[0]);
+    await waitFor(() => expect(mock.write).toHaveBeenCalledTimes(2));
+    await waitFor(() => submits().forEach((button) => expect(button).toBeEnabled()));
+    expect(mock.payload.media.map((m: any) => m.mux_upload_id || m.url)).toEqual(['kept-photo', 'B']);
+    expect(mock.success).not.toHaveBeenCalled();
+    expect(text).toHaveValue('still blocked after text edit');
+    expect(screen.queryByText('Video no longer available')).toBeNull();
+    fireEvent.click(screen.getByText('Remove video'));
+    submits().forEach((button) => expect(button).toBeEnabled());
   });
 });

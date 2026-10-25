@@ -75,6 +75,15 @@ describe('real review/timeline submit-handler recovery', () => {
       if (kind === 'review') fireEvent.click(screen.getByText('Next'));
       expect(screen.getByLabelText(field)).toHaveValue('edited but still blocked');
       expect(screen.getByRole('button', { name: submit })).toBeEnabled();
+      mock.error = { code: 'P0001', message: 'unrelated_save_failure' };
+      if (kind === 'review') mock.save.mockRejectedValue(mock.error);
+      fireEvent.click(screen.getByRole('button', { name: submit }));
+      await waitFor(() => expect(mock.save).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(screen.getByRole('button', { name: submit })).toBeEnabled());
+      expect(screen.getByLabelText(field)).toHaveValue('edited but still blocked');
+      expect(screen.queryByText('Video no longer available')).toBeNull();
+      const sentMedia = kind === 'review' ? mock.payload.media : mock.payload[edit ? 4 : 4];
+      expect(sentMedia.map((m: any) => m.mux_upload_id || m.url)).toEqual(['kept-photo', 'B']);
     });
   }
 });
