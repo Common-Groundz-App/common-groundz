@@ -1,5 +1,10 @@
 # Roadmap
 
+## Unavailable composer video recovery (approved 2026-10-25)
+- [ ] Conservative server-error recognition and persistent upload-specific submission block
+- [ ] Recovery tile, Replace/Remove, toast and mobile media scroll across Post/Review/Timeline create/edit
+- [ ] Submit-handler regression tests and mobile/desktop verification; cleanup backend unchanged
+
 ## Silent Mux abandonment (approved 2026-10-24)
 - [x] Explicit abandonment across Post/Review/Timeline create/edit — owner verified complete
 - [x] Apply both reason constraints and bounded silent reconciliation through existing run-start hook
