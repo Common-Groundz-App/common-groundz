@@ -1515,8 +1515,16 @@ export function EnhancedCreatePostForm({
                 item={item} media={media} sessionId={sessionId} kind="post"
                 disabled={isSubmitting || inFlightUploads.some((u) => u.status === 'uploading')}
                 onRemove={() => removeMedia(item)} onUploadsChange={handleUploadsChange}
-                onVideoStarted={(next, file) => { removeMedia(item); handleVideoStarted(next, file); }}
-                onUploaded={handleMediaUpload} onLatePoster={handleLatePoster}
+                onUploaded={(next, file) => {
+                  removeMedia(item);
+                  const keyed = ensureClientKey(next);
+                  if (keyed.clientKey) {
+                    uploadRegistryRef.current.register(keyed.clientKey, keyed.uploadAttemptId);
+                    if (keyed.mux_upload_id) uploadRegistryRef.current.attachUploadId(keyed.clientKey, keyed.mux_upload_id);
+                    if (file) localPreviewUrlsRef.current.set(keyed.clientKey, URL.createObjectURL(file));
+                  }
+                  setMedia((prev) => [...prev, { ...keyed, order: prev.length }]);
+                }} onLatePoster={handleLatePoster}
               /> : null;
             }}
             previewSrcOverride={(item) =>

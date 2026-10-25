@@ -662,7 +662,7 @@ export function ReviewComposerScreen(props: Props) {
                       item={item} media={state.values.media} sessionId={uploads.sessionId} kind="review"
                       allowVideo={videoPolicy.allowVideo} disabled={state.status !== 'ready' || isUploading}
                       onRemove={() => handleMediaRemove(item)} onUploadsChange={onUploadsChange}
-                      onUploaded={(next) => { handleMediaRemove(item); handleMediaAdded(next); }}
+                      onUploaded={(next) => { handleMediaRemove(item); syncCommitted(uploadSid, state.values.media.length - 1); handleMediaAdded(next); }}
                     /> : null}
                     overlayForItem={videoOverlay}
                   />
