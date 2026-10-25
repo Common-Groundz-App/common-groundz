@@ -105,6 +105,9 @@ export default defineConfig({
           // Explicit, like the node list: `src` still holds scratch spec files
           // (e.g. LightboxPreview.handoff.test.tsx) with no executable tests.
           include: [
+            'src/utils/__tests__/muxVideoUnavailable.test.tsx',
+            'src/components/review-composer/__tests__/unavailableVideoRecovery.test.tsx',
+            'src/components/feed/unavailableVideoRecovery.test.tsx',
             'src/contexts/ComposerFocusContext.test.tsx',
             'src/components/review-composer/__tests__/composerHooks.test.tsx',
             'src/components/review-composer/__tests__/historyGuardRouter.test.tsx',
