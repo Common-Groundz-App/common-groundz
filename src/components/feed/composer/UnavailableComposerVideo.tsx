@@ -33,6 +33,7 @@ export function UnavailableComposerVideo(p: Props) {
         <MediaUploader
           sessionId={p.sessionId}
           truthfulVideoProgress
+          videoReplacementOnly
           videoMuxOnly={p.kind !== 'post'}
           muxKind={p.kind}
           allowVideo={p.allowVideo}

@@ -81,6 +81,8 @@ interface MediaUploaderProps {
    * uploadAttemptId; callers must merge it into that exact item.
    */
   onVideoStarted?: (item: MediaItem, file: File) => void;
+  /** Recovery-only picker: replacement must be a fresh video upload. */
+  videoReplacementOnly?: boolean;
 }
 
 /** Fast local width/height read for the placeholder tile (bounded). */
@@ -318,6 +320,7 @@ export function MediaUploader({
   muxKind,
   truthfulVideoProgress = false,
   onVideoStarted,
+  videoReplacementOnly = false,
 }: MediaUploaderProps) {
   const cancelledFilesRef = useRef<WeakSet<File>>(new WeakSet());
   const abortControllersRef = useRef<Map<File, AbortController>>(new Map());
@@ -368,11 +371,15 @@ export function MediaUploader({
     objectUrlsRef.current.delete(url);
   };
 
-  const acceptTypes = (allowVideo ? ALLOWED_MEDIA_TYPES : ALLOWED_IMAGE_TYPES).join(',');
+  const acceptTypes = (videoReplacementOnly ? ALLOWED_MEDIA_TYPES.filter((type) => type.startsWith('video/')) : allowVideo ? ALLOWED_MEDIA_TYPES : ALLOWED_IMAGE_TYPES).join(',');
 
   const handleFileSelect = async (input: FileList | File[] | null) => {
     if (!input || !user || disabled) return;
     let files: File[] = Array.from(input);
+    if (videoReplacementOnly) {
+      files = files.filter((file) => file.type.startsWith('video/')).slice(0, 1);
+      if (!files.length) return;
+    }
     if (!allowVideo) {
       const photos = files.filter((f) => !f.type.startsWith('video/'));
       if (photos.length < files.length) {
@@ -640,7 +647,7 @@ export function MediaUploader({
             }
             const input = document.createElement('input');
             input.type = 'file';
-            input.multiple = true;
+            input.multiple = !videoReplacementOnly;
             input.accept = acceptTypes;
             input.onchange = (e) =>
               handleFileSelect((e.target as HTMLInputElement).files);
@@ -687,7 +694,7 @@ export function MediaUploader({
           }
           const input = document.createElement('input');
           input.type = 'file';
-          input.multiple = true;
+          input.multiple = !videoReplacementOnly;
           input.accept = acceptTypes;
           input.onchange = (e) => handleFileSelect((e.target as HTMLInputElement).files);
           input.click();
