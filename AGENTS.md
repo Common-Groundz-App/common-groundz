@@ -14,3 +14,5 @@
 - Managed feed videos attach HLS only inside the provider's separate loading budget (`feedVideoLoadBudget`, keyed by stable slot id, pins > active > grace > nearest); playback selection stays solely in FeedVideoManager so bandwidth limits never change autoplay.
 - Composer Mux abandonment goes only through `mux_abandon_composer_uploads` (server-derived `mux_uploads.kind`, saved media skipped) and feeds the existing cleanup queue; every abandonment/rescue path locks upload rows → asset locks → candidate rows, avoiding deadlocks with the webhook and save triggers.
 - Silent Mux reconciliation runs in an independent fault-isolated block of the existing live-run start hook, using trusted-kind uploads and existing saved-reference/enqueue/rescue helpers; this closes unsaved-session leaks without changing deletion mechanics or scheduling.
+
+- Composer unavailable-video recovery is UI-only, keyed by rejected Mux upload IDs and recognized only from the attachment barrier signal; unrelated field edits cannot unblock the same upload, and database save/rescue remains authoritative.

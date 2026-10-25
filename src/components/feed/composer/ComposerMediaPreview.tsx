@@ -23,6 +23,7 @@ interface ComposerMediaPreviewProps {
   preserveMediaOrder?: boolean;
   /** Resume playback after the local→Mux source swap if it was playing. */
   resumeAfterSourceSwap?: boolean;
+  recoveryForItem?: (item: MediaItem) => React.ReactNode;
 }
 
 /**
@@ -40,10 +41,21 @@ export function ComposerMediaPreview({
   previewSrcOverride,
   preserveMediaOrder,
   resumeAfterSourceSwap,
+  recoveryForItem,
 }: ComposerMediaPreviewProps) {
   if (media.length === 0) return null;
 
   const sorted = [...media].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  // Rejected videos must not keep displaying a healthy local blob player.
+  // Full-width recovery avoids squeezing its actions into a collage cell.
+  if (recoveryForItem && sorted.some((item) => recoveryForItem(item))) {
+    return <div className={cn('mt-3 space-y-3', className)}>{sorted.map((item) => (
+      <React.Fragment key={item.clientKey || item.id || item.mux_upload_id || item.url}>
+        {recoveryForItem(item) || <ComposerMediaPreview media={[item]} onRemove={onRemove} overlayForItem={overlayForItem} previewSrcOverride={previewSrcOverride} />}
+      </React.Fragment>
+    ))}</div>;
+  }
 
   return (
     <div className={cn('mt-3', className)}>
