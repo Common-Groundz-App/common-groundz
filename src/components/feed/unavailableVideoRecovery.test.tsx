@@ -32,10 +32,10 @@ afterEach(cleanup);
 describe('real Post submit-handler recovery', () => {
   for (const edit of [false, true]) it(`${edit ? 'edit' : 'create'} keeps draft and blocks the rejected upload`, async () => {
     render(<QueryClientProvider client={new QueryClient()}><EnhancedCreatePostForm onSuccess={mock.success} postToEdit={edit ? { id: 'p1', content: 'initial draft', title: 'kept title', media: [] } : undefined} /></QueryClientProvider>);
-    const text = screen.getByPlaceholderText('Share your experience...');
+    const text = screen.getAllByRole('textbox')[1];
     fireEvent.change(text, { target: { value: 'preserve all written work' } });
     fireEvent.click(screen.getByText('Attach A')); fireEvent.click(screen.getByText('Attach photo'));
-    const submits = () => screen.getAllByRole('button', { name: edit ? 'Update' : 'Post', exact: true });
+    const submits = () => screen.getAllByRole('button', { name: edit ? /^Update$/ : /^Post$/ });
     fireEvent.click(submits()[0]);
     await waitFor(() => expect(mock.toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Video no longer available', variant: 'destructive' })));
     expect(mock.success).not.toHaveBeenCalled(); expect(text).toHaveValue('preserve all written work');

@@ -32,6 +32,7 @@ vi.mock('@/components/feed/composer/MuxUploadChip', () => ({ MuxUploadChip: () =
 vi.mock('@/services/review/ownReview', async (original) => ({ ...(await original<any>()), findOwnReviewForEntity: async () => ({ status: 'none' }) }));
 vi.mock('@/services/review/core', () => ({ createReview: (p: any) => { mock.payload = p; return mock.save(); }, updateReview: (_id: string, p: any) => { mock.payload = p; return mock.save(); } }));
 vi.mock('@/services/review/timeline', () => ({
+  toTimelineRecommendationValue: (base: boolean, choice: string | null) => base ? 'auto' : choice,
   addReviewUpdate: async (...args: any[]) => { mock.payload = args; mock.save(); args[6]?.onError?.(mock.error); return false; },
   editLatestReviewUpdate: async (...args: any[]) => { mock.payload = args; mock.save(); args[6]?.(mock.error); return 'error'; },
 }));
