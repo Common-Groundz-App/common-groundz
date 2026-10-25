@@ -1,9 +1,9 @@
 # Roadmap
 
 ## One-time historical Mux reconciliation (approved 2026-10-25)
-- [ ] Recheck the exact 72 historical assets, references and exclusions
-- [ ] Reconcile 68 externally missing assets with truthful audits; four survivors receive fresh 24-hour grace
-- [ ] Verify exact outcomes, audit totals, untouched upload history and both excluded test assets
+- [x] Recheck the exact 72 historical assets, references and exclusions
+- [x] Reconcile 68 externally missing assets with truthful audits; four survivors receive fresh 24-hour grace
+- [x] Verify exact outcomes, audit totals, untouched upload history and both excluded test assets
 - [ ] Four surviving historical assets finish normal cleanup after fresh grace; waiting on time and scheduled worker
 
 ## Unavailable composer video recovery (approved 2026-10-25)
