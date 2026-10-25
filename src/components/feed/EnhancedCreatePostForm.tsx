@@ -1516,6 +1516,7 @@ export function EnhancedCreatePostForm({
                 disabled={isSubmitting || inFlightUploads.some((u) => u.status === 'uploading')}
                 onRemove={() => removeMedia(item)} onUploadsChange={handleUploadsChange}
                 onUploaded={(next, file) => {
+                  setInFlightUploads([]);
                   removeMedia(item);
                   const keyed = ensureClientKey(next);
                   if (keyed.clientKey) {

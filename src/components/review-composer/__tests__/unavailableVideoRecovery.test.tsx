@@ -24,7 +24,7 @@ vi.mock('@/components/profile/reviews/steps/StepOne', () => ({ default: (p: any)
 vi.mock('@/components/profile/reviews/steps/SubjectSelectStep', () => ({ default: () => null }));
 vi.mock('@/components/profile/reviews/steps/StepFour', () => ({ default: (p: any) => <><input aria-label="Review text" value={p.description} onChange={(e) => p.onDescriptionChange(e.target.value)} /><input aria-label="Review title" value={p.title} onChange={(e) => p.onTitleChange(e.target.value)} /></> }));
 vi.mock('@/components/media/MediaUploader', () => ({ MediaUploader: (p: any) => <>
-  {p.customButton ? <button disabled={p.disabled} onClick={() => p.onMediaUploaded({ ...a, id: 'video-B', mux_upload_id: 'B', url: 'poster-B' })}>Replace</button> : <><button onClick={() => p.onMediaUploaded(a)}>Attach A</button><button onClick={() => p.onMediaUploaded(photo)}>Attach photo</button></>}
+  {p.customButton ? <button disabled={p.disabled} onClick={() => { p.onUploadsChange([{ status: 'uploading' }]); p.onMediaUploaded({ ...a, id: 'video-B', mux_upload_id: 'B', url: 'poster-B' }); }}>Replace</button> : <><button onClick={() => p.onMediaUploaded(a)}>Attach A</button><button onClick={() => p.onMediaUploaded(photo)}>Attach photo</button></>}
 </> }));
 vi.mock('@/components/feed/composer/ComposerMediaPreview', () => ({ ComposerMediaPreview: (p: any) => <>{p.media.map((m: any) => <React.Fragment key={m.id}>{p.recoveryForItem?.(m) || <button onClick={() => p.onRemove(m)}>Remove {m.id}</button>}</React.Fragment>)}</> }));
 vi.mock('@/components/media/CompactMediaGrid', () => ({ CompactMediaGrid: () => null }));
