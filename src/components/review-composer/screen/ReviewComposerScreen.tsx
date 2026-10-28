@@ -331,7 +331,7 @@ export function ReviewComposerScreen(props: Props) {
     if (!id) return;
     // Fields in the details area live in one shared container.
     if (DETAIL_SECTIONS.includes(id)) setDetailsOpen(true);
-    const target = DETAIL_SECTIONS.includes(id) ? 'details' : id === 'text' ? 'headline' : id;
+    const target = DETAIL_SECTIONS.includes(id) ? 'details' : id;
     requestAnimationFrame(() => {
       const el = document.getElementById(`composer-section-${target}`);
       el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -599,41 +599,53 @@ export function ReviewComposerScreen(props: Props) {
 
         {videoBlocker && <div className="space-y-2"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><VideoRecheckLink active={!!videoBlocker} /></div>}
 
-        {onStep(SID.media) && (
-          <div id="composer-section-media" tabIndex={-1} className="w-full space-y-8 py-2 outline-none">
-            <h2 className="text-center text-xl font-medium">
+        {onStep(SID.text) && renderedConfig && (
+          <section id="composer-section-text" tabIndex={-1} className="space-y-3 rounded-2xl border border-border bg-card p-4 outline-none sm:p-6">
+            <h2 className="text-lg font-semibold text-foreground">
               Tell us about your {renderedConfig?.subjectLabel ?? 'experience'}
             </h2>
+            <StepFour
+              part="text"
+              config={renderedConfig}
+              answers={{
+                tags: { food_tags: state.values.foodTags },
+                text: {},
+                choices: state.values.questionnaire.choices,
+                curated: state.values.questionnaire.curated,
+              }}
+              onAddTag={(fieldId, tag) =>
+                fieldId === 'food_tags' &&
+                !state.values.foodTags.includes(tag) &&
+                setValue('foodTags', [...state.values.foodTags, tag])
+              }
+              onRemoveTag={(fieldId, tag) =>
+                fieldId === 'food_tags' && setValue('foodTags', state.values.foodTags.filter((t) => t !== tag))
+              }
+              onAnswerTextChange={() => {}}
+              onAnswerChoiceChange={(fieldId, value) =>
+                dispatch({ type: 'SET_QUESTIONNAIRE_CHOICE', sessionKey, fieldId, value: value ?? null })
+              }
+              onAnswerCuratedChange={(fieldId, value) =>
+                dispatch({ type: 'SET_QUESTIONNAIRE_CURATED', sessionKey, fieldId, value })
+              }
+              title={state.values.headline}
+              onTitleChange={(v) => setValue('headline', v)}
+              description={state.values.text}
+              onDescriptionChange={(v) => setValue('text', v)}
+              experienceDate={state.values.experienceDate ? new Date(state.values.experienceDate) : undefined}
+              onExperienceDateChange={(d) => setValue('experienceDate', d.toISOString())}
+              visibility={state.values.visibility}
+              onVisibilityChange={(v) => setValue('visibility', v)}
+              nonPublicLockedReason={visibilityLocked}
+            />
+            {err('text') && <FieldError message={err('text')!} />}
+          </section>
+        )}
+
+        {onStep(SID.media) && (
+          <div id="composer-section-media" tabIndex={-1} className="w-full space-y-6 rounded-2xl border border-border bg-card p-4 outline-none sm:p-6">
 
             {showLocationPrompt && locationEligible && <LocationAccessPrompt onCancel={skipLocationPrompt} className="mb-8" />}
-
-            {subjectId && display && (
-              <div className="space-y-2" data-testid="composer-subject-preview">
-                <EntityPreviewCard
-                  entity={{ ...display, image_url: display.image_url?.replace(/^http:\/\//i, 'https://') }}
-                  type={display.type ?? ''}
-                  onChange={() => {
-                    /* subject changes happen on the subject step only */
-                  }}
-                  disableChange
-                />
-                {contextLine && <p className="text-sm text-muted-foreground">{contextLine}</p>}
-              </div>
-            )}
-
-            {isEdit && !state.stored?.entity_id && (
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="composer-legacy-title">What this review is about</Label>
-                  <Input id="composer-legacy-title" value={state.stored?.title ?? ''} readOnly disabled aria-readonly="true" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="composer-legacy-venue">Where</Label>
-                  <Input id="composer-legacy-venue" value={state.stored?.venue ?? ''} readOnly disabled aria-readonly="true" />
-                </div>
-                <p className="text-xs text-muted-foreground md:col-span-2">The subject of a review can't be changed.</p>
-              </div>
-            )}
 
             {state.values.media.length > 0 && (
               <div className="space-y-2">
@@ -700,9 +712,70 @@ export function ReviewComposerScreen(props: Props) {
           </div>
         )}
 
+
         {onStep(SID.text) && renderedConfig && (
-          <div id="composer-section-headline" tabIndex={-1} className="outline-none">
+          <section id="composer-section-details" tabIndex={-1} className="rounded-2xl border border-border bg-card outline-none">
+            <button
+              type="button"
+              id="composer-details-toggle"
+              aria-expanded={detailsOpen}
+              aria-controls="composer-details-panel"
+              onClick={() => setDetailsOpen((o) => !o)}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl p-4 text-left sm:p-6"
+            >
+              <span className="space-y-0.5">
+                <span className="block text-lg font-semibold text-foreground">Add more details</span>
+                <span className="block text-sm text-muted-foreground">Headline, when you experienced it, and {renderedConfig?.subjectLabel ?? 'experience'}-specific questions — all optional</span>
+              </span>
+              <ChevronDown aria-hidden="true" className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {/* Kept mounted so answers and in-progress inputs survive collapsing;
+                `hidden` removes it from tab order and assistive tech. */}
+            <div id="composer-details-panel" role="region" aria-labelledby="composer-details-toggle" hidden={!detailsOpen} className="border-t border-border p-4 sm:p-6">
+              <div id="composer-section-headline" tabIndex={-1} className="outline-none">
             <StepFour
+              part="details"
+              config={renderedConfig}
+              answers={{
+                tags: { food_tags: state.values.foodTags },
+                text: {},
+                choices: state.values.questionnaire.choices,
+                curated: state.values.questionnaire.curated,
+              }}
+              onAddTag={(fieldId, tag) =>
+                fieldId === 'food_tags' &&
+                !state.values.foodTags.includes(tag) &&
+                setValue('foodTags', [...state.values.foodTags, tag])
+              }
+              onRemoveTag={(fieldId, tag) =>
+                fieldId === 'food_tags' && setValue('foodTags', state.values.foodTags.filter((t) => t !== tag))
+              }
+              onAnswerTextChange={() => {}}
+              onAnswerChoiceChange={(fieldId, value) =>
+                dispatch({ type: 'SET_QUESTIONNAIRE_CHOICE', sessionKey, fieldId, value: value ?? null })
+              }
+              onAnswerCuratedChange={(fieldId, value) =>
+                dispatch({ type: 'SET_QUESTIONNAIRE_CURATED', sessionKey, fieldId, value })
+              }
+              title={state.values.headline}
+              onTitleChange={(v) => setValue('headline', v)}
+              description={state.values.text}
+              onDescriptionChange={(v) => setValue('text', v)}
+              experienceDate={state.values.experienceDate ? new Date(state.values.experienceDate) : undefined}
+              onExperienceDateChange={(d) => setValue('experienceDate', d.toISOString())}
+              visibility={state.values.visibility}
+              onVisibilityChange={(v) => setValue('visibility', v)}
+              nonPublicLockedReason={visibilityLocked}
+            />
+              </div>
+            </div>
+          </section>
+        )}
+
+        {onStep(SID.text) && renderedConfig && (
+          <section id="composer-section-visibility" tabIndex={-1} className="space-y-2 rounded-2xl border border-border bg-card p-4 outline-none sm:p-6">
+            <StepFour
+              part="visibility"
               config={renderedConfig}
               answers={{
                 tags: { food_tags: state.values.foodTags },
@@ -736,23 +809,14 @@ export function ReviewComposerScreen(props: Props) {
               nonPublicLockedReason={visibilityLocked}
             />
             {err('visibility') && <FieldError message={err('visibility')!} />}
-          </div>
+          </section>
         )}
       </div>
 
-      <footer className="mt-8 flex items-center justify-between gap-3">
-        <Button type="button" variant="outline" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0 || state.status === 'saving'}>
-          Back
+      <footer className="sticky bottom-0 z-10 -mx-4 mt-8 flex items-center justify-end gap-3 border-t border-border bg-background/95 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <Button type="button" className="w-full sm:w-auto" onClick={handleSave} disabled={!canSubmit(state) || isUploading || subjectBlocked || !!videoBlocker || unavailableVideo.blocked}>
+          {state.status === 'saving' ? 'Saving…' : caps.submitLabel}
         </Button>
-        {isLast ? (
-          <Button type="button" onClick={handleSave} disabled={!canSubmit(state) || isUploading || subjectBlocked || !!videoBlocker || unavailableVideo.blocked}>
-            {state.status === 'saving' ? 'Saving…' : caps.submitLabel}
-          </Button>
-        ) : (
-          <Button type="button" onClick={goNext} disabled={isUploading || (onStep(SID.subject) && subjectBlocked)}>
-            Next
-          </Button>
-        )}
       </footer>
 
       <ConfirmationDialog
