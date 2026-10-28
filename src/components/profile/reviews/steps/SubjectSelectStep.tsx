@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { X, Check, PlusCircle } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { UnifiedEntitySelector } from '@/components/feed/UnifiedEntitySelector';
 import { EntityAdapter } from '@/components/profile/circles/types';
-import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
 import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
