@@ -115,6 +115,7 @@ describe('single-page review composer', () => {
 
   it('submit without a rating validates the whole form, saves nothing and focuses the rating', async () => {
     render(<ReviewComposerScreen {...createProps} />, { wrapper });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() => expect(document.activeElement?.id).toBe('composer-section-rating'));
     expect(mock.save).not.toHaveBeenCalled();

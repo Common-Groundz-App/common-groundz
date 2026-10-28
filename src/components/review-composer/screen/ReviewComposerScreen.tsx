@@ -332,7 +332,7 @@ export function ReviewComposerScreen(props: Props) {
     const target = DETAIL_SECTIONS.includes(id) ? 'details' : id;
     requestAnimationFrame(() => {
       const el = document.getElementById(`composer-section-${target}`);
-      el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
       el?.focus({ preventScroll: true });
     });
   };
