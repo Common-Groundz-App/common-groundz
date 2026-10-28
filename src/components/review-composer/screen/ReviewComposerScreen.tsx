@@ -11,7 +11,7 @@ import { VideoRecheckLink } from '@/components/feed/composer/VideoRecheckLink';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmationDialog } from '@/components/common/ConfirmationDialog';
@@ -24,10 +24,8 @@ import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { ComposerMediaPreview } from '@/components/feed/composer/ComposerMediaPreview';
 import { composerMuxState, isNewMuxVideo, mediaIdentity, preparedComposerMedia } from '@/utils/composerVideoReadiness';
-import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
 import { useLocation as useLocationAccess } from '@/contexts/LocationContext';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   decideFinishedUpload,
@@ -61,7 +59,7 @@ import {
   sectionContextOf,
   useComposerController,
 } from '../store';
-import { nextStep, stepCount, validateForSubmit } from '../stepEngine';
+import { validateForSubmit } from '../stepEngine';
 import { buildCreateReviewPayload, buildEditReviewPayload } from '../saveBuilders';
 import { fromCreateReviewError, fromUpdateReviewError, MEDIA_RETIRED_TOAST, reviewVideoErrorMessage } from '../serverErrors';
 import { gatherAmbiguousSaveEvidence } from '../reconcile';
@@ -94,7 +92,8 @@ type ExistingCheck = { entityId: string; state: 'checking' | 'found' | 'none' | 
 
 const SID = { rating: 'rating', subject: 'subject', media: 'media', text: 'text' } as const satisfies Record<string, SectionId>;
 
-const STEP_TITLES = ['Rating', 'Subject', 'Photos', 'Details'];
+/** Sections shown inside the collapsed "Add more details" area. */
+const DETAIL_SECTIONS: readonly SectionId[] = ['headline', 'experienceDate', 'questionnaire', 'foodTags'];
 
 export function ReviewComposerScreen(props: Props) {
   const navigate = useNavigate();
@@ -111,7 +110,7 @@ export function ReviewComposerScreen(props: Props) {
   const { state, dispatch, sessionKey } = useComposerController(target, preselected?.subject ?? null);
   const uploads = useUploadSession(sessionKey);
   const caps = getCapabilities(state.mode);
-  const [step, setStep] = useState(0);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [display, setDisplay] = useState<EntityAdapter | null>(
     props.mode === 'edit-review' ? props.loaded.display : preselected?.display ?? null,
   );
@@ -303,8 +302,7 @@ export function ReviewComposerScreen(props: Props) {
 
   /* ---------------- location prompt (questionnaire-driven) ---------------- */
   const { permissionStatus, locationEnabled } = useLocationAccess();
-  const onMediaStep = (caps.steps[step] as readonly SectionId[] | undefined)?.indexOf('media') !== undefined &&
-    (caps.steps[step] as readonly SectionId[]).indexOf('media') >= 0;
+  const onMediaStep = true; // single page: the media section is always shown
   const locationEligible = !!renderedConfig?.showLocationPrompt;
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   useEffect(() => {
@@ -329,12 +327,21 @@ export function ReviewComposerScreen(props: Props) {
   /* ---------------- step navigation ---------------- */
   const focusSection = (id: SectionId | null) => {
     if (!id) return;
-    requestAnimationFrame(() => document.getElementById(`composer-section-${id}`)?.focus());
+    // Fields in the details area live in one shared container.
+    if (DETAIL_SECTIONS.includes(id)) setDetailsOpen(true);
+    const target = DETAIL_SECTIONS.includes(id) ? 'details' : id;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`composer-section-${target}`);
+      el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+      el?.focus({ preventScroll: true });
+    });
   };
 
-  const onStep = (id: SectionId) => (caps.steps[step] as readonly SectionId[]).indexOf(id) >= 0;
+  // Single page: every configured review section is rendered together.
+  // Step config, validation and payloads are unchanged.
+  const onStep = (id: SectionId) => (caps.steps.flat() as readonly SectionId[]).indexOf(id) >= 0;
 
-  // Parity with the popup: fires each time the subject step becomes visible.
+  // Parity with the popup: fires when the subject section becomes visible.
   const subjectStepVisible = onStep(SID.subject);
   useEffect(() => {
     if (subjectStepVisible) logFunnel({ event: 'review_subject_step_shown', source: 'review_form' });
@@ -344,13 +351,6 @@ export function ReviewComposerScreen(props: Props) {
   const subjectBlocked =
     !isEdit && (isAddingSubject || isResolvingContext || (!!subjectId && existing?.entityId === subjectId && existing.state !== 'none'));
 
-  const goNext = () => {
-    const r = nextStep(state, step);
-    dispatch({ type: 'VALIDATED', sessionKey, errors: r.validation.errors });
-    if (!r.validation.ok) return focusSection(r.validation.firstInvalid);
-    if (onStep(SID.subject) && subjectBlocked) return;
-    setStep(r.stepIndex);
-  };
 
   /* ---------------- saving ---------------- */
   const attemptRef = useRef<Record<string, unknown> | undefined>(undefined);
@@ -391,11 +391,7 @@ export function ReviewComposerScreen(props: Props) {
     if (saveLock.current || !canSubmit(state) || isUploading || videoBlocker || unavailableVideo.blocked) return;
     const v = validateForSubmit(state);
     dispatch({ type: 'VALIDATED', sessionKey, errors: v.errors });
-    if (!v.ok) {
-      const idx = caps.steps.findIndex((s) => (s as readonly SectionId[]).includes(v.firstInvalid!));
-      if (idx >= 0) setStep(idx);
-      return focusSection(v.firstInvalid);
-    }
+    if (!v.ok) return focusSection(v.firstInvalid);
     const touched = new Set(state.questionnaireTouched);
     const built = isEdit
       ? buildEditReviewPayload({ values: state.values, stored: state.stored, questionnaireTouched: touched })
@@ -430,8 +426,6 @@ export function ReviewComposerScreen(props: Props) {
       uploads.send({ type: 'SAVE_FAILED' });
       dispatch({ type: 'SAVE_RESULT', sessionKey, result });
       if (unavailableVideo.handleError(error)) {
-        const mediaStep = caps.steps.findIndex((sections) => (sections as readonly SectionId[]).includes('media'));
-        if (mediaStep >= 0) setStep(mediaStep);
         scrollToUnavailableMedia();
         return;
       }
@@ -518,12 +512,9 @@ export function ReviewComposerScreen(props: Props) {
   /* ---------------- render ---------------- */
   if (state.status === 'loading') return <ComposerSkeleton />;
 
-  const total = stepCount(state);
-  const isLast = step === total - 1;
-  const stepIds = caps.steps[step] as readonly SectionId[];
   const err = (id: SectionId) => state.meta[id].error;
   const showExistingNotice =
-    (!isEdit && !!subjectId && existing?.entityId === subjectId && existing.state !== 'none' && step >= 1) ||
+    (!isEdit && !!subjectId && existing?.entityId === subjectId && existing.state !== 'none') ||
     (state.status === 'blocked' && state.blockedReason === 'existing_review');
 
   return (
@@ -533,14 +524,9 @@ export function ReviewComposerScreen(props: Props) {
           Cancel
         </Button>
         <h1 className="text-base font-semibold text-foreground">{isEdit ? 'Edit review' : 'Write a review'}</h1>
-        <span className="w-16 text-right text-sm text-muted-foreground" aria-live="polite">
-          {step + 1} / {total}
-        </span>
+        <span className="w-16" aria-hidden="true" />
       </header>
-      <div className="mb-6 h-1 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
-        <div className="h-full bg-primary transition-all" style={{ width: `${((step + 1) / total) * 100}%` }} />
-      </div>
-      <p className="sr-only">Step {step + 1} of {total}: {STEP_TITLES[step]}</p>
+      <div className="mb-6 h-px w-full bg-border" aria-hidden="true" />
 
       {showExistingNotice && (
         <ExistingNotice
@@ -611,41 +597,53 @@ export function ReviewComposerScreen(props: Props) {
 
         {videoBlocker && <div className="space-y-2"><p role="status" className="text-sm text-muted-foreground">{videoBlocker}</p><VideoRecheckLink active={!!videoBlocker} /></div>}
 
-        {onStep(SID.media) && (
-          <div id="composer-section-media" tabIndex={-1} className="w-full space-y-8 py-2 outline-none">
-            <h2 className="text-center text-xl font-medium">
+        {onStep(SID.text) && renderedConfig && (
+          <section id="composer-section-text" tabIndex={-1} className="space-y-3 rounded-2xl border border-border bg-card p-4 outline-none sm:p-6">
+            <h2 className="text-lg font-semibold text-foreground">
               Tell us about your {renderedConfig?.subjectLabel ?? 'experience'}
             </h2>
+            <StepFour
+              part="text"
+              config={renderedConfig}
+              answers={{
+                tags: { food_tags: state.values.foodTags },
+                text: {},
+                choices: state.values.questionnaire.choices,
+                curated: state.values.questionnaire.curated,
+              }}
+              onAddTag={(fieldId, tag) =>
+                fieldId === 'food_tags' &&
+                !state.values.foodTags.includes(tag) &&
+                setValue('foodTags', [...state.values.foodTags, tag])
+              }
+              onRemoveTag={(fieldId, tag) =>
+                fieldId === 'food_tags' && setValue('foodTags', state.values.foodTags.filter((t) => t !== tag))
+              }
+              onAnswerTextChange={() => {}}
+              onAnswerChoiceChange={(fieldId, value) =>
+                dispatch({ type: 'SET_QUESTIONNAIRE_CHOICE', sessionKey, fieldId, value: value ?? null })
+              }
+              onAnswerCuratedChange={(fieldId, value) =>
+                dispatch({ type: 'SET_QUESTIONNAIRE_CURATED', sessionKey, fieldId, value })
+              }
+              title={state.values.headline}
+              onTitleChange={(v) => setValue('headline', v)}
+              description={state.values.text}
+              onDescriptionChange={(v) => setValue('text', v)}
+              experienceDate={state.values.experienceDate ? new Date(state.values.experienceDate) : undefined}
+              onExperienceDateChange={(d) => setValue('experienceDate', d.toISOString())}
+              visibility={state.values.visibility}
+              onVisibilityChange={(v) => setValue('visibility', v)}
+              nonPublicLockedReason={visibilityLocked}
+            />
+            {err('text') && <FieldError message={err('text')!} />}
+          </section>
+        )}
+
+        {onStep(SID.media) && (
+          <div id="composer-section-media" tabIndex={-1} className="w-full space-y-6 rounded-2xl border border-border bg-card p-4 outline-none sm:p-6">
 
             {showLocationPrompt && locationEligible && <LocationAccessPrompt onCancel={skipLocationPrompt} className="mb-8" />}
-
-            {subjectId && display && (
-              <div className="space-y-2" data-testid="composer-subject-preview">
-                <EntityPreviewCard
-                  entity={{ ...display, image_url: display.image_url?.replace(/^http:\/\//i, 'https://') }}
-                  type={display.type ?? ''}
-                  onChange={() => {
-                    /* subject changes happen on the subject step only */
-                  }}
-                  disableChange
-                />
-                {contextLine && <p className="text-sm text-muted-foreground">{contextLine}</p>}
-              </div>
-            )}
-
-            {isEdit && !state.stored?.entity_id && (
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="composer-legacy-title">What this review is about</Label>
-                  <Input id="composer-legacy-title" value={state.stored?.title ?? ''} readOnly disabled aria-readonly="true" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="composer-legacy-venue">Where</Label>
-                  <Input id="composer-legacy-venue" value={state.stored?.venue ?? ''} readOnly disabled aria-readonly="true" />
-                </div>
-                <p className="text-xs text-muted-foreground md:col-span-2">The subject of a review can't be changed.</p>
-              </div>
-            )}
 
             {state.values.media.length > 0 && (
               <div className="space-y-2">
@@ -712,9 +710,70 @@ export function ReviewComposerScreen(props: Props) {
           </div>
         )}
 
+
         {onStep(SID.text) && renderedConfig && (
-          <div id="composer-section-headline" tabIndex={-1} className="outline-none">
+          <section id="composer-section-details" tabIndex={-1} className="rounded-2xl border border-border bg-card outline-none">
+            <button
+              type="button"
+              id="composer-details-toggle"
+              aria-expanded={detailsOpen}
+              aria-controls="composer-details-panel"
+              onClick={() => setDetailsOpen((o) => !o)}
+              className="flex w-full items-center justify-between gap-3 rounded-2xl p-4 text-left sm:p-6"
+            >
+              <span className="space-y-0.5">
+                <span className="block text-lg font-semibold text-foreground">Add more details</span>
+                <span className="block text-sm text-muted-foreground">Headline, when you experienced it, and {renderedConfig?.subjectLabel ?? 'experience'}-specific questions — all optional</span>
+              </span>
+              <ChevronDown aria-hidden="true" className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {/* Kept mounted so answers and in-progress inputs survive collapsing;
+                `hidden` removes it from tab order and assistive tech. */}
+            <div id="composer-details-panel" role="region" aria-labelledby="composer-details-toggle" hidden={!detailsOpen} className="border-t border-border p-4 sm:p-6">
+              <div id="composer-section-headline" tabIndex={-1} className="outline-none">
             <StepFour
+              part="details"
+              config={renderedConfig}
+              answers={{
+                tags: { food_tags: state.values.foodTags },
+                text: {},
+                choices: state.values.questionnaire.choices,
+                curated: state.values.questionnaire.curated,
+              }}
+              onAddTag={(fieldId, tag) =>
+                fieldId === 'food_tags' &&
+                !state.values.foodTags.includes(tag) &&
+                setValue('foodTags', [...state.values.foodTags, tag])
+              }
+              onRemoveTag={(fieldId, tag) =>
+                fieldId === 'food_tags' && setValue('foodTags', state.values.foodTags.filter((t) => t !== tag))
+              }
+              onAnswerTextChange={() => {}}
+              onAnswerChoiceChange={(fieldId, value) =>
+                dispatch({ type: 'SET_QUESTIONNAIRE_CHOICE', sessionKey, fieldId, value: value ?? null })
+              }
+              onAnswerCuratedChange={(fieldId, value) =>
+                dispatch({ type: 'SET_QUESTIONNAIRE_CURATED', sessionKey, fieldId, value })
+              }
+              title={state.values.headline}
+              onTitleChange={(v) => setValue('headline', v)}
+              description={state.values.text}
+              onDescriptionChange={(v) => setValue('text', v)}
+              experienceDate={state.values.experienceDate ? new Date(state.values.experienceDate) : undefined}
+              onExperienceDateChange={(d) => setValue('experienceDate', d.toISOString())}
+              visibility={state.values.visibility}
+              onVisibilityChange={(v) => setValue('visibility', v)}
+              nonPublicLockedReason={visibilityLocked}
+            />
+              </div>
+            </div>
+          </section>
+        )}
+
+        {onStep(SID.text) && renderedConfig && (
+          <section id="composer-section-visibility" tabIndex={-1} className="space-y-2 rounded-2xl border border-border bg-card p-4 outline-none sm:p-6">
+            <StepFour
+              part="visibility"
               config={renderedConfig}
               answers={{
                 tags: { food_tags: state.values.foodTags },
@@ -748,23 +807,14 @@ export function ReviewComposerScreen(props: Props) {
               nonPublicLockedReason={visibilityLocked}
             />
             {err('visibility') && <FieldError message={err('visibility')!} />}
-          </div>
+          </section>
         )}
       </div>
 
-      <footer className="mt-8 flex items-center justify-between gap-3">
-        <Button type="button" variant="outline" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0 || state.status === 'saving'}>
-          Back
+      <footer className="sticky bottom-0 z-10 -mx-4 mt-8 flex items-center justify-end gap-3 border-t border-border bg-background/95 px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <Button type="button" className="w-full sm:w-auto" onClick={handleSave} disabled={!canSubmit(state) || isUploading || subjectBlocked || !!videoBlocker || unavailableVideo.blocked}>
+          {state.status === 'saving' ? 'Saving…' : caps.submitLabel}
         </Button>
-        {isLast ? (
-          <Button type="button" onClick={handleSave} disabled={!canSubmit(state) || isUploading || subjectBlocked || !!videoBlocker || unavailableVideo.blocked}>
-            {state.status === 'saving' ? 'Saving…' : caps.submitLabel}
-          </Button>
-        ) : (
-          <Button type="button" onClick={goNext} disabled={isUploading || (onStep(SID.subject) && subjectBlocked)}>
-            Next
-          </Button>
-        )}
       </footer>
 
       <ConfirmationDialog

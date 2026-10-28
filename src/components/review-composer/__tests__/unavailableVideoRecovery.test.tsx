@@ -22,7 +22,7 @@ vi.mock('@/components/ui/connected-rings', () => ({ ConnectedRingsRating: () => 
 vi.mock('@/components/profile/reviews/questionnaire/ChoiceChips', () => ({ default: () => null }));
 vi.mock('@/components/profile/reviews/steps/StepOne', () => ({ default: (p: any) => <button onClick={() => p.onChange(4)}>Rate four</button> }));
 vi.mock('@/components/profile/reviews/steps/SubjectSelectStep', () => ({ default: () => null }));
-vi.mock('@/components/profile/reviews/steps/StepFour', () => ({ default: (p: any) => <><input aria-label="Review text" value={p.description} onChange={(e) => p.onDescriptionChange(e.target.value)} /><input aria-label="Review title" value={p.title} onChange={(e) => p.onTitleChange(e.target.value)} /></> }));
+vi.mock('@/components/profile/reviews/steps/StepFour', () => ({ default: (p: any) => <>{p.part === 'text' && <input aria-label="Review text" value={p.description} onChange={(e) => p.onDescriptionChange(e.target.value)} />}{p.part === 'details' && <input aria-label="Review title" value={p.title} onChange={(e) => p.onTitleChange(e.target.value)} />}</> }));
 vi.mock('@/components/media/MediaUploader', () => ({ MediaUploader: (p: any) => <>
   {p.customButton ? <button disabled={p.disabled} onClick={() => { p.onUploadsChange([{ status: 'uploading' }]); p.onMediaUploaded({ ...a, id: 'video-B', mux_upload_id: 'B', url: 'poster-B' }); }}>Replace</button> : <><button onClick={() => p.onMediaUploaded(a)}>Attach A</button><button onClick={() => p.onMediaUploaded(photo)}>Attach photo</button></>}
 </> }));
@@ -52,27 +52,23 @@ describe('real review/timeline submit-handler recovery', () => {
       if (kind === 'timeline') mock.save.mockReturnValue(undefined);
       render(kind === 'review' ? <ReviewComposerScreen {...p} /> : <TimelineComposerScreen {...p} />, { wrapper });
       if (kind === 'review') {
-        fireEvent.click(screen.getByText('Rate four')); fireEvent.click(screen.getByText('Next'));
-        await waitFor(() => expect(screen.getByText('Next')).toBeEnabled()); fireEvent.click(screen.getByText('Next'));
+        fireEvent.click(screen.getByText('Rate four'));
       }
       fireEvent.click(screen.getByText('Attach A')); fireEvent.click(screen.getByText('Attach photo'));
-      if (kind === 'review') fireEvent.click(screen.getByText('Next'));
       const field = kind === 'review' ? 'Review text' : 'Update Comment *';
       fireEvent.change(screen.getByLabelText(field), { target: { value: 'all my written work' } });
       const submit = kind === 'review' ? edit ? 'Save changes' : 'Publish' : edit ? 'Save update' : 'Add update';
+      await waitFor(() => expect(screen.getByRole('button', { name: submit })).toBeEnabled());
       fireEvent.click(screen.getByRole('button', { name: submit }));
       await waitFor(() => expect(mock.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive', title: 'Video no longer available' })));
       expect(mock.save).toHaveBeenCalledOnce();
       expect(screen.getByText('Remove photo')).toBeInTheDocument();
-      if (kind === 'review') fireEvent.click(screen.getByText('Next'));
       expect(screen.getByLabelText(field)).toHaveValue('all my written work');
       fireEvent.change(screen.getByLabelText(field), { target: { value: 'edited but still blocked' } });
       expect(screen.getByRole('button', { name: submit })).toBeDisabled();
       fireEvent.click(screen.getByRole('button', { name: submit })); expect(mock.save).toHaveBeenCalledOnce();
-      if (kind === 'review') fireEvent.click(screen.getByText('Back'));
       fireEvent.click(screen.getByText('Replace'));
       expect(screen.queryByText('Video no longer available')).toBeNull();
-      if (kind === 'review') fireEvent.click(screen.getByText('Next'));
       expect(screen.getByLabelText(field)).toHaveValue('edited but still blocked');
       expect(screen.getByRole('button', { name: submit })).toBeEnabled();
       mock.error = { code: 'P0001', message: 'unrelated_save_failure' };

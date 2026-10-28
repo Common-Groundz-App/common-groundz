@@ -117,6 +117,7 @@ export default defineConfig({
             'src/hooks/useSoftwareKeyboardOpen.test.tsx',
             'src/hooks/useMuxStatus.readiness.test.tsx',
             'src/components/review-composer/__tests__/readyBeforePublish.test.tsx',
+        'src/components/review-composer/__tests__/singlePageComposer.test.tsx',
             'src/components/review-composer/__tests__/composerVideoFixes.test.tsx',
             'src/hooks/useBlurComposerOnKeyboardDismiss.test.tsx',
             'src/hooks/useDockCorrection.test.tsx',

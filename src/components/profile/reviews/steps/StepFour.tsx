@@ -30,6 +30,11 @@ interface StepFourProps {
   onVisibilityChange: (value: "public" | "circle_only" | "private") => void;
   /** Optional (new composer only): when set, only "Everyone" can be chosen and this reason is shown. */
   nonPublicLockedReason?: string | null;
+  /**
+   * Which slice to render. Defaults to `all` (legacy popup, unchanged). The
+   * single-page composer renders each slice once, so every input exists once.
+   */
+  part?: 'all' | 'text' | 'details' | 'visibility';
 }
 
 const StepFour = ({
@@ -49,15 +54,22 @@ const StepFour = ({
   visibility,
   onVisibilityChange,
   nonPublicLockedReason,
+  part = 'all',
 }: StepFourProps) => {
   const locked = !!nonPublicLockedReason;
+  const all = part === 'all';
+  const showText = all || part === 'text';
+  const showDetails = all || part === 'details';
+  const showVisibility = all || part === 'visibility';
   return (
-    <div className="w-full space-y-8 py-2">
+    <div className={all ? 'w-full space-y-8 py-2' : 'w-full space-y-8'}>
+      {all && (
       <h2 className="text-xl font-medium text-center">
         Additional details (optional)
       </h2>
-      
+      )}
       {/* Review Headline - Updated label for clarity */}
+      {showDetails && (
       <div className="space-y-2">
         <Label htmlFor="review-title" className="flex items-center gap-2 font-medium">
           <span className="text-lg">📝</span>
@@ -71,8 +83,10 @@ const StepFour = ({
           className="border-brand-orange/30 focus-visible:ring-brand-orange/30 transition-all duration-200"
         />
       </div>
+      )}
       
       {/* Description */}
+      {showText && (
       <div className="space-y-2">
         <Label htmlFor="description" className="flex items-center gap-2 font-medium">
           <span className="text-lg">💬</span>
@@ -87,8 +101,10 @@ const StepFour = ({
           className="border-brand-orange/30 focus-visible:ring-brand-orange/30 resize-none transition-all duration-200"
         />
       </div>
+      )}
       
       {/* Experience Date */}
+      {showDetails && (<>
       <div className="space-y-2">
         <Label className="flex items-center gap-2 font-medium">
           <span className="text-lg">📅</span>
@@ -110,8 +126,10 @@ const StepFour = ({
         onChoiceChange={onAnswerChoiceChange}
         onCuratedChange={onAnswerCuratedChange}
       />
+      </>)}
       
       {/* Visibility */}
+      {showVisibility && (
       <div className="space-y-2">
         <Label className="flex items-center gap-2 font-medium">
           <span className="text-lg">👁️</span>
@@ -161,6 +179,7 @@ const StepFour = ({
           </p>
         )}
       </div>
+      )}
     </div>
   );
 };
