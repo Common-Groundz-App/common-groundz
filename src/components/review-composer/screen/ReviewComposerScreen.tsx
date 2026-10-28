@@ -61,7 +61,7 @@ import {
   sectionContextOf,
   useComposerController,
 } from '../store';
-import { nextStep, stepCount, validateForSubmit } from '../stepEngine';
+import { validateForSubmit } from '../stepEngine';
 import { buildCreateReviewPayload, buildEditReviewPayload } from '../saveBuilders';
 import { fromCreateReviewError, fromUpdateReviewError, MEDIA_RETIRED_TOAST, reviewVideoErrorMessage } from '../serverErrors';
 import { gatherAmbiguousSaveEvidence } from '../reconcile';
@@ -94,7 +94,8 @@ type ExistingCheck = { entityId: string; state: 'checking' | 'found' | 'none' | 
 
 const SID = { rating: 'rating', subject: 'subject', media: 'media', text: 'text' } as const satisfies Record<string, SectionId>;
 
-const STEP_TITLES = ['Rating', 'Subject', 'Photos', 'Details'];
+/** Sections shown inside the collapsed "Add more details" area. */
+const DETAIL_SECTIONS: readonly SectionId[] = ['headline', 'experienceDate', 'questionnaire', 'foodTags'];
 
 export function ReviewComposerScreen(props: Props) {
   const navigate = useNavigate();
@@ -111,7 +112,7 @@ export function ReviewComposerScreen(props: Props) {
   const { state, dispatch, sessionKey } = useComposerController(target, preselected?.subject ?? null);
   const uploads = useUploadSession(sessionKey);
   const caps = getCapabilities(state.mode);
-  const [step, setStep] = useState(0);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [display, setDisplay] = useState<EntityAdapter | null>(
     props.mode === 'edit-review' ? props.loaded.display : preselected?.display ?? null,
   );
@@ -303,8 +304,7 @@ export function ReviewComposerScreen(props: Props) {
 
   /* ---------------- location prompt (questionnaire-driven) ---------------- */
   const { permissionStatus, locationEnabled } = useLocationAccess();
-  const onMediaStep = (caps.steps[step] as readonly SectionId[] | undefined)?.indexOf('media') !== undefined &&
-    (caps.steps[step] as readonly SectionId[]).indexOf('media') >= 0;
+  const onMediaStep = true; // single page: the media section is always shown
   const locationEligible = !!renderedConfig?.showLocationPrompt;
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   useEffect(() => {
@@ -329,12 +329,21 @@ export function ReviewComposerScreen(props: Props) {
   /* ---------------- step navigation ---------------- */
   const focusSection = (id: SectionId | null) => {
     if (!id) return;
-    requestAnimationFrame(() => document.getElementById(`composer-section-${id}`)?.focus());
+    // Fields in the details area live in one shared container.
+    if (DETAIL_SECTIONS.includes(id)) setDetailsOpen(true);
+    const target = DETAIL_SECTIONS.includes(id) ? 'details' : id === 'text' ? 'headline' : id;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`composer-section-${target}`);
+      el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el?.focus({ preventScroll: true });
+    });
   };
 
-  const onStep = (id: SectionId) => (caps.steps[step] as readonly SectionId[]).indexOf(id) >= 0;
+  // Single page: every configured review section is rendered together.
+  // Step config, validation and payloads are unchanged.
+  const onStep = (id: SectionId) => (caps.steps.flat() as readonly SectionId[]).indexOf(id) >= 0;
 
-  // Parity with the popup: fires each time the subject step becomes visible.
+  // Parity with the popup: fires when the subject section becomes visible.
   const subjectStepVisible = onStep(SID.subject);
   useEffect(() => {
     if (subjectStepVisible) logFunnel({ event: 'review_subject_step_shown', source: 'review_form' });
@@ -344,13 +353,6 @@ export function ReviewComposerScreen(props: Props) {
   const subjectBlocked =
     !isEdit && (isAddingSubject || isResolvingContext || (!!subjectId && existing?.entityId === subjectId && existing.state !== 'none'));
 
-  const goNext = () => {
-    const r = nextStep(state, step);
-    dispatch({ type: 'VALIDATED', sessionKey, errors: r.validation.errors });
-    if (!r.validation.ok) return focusSection(r.validation.firstInvalid);
-    if (onStep(SID.subject) && subjectBlocked) return;
-    setStep(r.stepIndex);
-  };
 
   /* ---------------- saving ---------------- */
   const attemptRef = useRef<Record<string, unknown> | undefined>(undefined);
@@ -391,11 +393,7 @@ export function ReviewComposerScreen(props: Props) {
     if (saveLock.current || !canSubmit(state) || isUploading || videoBlocker || unavailableVideo.blocked) return;
     const v = validateForSubmit(state);
     dispatch({ type: 'VALIDATED', sessionKey, errors: v.errors });
-    if (!v.ok) {
-      const idx = caps.steps.findIndex((s) => (s as readonly SectionId[]).includes(v.firstInvalid!));
-      if (idx >= 0) setStep(idx);
-      return focusSection(v.firstInvalid);
-    }
+    if (!v.ok) return focusSection(v.firstInvalid);
     const touched = new Set(state.questionnaireTouched);
     const built = isEdit
       ? buildEditReviewPayload({ values: state.values, stored: state.stored, questionnaireTouched: touched })
@@ -430,8 +428,6 @@ export function ReviewComposerScreen(props: Props) {
       uploads.send({ type: 'SAVE_FAILED' });
       dispatch({ type: 'SAVE_RESULT', sessionKey, result });
       if (unavailableVideo.handleError(error)) {
-        const mediaStep = caps.steps.findIndex((sections) => (sections as readonly SectionId[]).includes('media'));
-        if (mediaStep >= 0) setStep(mediaStep);
         scrollToUnavailableMedia();
         return;
       }
@@ -518,12 +514,9 @@ export function ReviewComposerScreen(props: Props) {
   /* ---------------- render ---------------- */
   if (state.status === 'loading') return <ComposerSkeleton />;
 
-  const total = stepCount(state);
-  const isLast = step === total - 1;
-  const stepIds = caps.steps[step] as readonly SectionId[];
   const err = (id: SectionId) => state.meta[id].error;
   const showExistingNotice =
-    (!isEdit && !!subjectId && existing?.entityId === subjectId && existing.state !== 'none' && step >= 1) ||
+    (!isEdit && !!subjectId && existing?.entityId === subjectId && existing.state !== 'none') ||
     (state.status === 'blocked' && state.blockedReason === 'existing_review');
 
   return (
@@ -533,14 +526,9 @@ export function ReviewComposerScreen(props: Props) {
           Cancel
         </Button>
         <h1 className="text-base font-semibold text-foreground">{isEdit ? 'Edit review' : 'Write a review'}</h1>
-        <span className="w-16 text-right text-sm text-muted-foreground" aria-live="polite">
-          {step + 1} / {total}
-        </span>
+        <span className="w-16" aria-hidden="true" />
       </header>
-      <div className="mb-6 h-1 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
-        <div className="h-full bg-primary transition-all" style={{ width: `${((step + 1) / total) * 100}%` }} />
-      </div>
-      <p className="sr-only">Step {step + 1} of {total}: {STEP_TITLES[step]}</p>
+      <div className="mb-6 h-px w-full bg-border" aria-hidden="true" />
 
       {showExistingNotice && (
         <ExistingNotice
