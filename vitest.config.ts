@@ -138,7 +138,7 @@ export default defineConfig({
             'src/components/common/imageWithFallbackStep2.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
             'src/components/content/StructuredFieldsDisplay.test.tsx',
-            'src/components/common/EntityImage.test.tsx',
+            'src/components/common/EntityImage.test.tsx', 'src/components/common/__tests__/EntityPreviewCard.test.tsx',
             'src/components/feed/PostedEntityPill.test.tsx',
             'src/components/profile/reviews/__tests__/ReviewTimelineViewer.test.tsx',
             'src/components/reviews/ReviewOwnerMenu.test.tsx',

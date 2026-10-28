@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { X, Check, PlusCircle } from 'lucide-react';
+import { PlusCircle } from 'lucide-react';
 import { UnifiedEntitySelector } from '@/components/feed/UnifiedEntitySelector';
 import { EntityAdapter } from '@/components/profile/circles/types';
-import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { useEntityImageFallback } from '@/hooks/useEntityImageFallback';
 import { getEntityFallbackIcon } from '@/utils/entityImageFallback';
+import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
 import SubjectQuickCreate from './SubjectQuickCreate';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 import {
@@ -98,31 +98,15 @@ const SubjectSelectStep = ({
       </div>
 
       {subject ? (
-        <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3">
-          <SubjectThumbnail subject={subject} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-              <p className="truncate font-medium">{subject.name}</p>
-            </div>
-            <p className="truncate text-xs text-muted-foreground">
-              {isResolvingContext
-                ? 'Finding where this is from...'
-                : contextLine || getEntityTypeLabel(subject.type)}
-            </p>
-          </div>
-          {!isLocked && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label="Clear selected subject"
-              onClick={() => onSubjectChange(null)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        <EntityPreviewCard
+          entity={{ ...subject, image_url: subject.image_url?.replace(/^http:\/\//i, 'https://') }}
+          type={subject.type ?? ''}
+          onChange={() => onSubjectChange(null)}
+          disableChange={isLocked}
+          changeAriaLabel="Clear selected subject"
+          contextLine={contextLine}
+          isResolvingContext={isResolvingContext}
+        />
       ) : locked && lockedStatus === 'error' ? (
         <div className="rounded-xl border bg-muted/30 p-4 text-center space-y-2" role="alert">
           <p className="font-medium">Subject unavailable</p>

@@ -27,6 +27,11 @@ interface EntityPreviewCardProps {
   type: string;
   onChange: () => void;
   disableChange?: boolean; // New prop to disable the change button
+  /** Optional parent/offering context (e.g. "Dish at Toit"). Rendered only when passed. */
+  contextLine?: string | null;
+  isResolvingContext?: boolean;
+  /** Accessible name for the Change button. */
+  changeAriaLabel?: string;
 }
 
 export const EntityPreviewCard = ({
@@ -34,6 +39,9 @@ export const EntityPreviewCard = ({
   type,
   onChange,
   disableChange = false, // Default to false to maintain backward compatibility
+  contextLine,
+  isResolvingContext = false,
+  changeAriaLabel,
 }: EntityPreviewCardProps) => {
   const { imageUrl, showFallback, markImageFailed } = useEntityImageFallback(entity);
   const FallbackIcon = getEntityFallbackIcon(type);
@@ -41,7 +49,10 @@ export const EntityPreviewCard = ({
   if (!entity) return null;
 
   // Get address from metadata if available (for Google Places)
-  const address = entity.metadata?.formatted_address || entity.venue;
+  // Only a verified geographic address earns the MapPin; `venue` is overloaded
+  // (director, author, brand, restaurant name...) so it is shown neutrally.
+  const verifiedAddress = entity.metadata?.formatted_address?.trim() || null;
+  const neutralVenue = !verifiedAddress ? entity.venue?.trim() || null : null;
   const isGooglePlace = entity.api_source === "google_places";
   
   // Extract useful metadata
@@ -85,20 +96,21 @@ export const EntityPreviewCard = ({
             type="button"
             className="text-sm px-3 py-1 border rounded-md bg-white hover:bg-accent border-border shadow-sm transition"
             onClick={onChange}
+            aria-label={changeAriaLabel}
           >
             Change
           </button>
         )}
       </div>
       <div className={cn(
-        "flex flex-col sm:flex-row w-full rounded-xl bg-white p-4 shadow-md border gap-4",
+        "flex flex-row w-full rounded-xl bg-white p-4 shadow-md border gap-4",
         "hover:shadow-lg transition-shadow duration-200"
       )}>
         {/* Image section */}
         <div className="flex-shrink-0">
           {showFallback ? (
             <div
-              className="w-full sm:w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center text-muted-foreground text-sm font-semibold border"
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg bg-gray-100 flex items-center justify-center text-muted-foreground text-sm font-semibold border"
               role="img"
               aria-label={entity.name || entity.title || "Preview"}
             >
@@ -108,7 +120,7 @@ export const EntityPreviewCard = ({
             <img
               src={imageUrl || ''}
               alt={entity.name || entity.title || "Preview"}
-              className="w-full sm:w-24 h-24 object-cover rounded-lg border bg-gray-100"
+              className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg border bg-gray-100"
               onError={markImageFailed}
             />
           )}
@@ -121,12 +133,24 @@ export const EntityPreviewCard = ({
             {entity.name || entity.title}
           </div>
           
-          {/* Address with icon for places */}
-          {address && (
+          {/* Parent/offering context — only when the caller passes it */}
+          {(isResolvingContext || contextLine) && (
+            <div className="text-xs text-muted-foreground mb-1 break-words">
+              {isResolvingContext ? 'Finding where this is from...' : contextLine}
+            </div>
+          )}
+
+          {/* Verified address with icon */}
+          {verifiedAddress && (
             <div className="flex items-start gap-1 text-xs text-gray-500 font-medium mb-2">
               <MapPin className="h-3 w-3 mt-0.5 flex-shrink-0 text-brand-orange" strokeWidth={2.5} />
-              <span className="break-words">{address}</span>
+              <span className="break-words">{verifiedAddress}</span>
             </div>
+          )}
+
+          {/* Ambiguous venue value — neutral, no location icon */}
+          {neutralVenue && (
+            <div className="text-xs text-gray-500 font-medium mb-2 break-words">{neutralVenue}</div>
           )}
           
           {/* Additional metadata - price, cuisine types */}
@@ -148,7 +172,7 @@ export const EntityPreviewCard = ({
           
           {/* Description if available */}
           {entity.description && (
-            <div className="text-sm text-gray-700 leading-snug whitespace-pre-line break-words mt-2">
+            <div className="text-sm text-gray-700 leading-snug whitespace-pre-line break-words mt-2 line-clamp-3">
               {entity.description}
             </div>
           )}
