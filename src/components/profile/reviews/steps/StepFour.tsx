@@ -68,8 +68,8 @@ const StepFour = ({
         Additional details (optional)
       </h2>
       )}
-      {showDetails && (
       {/* Review Headline - Updated label for clarity */}
+      {showDetails && (
       <div className="space-y-2">
         <Label htmlFor="review-title" className="flex items-center gap-2 font-medium">
           <span className="text-lg">📝</span>
