@@ -26,7 +26,6 @@ import { ComposerMediaPreview } from '@/components/feed/composer/ComposerMediaPr
 import { composerMuxState, isNewMuxVideo, mediaIdentity, preparedComposerMedia } from '@/utils/composerVideoReadiness';
 import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
 import { useLocation as useLocationAccess } from '@/contexts/LocationContext';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   decideFinishedUpload,
