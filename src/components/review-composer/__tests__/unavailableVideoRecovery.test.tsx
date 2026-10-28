@@ -58,6 +58,7 @@ describe('real review/timeline submit-handler recovery', () => {
       const field = kind === 'review' ? 'Review text' : 'Update Comment *';
       fireEvent.change(screen.getByLabelText(field), { target: { value: 'all my written work' } });
       const submit = kind === 'review' ? edit ? 'Save changes' : 'Publish' : edit ? 'Save update' : 'Add update';
+      await waitFor(() => expect(screen.getByRole('button', { name: submit })).toBeEnabled());
       fireEvent.click(screen.getByRole('button', { name: submit }));
       await waitFor(() => expect(mock.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive', title: 'Video no longer available' })));
       expect(mock.save).toHaveBeenCalledOnce();
