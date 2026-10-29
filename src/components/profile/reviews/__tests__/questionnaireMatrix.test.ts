@@ -15,39 +15,39 @@ import {
 const EXPECTED: Record<string, { fields: string[]; repeatIntentLabel: string | null }> = {
   food: {
     fields: ['would_recommend', 'repeat_intent', 'portion', 'food_tags'],
-    repeatIntentLabel: 'Order again?',
+    repeatIntentLabel: 'Would you order it again?',
   },
   place: {
     fields: ['would_recommend', 'repeat_intent', 'stood_out', 'best_for'],
-    repeatIntentLabel: 'Go back?',
+    repeatIntentLabel: 'Would you visit again?',
   },
   product: {
     fields: ['would_recommend', 'repeat_intent', 'value', 'stood_out'],
-    repeatIntentLabel: 'Buy again?',
+    repeatIntentLabel: 'Would you buy it again?',
   },
   brand: {
     fields: ['would_recommend', 'repeat_intent', 'trust', 'stood_out'],
-    repeatIntentLabel: 'Buy from them again?',
+    repeatIntentLabel: 'Would you buy from this brand again?',
   },
   movie: {
     fields: ['would_recommend', 'repeat_intent', 'stood_out'],
-    repeatIntentLabel: 'Rewatch?',
+    repeatIntentLabel: 'Would you watch it again?',
   },
   tv_show: {
     fields: ['would_recommend', 'repeat_intent', 'worth_time', 'stood_out'],
-    repeatIntentLabel: 'Watch more?',
+    repeatIntentLabel: 'Would you keep watching?',
   },
   book: {
     fields: ['would_recommend', 'repeat_intent', 'worth_time', 'stood_out'],
-    repeatIntentLabel: 'Read again?',
+    repeatIntentLabel: 'Would you read it again?',
   },
   game: {
     fields: ['would_recommend', 'repeat_intent', 'worth_time', 'stood_out'],
-    repeatIntentLabel: 'Play again?',
+    repeatIntentLabel: 'Would you play it again?',
   },
   app: {
     fields: ['would_recommend', 'repeat_intent', 'solves_problem', 'stood_out'],
-    repeatIntentLabel: 'Keep using?',
+    repeatIntentLabel: 'Would you keep using it?',
   },
   course: {
     fields: ['would_recommend', 'worth_time', 'stood_out', 'best_for'],
@@ -55,19 +55,19 @@ const EXPECTED: Record<string, { fields: string[]; repeatIntentLabel: string | n
   },
   service: {
     fields: ['would_recommend', 'repeat_intent', 'value', 'stood_out'],
-    repeatIntentLabel: 'Use again?',
+    repeatIntentLabel: 'Would you use this service again?',
   },
   professional: {
     fields: ['would_recommend', 'repeat_intent', 'trust', 'stood_out'],
-    repeatIntentLabel: 'Work with them again?',
+    repeatIntentLabel: 'Would you work with them again?',
   },
   event: {
     fields: ['would_recommend', 'repeat_intent', 'worth_time', 'stood_out'],
-    repeatIntentLabel: 'Attend again?',
+    repeatIntentLabel: 'Would you attend again?',
   },
   experience: {
     fields: ['would_recommend', 'repeat_intent', 'worth_time', 'stood_out'],
-    repeatIntentLabel: 'Do again?',
+    repeatIntentLabel: 'Would you do it again?',
   },
   others: {
     fields: ['would_recommend', 'repeat_intent', 'stood_out'],
