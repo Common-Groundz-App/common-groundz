@@ -35,6 +35,13 @@ interface StepFourProps {
    * single-page composer renders each slice once, so every input exists once.
    */
   part?: 'all' | 'text' | 'details' | 'visibility';
+  /** New composer only: hide the headline input (legacy popup unchanged). */
+  hideHeadline?: boolean;
+  /** New composer only: entity-aware thoughts label/placeholder. */
+  thoughtsLabel?: string;
+  thoughtsPlaceholder?: string;
+  /** New composer only: questionnaire field ids rendered elsewhere. */
+  excludeFieldIds?: readonly string[];
 }
 
 const StepFour = ({
@@ -55,6 +62,10 @@ const StepFour = ({
   onVisibilityChange,
   nonPublicLockedReason,
   part = 'all',
+  hideHeadline = false,
+  thoughtsLabel,
+  thoughtsPlaceholder,
+  excludeFieldIds,
 }: StepFourProps) => {
   const locked = !!nonPublicLockedReason;
   const all = part === 'all';
@@ -69,7 +80,7 @@ const StepFour = ({
       </h2>
       )}
       {/* Review Headline - Updated label for clarity */}
-      {showDetails && (
+      {showDetails && !hideHeadline && (
       <div className="space-y-2">
         <Label htmlFor="review-title" className="flex items-center gap-2 font-medium">
           <span className="text-lg">📝</span>
@@ -90,13 +101,13 @@ const StepFour = ({
       <div className="space-y-2">
         <Label htmlFor="description" className="flex items-center gap-2 font-medium">
           <span className="text-lg">💬</span>
-          <span>Your thoughts</span>
+          <span>{thoughtsLabel ?? 'Your thoughts'}</span>
         </Label>
         <Textarea 
           id="description"
           value={description}
           onChange={(e) => onDescriptionChange(e.target.value)}
-          placeholder="Tell us what you liked or didn't like..."
+          placeholder={thoughtsPlaceholder ?? "Tell us what you liked or didn't like..."}
           rows={5}
           className="border-brand-orange/30 focus-visible:ring-brand-orange/30 resize-none transition-all duration-200"
         />
@@ -125,6 +136,7 @@ const StepFour = ({
         onTextChange={onAnswerTextChange}
         onChoiceChange={onAnswerChoiceChange}
         onCuratedChange={onAnswerCuratedChange}
+        excludeFieldIds={excludeFieldIds}
       />
       </>)}
       

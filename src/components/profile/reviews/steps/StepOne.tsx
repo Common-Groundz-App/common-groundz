@@ -8,9 +8,11 @@ interface StepOneProps {
   rating: number;
   onChange: (rating: number) => void;
   showError?: boolean;
+  /** New composer only: neutral secondary feedback (legacy popup unchanged). */
+  feedbackText?: string;
 }
 
-const StepOne = ({ rating, onChange, showError = false }: StepOneProps) => {
+const StepOne = ({ rating, onChange, showError = false, feedbackText }: StepOneProps) => {
   return (
     <div className="flex flex-col items-center py-10 px-4 space-y-6 w-full">
       <h2 className="text-xl font-medium text-center">
@@ -39,13 +41,13 @@ const StepOne = ({ rating, onChange, showError = false }: StepOneProps) => {
         </div>
       ) : (
         <p className="text-center text-muted-foreground">
-          {rating === 0 
+          {feedbackText ?? (rating === 0 
             ? "Tap on the rings to rate your experience" 
             : rating < 3 
               ? "We're sorry to hear that. Your feedback helps improve!"
               : rating < 4 
                 ? "Thanks for your honest rating!"
-                : "Awesome! We're glad you had a great experience!"}
+                : "Awesome! We're glad you had a great experience!")}
         </p>
       )}
     </div>

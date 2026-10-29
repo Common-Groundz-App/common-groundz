@@ -38,6 +38,8 @@ export interface QuestionnaireSectionsProps {
   onTextChange: (fieldId: string, value: string) => void;
   onChoiceChange: (fieldId: string, value: string | undefined) => void;
   onCuratedChange: (fieldId: string, value: CuratedTagAnswer) => void;
+  /** Field ids rendered elsewhere (e.g. elevated recommendation); skipped here. */
+  excludeFieldIds?: readonly string[];
 }
 
 const FieldRenderer: React.FC<{
@@ -129,12 +131,18 @@ const QuestionnaireSections: React.FC<QuestionnaireSectionsProps> = ({
   onTextChange,
   onChoiceChange,
   onCuratedChange,
+  excludeFieldIds,
 }) => {
-  if (config.sections.length === 0) return null;
+  const sections = excludeFieldIds?.length
+    ? config.sections
+        .map((s) => ({ ...s, fields: s.fields.filter((f) => !excludeFieldIds.includes(f.id)) }))
+        .filter((s) => s.fields.length > 0)
+    : config.sections;
+  if (sections.length === 0) return null;
 
   return (
     <>
-      {config.sections.map((section) => (
+      {sections.map((section) => (
         <div key={section.id} className="space-y-2">
           <Label className="flex items-center gap-2 font-medium">
             {section.icon && <span className="text-lg">{section.icon}</span>}
