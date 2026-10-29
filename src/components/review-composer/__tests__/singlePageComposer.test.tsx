@@ -32,7 +32,7 @@ vi.mock('@/components/profile/reviews/steps/StepFour', () => ({
     return <>
       {p.part === 'text' && <textarea aria-label="Your thoughts" value={p.description} onChange={(e) => p.onDescriptionChange(e.target.value)} />}
       {p.part === 'details' && <>
-        <input aria-label="Review headline" value={p.title} onChange={(e) => p.onTitleChange(e.target.value)} />
+        {!p.hideHeadline && <input aria-label="Review headline" value={p.title} onChange={(e) => p.onTitleChange(e.target.value)} />}
         <input aria-label="Custom tag draft" value={draft} onChange={(e) => setDraft(e.target.value)} />
       </>}
       {p.part === 'visibility' && ['public', 'circle_only', 'private'].map((v) => <button key={v} onClick={() => p.onVisibilityChange(v)}>Visibility {v}</button>)}
@@ -87,14 +87,11 @@ describe('single-page review composer', () => {
     expect(panel.hidden).toBe(true);
     fireEvent.click(toggle);
     expect(panel.hidden).toBe(false);
-    const headline = screen.getByLabelText('Review headline');
-    fireEvent.change(headline, { target: { value: 'My headline' } });
+    expect(screen.queryByLabelText('Review headline')).toBeNull();
     fireEvent.change(screen.getByLabelText('Custom tag draft'), { target: { value: 'unfinished tag' } });
     fireEvent.click(toggle);
     expect(panel.hidden).toBe(true);
     fireEvent.click(toggle);
-    expect(screen.getByLabelText('Review headline')).toBe(headline);
-    expect(screen.getByLabelText('Review headline')).toHaveValue('My headline');
     expect(screen.getByLabelText('Custom tag draft')).toHaveValue('unfinished tag');
   });
 
@@ -125,13 +122,12 @@ describe('single-page review composer', () => {
     render(<ReviewComposerScreen {...createProps} />, { wrapper });
     fireEvent.click(screen.getByText('Rate 4'));
     fireEvent.change(screen.getByLabelText('Your thoughts'), { target: { value: 'Great product' } });
-    fireEvent.change(screen.getByLabelText('Review headline'), { target: { value: 'Worth it' } });
     fireEvent.click(screen.getByText('Visibility circle_only'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() => expect(mock.save).toHaveBeenCalledOnce());
     expect(mock.payload).toMatchObject({
-      entity_id: 'subject', rating: 4, description: 'Great product', subtitle: 'Worth it', visibility: 'circle_only', media: [],
+      entity_id: 'subject', rating: 4, description: 'Great product', subtitle: '', visibility: 'circle_only', media: [],
     });
   });
 

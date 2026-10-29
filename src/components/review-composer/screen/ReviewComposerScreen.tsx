@@ -39,7 +39,9 @@ import { DIALOG_COPY, type GuardMode } from './historyGuard';
 import { useHistoryGuard } from './useHistoryGuard';
 import { markLocationPromptShown, markLocationPromptSkipped, shouldShowLocationPrompt } from './locationPromptPolicy';
 import type { EntityAdapter } from '@/components/profile/circles/types';
-import type { QuestionnaireConfig } from '@/components/profile/reviews/questionnaire/registry';
+import { WOULD_RECOMMEND_FIELD, type QuestionnaireConfig } from '@/components/profile/reviews/questionnaire/registry';
+import ChoiceChips from '@/components/profile/reviews/questionnaire/ChoiceChips';
+import { neutralRatingFeedback, thoughtsPromptFor } from '../prompts';
 import type { MediaItem, MediaUploadState } from '@/types/media';
 import { parseEntityTypeAtBoundary } from '@/services/entityType';
 import { createReview, updateReview } from '@/services/review/core';
@@ -271,6 +273,9 @@ export function ReviewComposerScreen(props: Props) {
       .filter((s) => s.fields.length > 0);
     return { ...config, sections };
   }, [q.resolution, qEnabled, foodEnabled]);
+  // The registry field, rendered once below the rings when this subject's questionnaire offers it.
+  const showRecommendation = !!renderedConfig?.sections.some((s) => s.fields.some((f) => f.id === WOULD_RECOMMEND_FIELD.id));
+  const thoughtsPrompt = thoughtsPromptFor(renderedConfig?.key);
 
   // Captures this render's session: a late finish is decided against the
   // session the upload started in, even after the screen has closed.
@@ -566,7 +571,19 @@ export function ReviewComposerScreen(props: Props) {
       <div className="min-h-[360px] space-y-6">
         {onStep(SID.rating) && (
           <div id="composer-section-rating" tabIndex={-1} className="outline-none">
-            <StepOne rating={state.values.rating ?? 0} onChange={(r) => setValue('rating', r)} showError={!!err('rating')} />
+            <StepOne rating={state.values.rating ?? 0} onChange={(r) => setValue('rating', r)} showError={!!err('rating')} feedbackText={neutralRatingFeedback(state.values.rating ?? 0)} />
+            {showRecommendation && (
+              <div id="composer-section-recommendation" className="mx-auto flex max-w-md flex-col items-center gap-1 px-4 pb-2 text-center [&_[role=group]]:justify-center">
+                <ChoiceChips
+                  fieldId={`composer-${WOULD_RECOMMEND_FIELD.id}`}
+                  label={WOULD_RECOMMEND_FIELD.label}
+                  options={WOULD_RECOMMEND_FIELD.options ?? []}
+                  value={state.values.questionnaire.choices[WOULD_RECOMMEND_FIELD.id]}
+                  onChange={(value) => dispatch({ type: 'SET_QUESTIONNAIRE_CHOICE', sessionKey, fieldId: WOULD_RECOMMEND_FIELD.id, value: value ?? null })}
+                />
+                <p className="text-xs text-muted-foreground">Optional</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -605,6 +622,8 @@ export function ReviewComposerScreen(props: Props) {
             <StepFour
               part="text"
               config={renderedConfig}
+              thoughtsLabel={thoughtsPrompt.label}
+              thoughtsPlaceholder={thoughtsPrompt.placeholder}
               answers={{
                 tags: { food_tags: state.values.foodTags },
                 text: {},
@@ -723,7 +742,7 @@ export function ReviewComposerScreen(props: Props) {
             >
               <span className="space-y-0.5">
                 <span className="block text-lg font-semibold text-foreground">Add more details</span>
-                <span className="block text-sm text-muted-foreground">Headline, when you experienced it, and {renderedConfig?.subjectLabel ?? 'experience'}-specific questions — all optional</span>
+                <span className="block text-sm text-muted-foreground">When you experienced it and {renderedConfig?.subjectLabel ?? 'experience'}-specific questions — all optional</span>
               </span>
               <ChevronDown aria-hidden="true" className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${detailsOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -734,6 +753,8 @@ export function ReviewComposerScreen(props: Props) {
             <StepFour
               part="details"
               config={renderedConfig}
+              hideHeadline
+              excludeFieldIds={[WOULD_RECOMMEND_FIELD.id]}
               answers={{
                 tags: { food_tags: state.values.foodTags },
                 text: {},

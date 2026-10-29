@@ -120,7 +120,7 @@ const PORTION_OPTIONS: readonly QuestionnaireOption[] = [
   { value: 'large', label: 'Large' },
 ];
 
-const WOULD_RECOMMEND_FIELD: QuestionnaireField = {
+export const WOULD_RECOMMEND_FIELD: QuestionnaireField = {
   id: 'would_recommend',
   kind: 'single-choice',
   label: 'Would you recommend it?',
