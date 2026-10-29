@@ -70,6 +70,7 @@ const nodeIncludes = [
   'src/components/profile/reviews/__tests__/curatedTagInput.test.ts',
   'src/components/profile/reviews/__tests__/questionnaireEnvelope.test.ts',
   'src/components/review-composer/__tests__/composerFoundation.test.ts',
+  'src/components/review-composer/__tests__/phase2Prompts.test.ts',
   'src/components/review-composer/__tests__/composerPage3b.test.ts',
   'src/components/review-composer/__tests__/composer3bCloseout.test.ts',
   'src/components/review-composer/__tests__/composer3cTimeline.test.ts',
