@@ -220,7 +220,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     subjectLabel: 'movie',
     showLocationPrompt: false,
     sections: [
-      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Rewatch?')]),
+      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you watch it again?')]),
       stoodOutSection('stood_out:movie'),
     ],
   },
@@ -229,7 +229,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     subjectLabel: 'book',
     showLocationPrompt: false,
     sections: [
-      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Read again?'), WORTH_TIME_FIELD]),
+      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you read it again?'), WORTH_TIME_FIELD]),
       stoodOutSection('stood_out:book'),
     ],
   },
@@ -238,7 +238,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     subjectLabel: 'show',
     showLocationPrompt: false,
     sections: [
-      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Watch more?'), WORTH_TIME_FIELD]),
+      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you keep watching?'), WORTH_TIME_FIELD]),
       stoodOutSection('stood_out:tv_show'),
     ],
   },
@@ -259,7 +259,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([
         WOULD_RECOMMEND_FIELD,
-        repeatIntentField('Keep using?'),
+        repeatIntentField('Would you keep using it?'),
         SOLVES_PROBLEM_FIELD,
       ]),
       stoodOutSection('stood_out:app'),
@@ -270,7 +270,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     subjectLabel: 'game',
     showLocationPrompt: false,
     sections: [
-      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Play again?'), WORTH_TIME_FIELD]),
+      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you play it again?'), WORTH_TIME_FIELD]),
       stoodOutSection('stood_out:game'),
     ],
   },
@@ -279,7 +279,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     subjectLabel: 'experience',
     showLocationPrompt: true,
     sections: [
-      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Do again?'), WORTH_TIME_FIELD]),
+      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you do it again?'), WORTH_TIME_FIELD]),
       stoodOutSection('stood_out:experience'),
     ],
   },
@@ -288,7 +288,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     subjectLabel: 'dish',
     showLocationPrompt: true,
     sections: [
-      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Order again?'), PORTION_FIELD]),
+      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you order it again?'), PORTION_FIELD]),
       FOOD_TAGS_SECTION,
     ],
   },
@@ -297,7 +297,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     subjectLabel: 'product',
     showLocationPrompt: false,
     sections: [
-      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Buy again?'), VALUE_FIELD]),
+      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you buy it again?'), VALUE_FIELD]),
       stoodOutSection('stood_out:product'),
     ],
   },
@@ -306,7 +306,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     subjectLabel: 'place',
     showLocationPrompt: true,
     sections: [
-      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Go back?')]),
+      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you visit again?')]),
       stoodOutSection('stood_out:place'),
       bestForSection('best_for:place'),
     ],
@@ -318,7 +318,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([
         WOULD_RECOMMEND_FIELD,
-        repeatIntentField('Buy from them again?'),
+        repeatIntentField('Would you buy from this brand again?'),
         TRUST_FIELD,
       ]),
       stoodOutSection('stood_out:brand'),
@@ -329,7 +329,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     subjectLabel: 'event',
     showLocationPrompt: true,
     sections: [
-      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Attend again?'), WORTH_TIME_FIELD]),
+      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you attend again?'), WORTH_TIME_FIELD]),
       stoodOutSection('stood_out:event'),
     ],
   },
@@ -338,7 +338,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     subjectLabel: 'service',
     showLocationPrompt: false,
     sections: [
-      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Use again?'), VALUE_FIELD]),
+      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you use this service again?'), VALUE_FIELD]),
       stoodOutSection('stood_out:service'),
     ],
   },
@@ -349,7 +349,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([
         WOULD_RECOMMEND_FIELD,
-        repeatIntentField('Work with them again?'),
+        repeatIntentField('Would you work with them again?'),
         TRUST_FIELD,
       ]),
       stoodOutSection('stood_out:professional'),
