@@ -16,3 +16,4 @@
 - Silent Mux reconciliation runs in an independent fault-isolated block of the existing live-run start hook, using trusted-kind uploads and existing saved-reference/enqueue/rescue helpers; this closes unsaved-session leaks without changing deletion mechanics or scheduling.
 
 - Composer unavailable-video recovery is UI-only, keyed by rejected Mux upload IDs and recognized only from the attachment barrier signal; unrelated field edits cannot unblock the same upload, and database save/rescue remains authoritative.
+- Review tag pickers render through the presentational `UnifiedTagSelector`, with per-purpose adapters owning storage shape and caps (`getCuratedTagLimits` per tag set); one consistent UI without merging questionnaire and Food data models.
