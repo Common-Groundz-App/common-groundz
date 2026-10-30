@@ -153,14 +153,6 @@ const SOLVES_PROBLEM_FIELD = extraChoiceField(
 );
 const PORTION_FIELD = extraChoiceField('portion', 'Portion size', PORTION_OPTIONS);
 
-const stoodOutField = (tagSet: CuratedTagSet): QuestionnaireField => ({
-  id: 'stood_out',
-  kind: 'tags',
-  tagSet,
-  label: 'What stood out?',
-  helperText: 'Pick up to 5, or add your own.',
-  required: false,
-});
 
 const bestForField = (tagSet: CuratedTagSet): QuestionnaireField => ({
   id: 'best_for',
