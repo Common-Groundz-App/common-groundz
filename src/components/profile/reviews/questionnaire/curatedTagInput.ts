@@ -1,18 +1,21 @@
 /**
- * Phase 3C Stage 2 — pure input rules for `CuratedTagSelector`.
+ * Pure input rules for `CuratedTagSelector` / `UnifiedTagSelector`.
  *
  * No React. The component is a thin shell over these functions so the caps,
  * normalization and grandfathering rules are unit-testable in the node suite.
  *
- * Frozen rules:
- * - 5 combined (selected + custom), max 3 custom, 40 characters each.
+ * Rules:
+ * - Caps are per purpose (`getCuratedTagLimits`); defaults to
+ *   `CURATED_TAG_LIMITS` (5 combined, 3 custom, 40 characters).
  * - NFC-normalized and trimmed before case-insensitive dedupe, while PRESERVING
  *   the user's casing. Never blank.
+ * - A custom entry matching a curated suggestion (by label or stored code)
+ *   selects that suggestion instead of creating a custom duplicate.
  * - Caps govern CREATION and MODIFICATION, not passive viewing. Stored values
  *   over the cap are displayed and preserved intact, never truncated.
  * - `FoodTagSelector` is exempt from all of this and is not routed through here.
  */
-import { CURATED_TAG_LIMITS } from './vocabularies';
+import { CURATED_TAG_LIMITS, type CuratedTag, type CuratedTagLimits } from './vocabularies';
 
 export interface CuratedTagAnswer {
   selected: string[];
@@ -34,12 +37,18 @@ export function countCombined(answer: CuratedTagAnswer): number {
 }
 
 /** Passive viewing is never blocked; this only gates NEW input. */
-export function isAtCombinedCap(answer: CuratedTagAnswer): boolean {
-  return countCombined(answer) >= CURATED_TAG_LIMITS.maxCombined;
+export function isAtCombinedCap(
+  answer: CuratedTagAnswer,
+  limits: CuratedTagLimits = CURATED_TAG_LIMITS,
+): boolean {
+  return countCombined(answer) >= limits.maxCombined;
 }
 
-export function isAtCustomCap(answer: CuratedTagAnswer): boolean {
-  return answer.custom.length >= CURATED_TAG_LIMITS.maxCustom;
+export function isAtCustomCap(
+  answer: CuratedTagAnswer,
+  limits: CuratedTagLimits = CURATED_TAG_LIMITS,
+): boolean {
+  return answer.custom.length >= limits.maxCustom;
 }
 
 export type CuratedTagRejection =
@@ -59,6 +68,7 @@ export interface CuratedTagMutation {
 export function toggleCuratedTag(
   answer: CuratedTagAnswer,
   value: string,
+  limits: CuratedTagLimits = CURATED_TAG_LIMITS,
 ): CuratedTagMutation {
   if (answer.selected.includes(value)) {
     return {
@@ -66,16 +76,21 @@ export function toggleCuratedTag(
       changed: true,
     };
   }
-  if (isAtCombinedCap(answer)) {
+  if (isAtCombinedCap(answer, limits)) {
     return { answer, changed: false, rejection: 'combined_cap' };
   }
   return { answer: { ...answer, selected: [...answer.selected, value] }, changed: true };
 }
 
-export function addCustomTag(answer: CuratedTagAnswer, raw: string): CuratedTagMutation {
+export function addCustomTag(
+  answer: CuratedTagAnswer,
+  raw: string,
+  limits: CuratedTagLimits = CURATED_TAG_LIMITS,
+  vocabulary: readonly CuratedTag[] = [],
+): CuratedTagMutation {
   const value = normalizeCustomTag(raw);
   if (!value) return { answer, changed: false, rejection: 'blank' };
-  if (value.length > CURATED_TAG_LIMITS.maxCustomLength) {
+  if (value.length > limits.maxCustomLength) {
     return { answer, changed: false, rejection: 'too_long' };
   }
   const folded = foldCase(value);
@@ -83,8 +98,18 @@ export function addCustomTag(answer: CuratedTagAnswer, raw: string): CuratedTagM
   if (existing.includes(folded)) {
     return { answer, changed: false, rejection: 'duplicate' };
   }
-  if (isAtCustomCap(answer)) return { answer, changed: false, rejection: 'custom_cap' };
-  if (isAtCombinedCap(answer)) return { answer, changed: false, rejection: 'combined_cap' };
+  // Typing a suggestion's label selects the suggestion (keeps its stored code).
+  const curatedMatch = vocabulary.find(
+    (t) => foldCase(t.label) === folded || foldCase(t.value) === folded,
+  );
+  if (curatedMatch) {
+    if (answer.selected.includes(curatedMatch.value)) {
+      return { answer, changed: false, rejection: 'duplicate' };
+    }
+    return toggleCuratedTag(answer, curatedMatch.value, limits);
+  }
+  if (isAtCustomCap(answer, limits)) return { answer, changed: false, rejection: 'custom_cap' };
+  if (isAtCombinedCap(answer, limits)) return { answer, changed: false, rejection: 'combined_cap' };
   // The user's casing is preserved exactly as typed (after NFC + trim).
   return { answer: { ...answer, custom: [...answer.custom, value] }, changed: true };
 }
@@ -94,18 +119,21 @@ export function removeCustomTag(answer: CuratedTagAnswer, value: string): Curate
   return { answer: { ...answer, custom: answer.custom.filter((v) => v !== value) }, changed: true };
 }
 
-export function rejectionMessage(rejection: CuratedTagRejection): string {
+export function rejectionMessage(
+  rejection: CuratedTagRejection,
+  limits: CuratedTagLimits = CURATED_TAG_LIMITS,
+): string {
   switch (rejection) {
     case 'blank':
       return 'Type something first.';
     case 'too_long':
-      return `Keep it under ${CURATED_TAG_LIMITS.maxCustomLength} characters.`;
+      return `Keep it under ${limits.maxCustomLength} characters.`;
     case 'duplicate':
       return "You've already added that one.";
     case 'custom_cap':
-      return `You can add up to ${CURATED_TAG_LIMITS.maxCustom} of your own.`;
+      return `You can add up to ${limits.maxCustom} of your own.`;
     case 'combined_cap':
-      return `You can pick up to ${CURATED_TAG_LIMITS.maxCombined} in total.`;
+      return `You can pick up to ${limits.maxCombined} in total.`;
   }
 }
 
