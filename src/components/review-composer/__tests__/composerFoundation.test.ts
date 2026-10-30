@@ -253,6 +253,16 @@ describe('section availability', () => {
     const food = sectionsOnStep(s, 3).find((x) => x.id === 'foodTags');
     expect(food?.availability).toBe('enabled');
   });
+  it('switching subject drops liked/could_be_better answers', () => {
+    let s = initialComposerState({ sessionKey: 'k', mode: 'create-review' });
+    s = composerReducer(s, { type: 'SUBJECT_CHANGED', sessionKey: 'k', subject: BOOK });
+    s = composerReducer(s, { type: 'SET_QUESTIONNAIRE_CURATED', sessionKey: 'k', fieldId: 'liked', value: { selected: ['insightful'], custom: [] } });
+    s = composerReducer(s, { type: 'SET_QUESTIONNAIRE_CURATED', sessionKey: 'k', fieldId: 'could_be_better', value: { selected: ['repetitive'], custom: [] } });
+    expect(Object.keys(s.values.questionnaire.curated).sort()).toEqual(['could_be_better', 'liked']);
+    s = composerReducer(s, { type: 'SUBJECT_CHANGED', sessionKey: 'k', subject: FOOD });
+    expect(s.values.questionnaire.curated).toEqual({});
+    expect(s.questionnaireTouched).toEqual([]);
+  });
   it('food tags are subject-incompatible on a book and never saved', () => {
     let s = initialComposerState({ sessionKey: 'k', mode: 'create-review', preselectedSubject: BOOK });
     s = { ...s, values: { ...s.values, foodTags: ['stale'], rating: 4 } };

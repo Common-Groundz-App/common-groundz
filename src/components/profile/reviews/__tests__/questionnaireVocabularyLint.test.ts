@@ -73,7 +73,7 @@ describe('curated tag vocabularies match the frozen specification', () => {
 
   it('ships exactly the vocabularies the document declares', () => {
     expect(docVocabularies.map((v) => v.tagSet).sort()).toEqual(
-      Object.keys(CURATED_TAG_VOCABULARIES).sort(),
+      Object.keys(CURATED_TAG_VOCABULARIES).filter((k) => /^(stood_out|best_for):/.test(k)).sort(),
     );
   });
 

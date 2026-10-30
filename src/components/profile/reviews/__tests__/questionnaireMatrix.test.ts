@@ -18,59 +18,59 @@ const EXPECTED: Record<string, { fields: string[]; repeatIntentLabel: string | n
     repeatIntentLabel: 'Would you order it again?',
   },
   place: {
-    fields: ['would_recommend', 'repeat_intent', 'stood_out', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you visit again?',
   },
   product: {
-    fields: ['would_recommend', 'repeat_intent', 'value', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'value', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Would you buy it again?',
   },
   brand: {
-    fields: ['would_recommend', 'repeat_intent', 'trust', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'trust', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Would you buy from this brand again?',
   },
   movie: {
-    fields: ['would_recommend', 'repeat_intent', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Would you watch it again?',
   },
   tv_show: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Would you keep watching?',
   },
   book: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Would you read it again?',
   },
   game: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Would you play it again?',
   },
   app: {
-    fields: ['would_recommend', 'repeat_intent', 'solves_problem', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'solves_problem', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Would you keep using it?',
   },
   course: {
-    fields: ['would_recommend', 'worth_time', 'stood_out', 'best_for'],
+    fields: ['would_recommend', 'worth_time', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: null,
   },
   service: {
-    fields: ['would_recommend', 'repeat_intent', 'value', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'value', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Would you use this service again?',
   },
   professional: {
-    fields: ['would_recommend', 'repeat_intent', 'trust', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'trust', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Would you work with them again?',
   },
   event: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Would you attend again?',
   },
   experience: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Would you do it again?',
   },
   others: {
-    fields: ['would_recommend', 'repeat_intent', 'stood_out'],
+    fields: ['would_recommend', 'repeat_intent', 'liked', 'could_be_better'],
     repeatIntentLabel: 'Choose again?',
   },
 };
@@ -129,7 +129,7 @@ describe('frozen v1 questionnaire matrix', () => {
   it('keeps food on the untouched FoodTagSelector vocabulary and gives it no generic stood_out', () => {
     const fields = QUESTIONNAIRE_REGISTRY.food.sections.flatMap((s) => s.fields);
     expect(fields.find((f) => f.id === 'food_tags')?.tagSet).toBe('food');
-    expect(fields.some((f) => f.id === 'stood_out')).toBe(false);
+    expect(fields.some((f) => ['stood_out', 'liked', 'could_be_better'].includes(f.id))).toBe(false);
     expect(fields.some((f) => f.id === 'value')).toBe(false);
   });
 

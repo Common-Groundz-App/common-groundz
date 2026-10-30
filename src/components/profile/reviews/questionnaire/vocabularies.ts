@@ -274,6 +274,74 @@ const BEST_FOR_COURSE: readonly CuratedTag[] = [
  * the existing `FoodTagSelector` owns its own 13-tag vocabulary and stays
  * regression-identical, exempt from the curated caps.
  */
+/* ------------------------------------------------------------------ *
+ * Phase 4B.2 — observation vocabularies (`liked` / `could_be_better`).
+ *
+ * Derived from the frozen `stood_out` lists by sentiment so stable ids keep one
+ * meaning everywhere. Neutral tags appear in neither list. The legacy
+ * `stood_out:*` vocabularies stay untouched for hydration/compatibility only.
+ * ------------------------------------------------------------------ */
+
+type ObservationType =
+  | 'place' | 'product' | 'brand' | 'movie' | 'tv_show' | 'book' | 'game' | 'app'
+  | 'course' | 'service' | 'professional' | 'event' | 'experience' | 'others';
+
+const STOOD_OUT_BY_TYPE: Record<ObservationType, readonly CuratedTag[]> = {
+  place: STOOD_OUT_PLACE,
+  product: STOOD_OUT_PRODUCT,
+  brand: STOOD_OUT_BRAND,
+  movie: STOOD_OUT_MOVIE,
+  tv_show: STOOD_OUT_TV_SHOW,
+  book: STOOD_OUT_BOOK,
+  game: STOOD_OUT_GAME,
+  app: STOOD_OUT_APP,
+  course: STOOD_OUT_COURSE,
+  service: STOOD_OUT_SERVICE,
+  professional: STOOD_OUT_PROFESSIONAL,
+  event: STOOD_OUT_EVENT,
+  experience: STOOD_OUT_EXPERIENCE,
+  others: STOOD_OUT_OTHERS,
+};
+
+/** Approved Phase 4B.2 negative additions (new stable ids). */
+const NEGATIVE_ADDITIONS: Partial<Record<ObservationType, readonly CuratedTag[]>> = {
+  movie: [{ value: 'poor_pacing', label: 'Poor pacing', emoji: '🐌', sentiment: 'negative' }],
+  tv_show: [{ value: 'poor_pacing', label: 'Poor pacing', emoji: '🐌', sentiment: 'negative' }],
+  book: [{ value: 'hard_to_follow', label: 'Hard to follow', emoji: '🤯', sentiment: 'negative' }],
+  game: [{ value: 'poor_controls', label: 'Poor controls', emoji: '🕹️', sentiment: 'negative' }],
+  course: [{ value: 'unclear_explanations', label: 'Unclear explanations', emoji: '❓', sentiment: 'negative' }],
+  professional: [
+    { value: 'unprofessional_behavior', label: 'Unprofessional behavior', emoji: '⚠️', sentiment: 'negative' },
+  ],
+  event: [{ value: 'poor_organization', label: 'Poor organization', emoji: '📋', sentiment: 'negative' }],
+  experience: [{ value: 'poor_value', label: 'Poor value', emoji: '💸', sentiment: 'negative' }],
+  others: [{ value: 'poor_quality', label: 'Poor quality', emoji: '👎', sentiment: 'negative' }],
+};
+
+/** Presentation-only relabels; ids unchanged. */
+const LABEL_OVERRIDES: Record<string, string> = { touristy: 'Too touristy' };
+
+function relabel(tag: CuratedTag): CuratedTag {
+  const label = LABEL_OVERRIDES[tag.value];
+  return label ? { ...tag, label } : tag;
+}
+
+function likedFor(type: ObservationType): readonly CuratedTag[] {
+  return STOOD_OUT_BY_TYPE[type].filter((t) => t.sentiment === 'positive').map(relabel);
+}
+
+function couldBeBetterFor(type: ObservationType): readonly CuratedTag[] {
+  return [
+    ...STOOD_OUT_BY_TYPE[type].filter((t) => t.sentiment === 'negative').map(relabel),
+    ...(NEGATIVE_ADDITIONS[type] ?? []),
+  ];
+}
+
+/**
+ * Every curated vocabulary, keyed by tag-set name. `food` is deliberately ABSENT:
+ * the existing `FoodTagSelector` owns its own 13-tag vocabulary and stays
+ * regression-identical, exempt from the curated caps.
+ */
 export const CURATED_TAG_VOCABULARIES = {
   'stood_out:place': STOOD_OUT_PLACE,
   'stood_out:product': STOOD_OUT_PRODUCT,
@@ -291,6 +359,34 @@ export const CURATED_TAG_VOCABULARIES = {
   'stood_out:others': STOOD_OUT_OTHERS,
   'best_for:place': BEST_FOR_PLACE,
   'best_for:course': BEST_FOR_COURSE,
+  'liked:place': likedFor('place'),
+  'liked:product': likedFor('product'),
+  'liked:brand': likedFor('brand'),
+  'liked:movie': likedFor('movie'),
+  'liked:tv_show': likedFor('tv_show'),
+  'liked:book': likedFor('book'),
+  'liked:game': likedFor('game'),
+  'liked:app': likedFor('app'),
+  'liked:course': likedFor('course'),
+  'liked:service': likedFor('service'),
+  'liked:professional': likedFor('professional'),
+  'liked:event': likedFor('event'),
+  'liked:experience': likedFor('experience'),
+  'liked:others': likedFor('others'),
+  'could_be_better:place': couldBeBetterFor('place'),
+  'could_be_better:product': couldBeBetterFor('product'),
+  'could_be_better:brand': couldBeBetterFor('brand'),
+  'could_be_better:movie': couldBeBetterFor('movie'),
+  'could_be_better:tv_show': couldBeBetterFor('tv_show'),
+  'could_be_better:book': couldBeBetterFor('book'),
+  'could_be_better:game': couldBeBetterFor('game'),
+  'could_be_better:app': couldBeBetterFor('app'),
+  'could_be_better:course': couldBeBetterFor('course'),
+  'could_be_better:service': couldBeBetterFor('service'),
+  'could_be_better:professional': couldBeBetterFor('professional'),
+  'could_be_better:event': couldBeBetterFor('event'),
+  'could_be_better:experience': couldBeBetterFor('experience'),
+  'could_be_better:others': couldBeBetterFor('others'),
 } as const satisfies Record<string, readonly CuratedTag[]>;
 
 export type CuratedTagSet = keyof typeof CURATED_TAG_VOCABULARIES;
@@ -306,5 +402,5 @@ export function findCuratedTag(tagSet: CuratedTagSet, value: string): CuratedTag
 
 /** Per-purpose caps, keyed by the tag set's field prefix. */
 export function getCuratedTagLimits(tagSet: CuratedTagSet): CuratedTagLimits {
-  return tagSet.startsWith('stood_out:') ? STOOD_OUT_TAG_LIMITS : CURATED_TAG_LIMITS;
+  return tagSet.startsWith('best_for:') ? CURATED_TAG_LIMITS : STOOD_OUT_TAG_LIMITS;
 }
