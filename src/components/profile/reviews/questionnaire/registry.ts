@@ -194,12 +194,40 @@ const choiceSection = (fields: readonly QuestionnaireField[]): QuestionnaireSect
   fields,
 });
 
-const stoodOutSection = (tagSet: CuratedTagSet): QuestionnaireSectionConfig => ({
-  id: 'stood_out',
-  title: 'What stood out',
-  icon: '✨',
-  fields: [stoodOutField(tagSet)],
+/**
+ * Phase 4B.2 — two independent observation groups replace the mixed
+ * `stood_out` question. Legacy `stood_out` answers are never rendered but
+ * survive saves via the envelope's untouched-key passthrough.
+ */
+const observationField = (
+  id: 'liked' | 'could_be_better',
+  label: string,
+  tagSet: CuratedTagSet,
+): QuestionnaireField => ({
+  id,
+  kind: 'tags',
+  tagSet,
+  label,
+  helperText: 'Pick up to 5, or add your own.',
+  required: false,
 });
+
+const stoodOutSection = (type: string): QuestionnaireSectionConfig[] => [
+  {
+    id: 'liked',
+    title: 'What did you like?',
+    icon: '👍',
+    fields: [observationField('liked', 'What did you like?', `liked:${type}` as CuratedTagSet)],
+  },
+  {
+    id: 'could_be_better',
+    title: 'What could be better?',
+    icon: '🛠️',
+    fields: [
+      observationField('could_be_better', 'What could be better?', `could_be_better:${type}` as CuratedTagSet),
+    ],
+  },
+];
 
 const bestForSection = (tagSet: CuratedTagSet): QuestionnaireSectionConfig => ({
   id: 'best_for',
