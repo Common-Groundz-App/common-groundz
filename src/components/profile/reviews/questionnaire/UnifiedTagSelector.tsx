@@ -102,7 +102,9 @@ const UnifiedTagSelector: React.FC<UnifiedTagSelectorProps> = ({
       )}
 
       {suggestions.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">Suggested tags</p>
+          <div className="flex flex-wrap gap-2">
           {suggestions.map((tag) => {
             const isSelected = selectedSuggestionIds.includes(tag.id);
             const blocked = !isSelected && atLimit;
