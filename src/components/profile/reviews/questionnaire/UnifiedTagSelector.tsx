@@ -2,7 +2,8 @@
  * Phase 4B.1 — shared, presentational tag selector.
  *
  * Layout: "Selected tags" (only when something is selected; suggestions and
- * custom entries together, each removable) → suggestion pills → custom input.
+ * custom entries together, each removable) → "Suggested tags" pills → custom
+ * input. The two headers keep the two look-alike pill lists visually distinct.
  * Holds no answer state: callers (adapters) own the data model and rules. The
  * only local state is the custom-tag draft, which survives chip interactions
  * and collapsing (the details panel stays mounted).
