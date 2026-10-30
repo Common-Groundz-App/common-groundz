@@ -100,4 +100,13 @@ describe('UnifiedTagSelector (curated adapter)', () => {
     expect(within(list).getByText('Old custom')).toBeTruthy();
     expect(screen.getByRole('button', { name: /Good service/, pressed: true })).toBeTruthy();
   });
+
+  it('labels the suggestion pool so it reads separately from the selected list', () => {
+    render(<Harness tagSet="stood_out:place" />);
+    expect(screen.getByText('Suggested tags')).toBeTruthy();
+    expect(screen.queryByText('Selected tags')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Great ambience/, pressed: false }));
+    expect(screen.getByText('Selected tags')).toBeTruthy();
+    expect(screen.getByText('Suggested tags')).toBeTruthy();
+  });
 });
