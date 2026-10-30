@@ -25,7 +25,7 @@ const validMetadata = {
     type: 'movie',
     answers: {
       would_recommend: 'yes',
-      stood_out: { selected: ['slow_pacing'], custom: ['Great practical effects'] },
+      could_be_better: { selected: ['predictable'], custom: ['Great practical effects'] },
     },
   },
 };
@@ -70,8 +70,8 @@ describe('hydration', () => {
       movie,
     );
     expect(hydrated.choices).toEqual({ would_recommend: 'yes' });
-    expect(hydrated.curated.stood_out).toEqual({
-      selected: ['slow_pacing'],
+    expect(hydrated.curated.could_be_better).toEqual({
+      selected: ['predictable'],
       custom: ['Great practical effects'],
     });
   });
@@ -84,7 +84,7 @@ describe('hydration', () => {
           type: 'movie',
           answers: {
             would_recommend: 'definitely',
-            stood_out: { selected: ['from_a_future_build'], custom: ['x'] },
+            could_be_better: { selected: ['from_a_future_build'], custom: ['x'] },
           },
         },
       },
@@ -92,7 +92,7 @@ describe('hydration', () => {
     );
     const hydrated = hydrateQuestionnaireAnswers(read, movie);
     expect(hydrated.choices).toEqual({});
-    expect(hydrated.curated.stood_out).toEqual({ selected: [], custom: ['x'] });
+    expect(hydrated.curated.could_be_better).toEqual({ selected: [], custom: ['x'] });
   });
 
   it('renders every recognized value even when the stored field is over cap', () => {
@@ -158,8 +158,8 @@ describe('patch building', () => {
       ...base,
       read: { status: 'absent' },
       choices: { would_recommend: 'yes' },
-      curated: { stood_out: { selected: [], custom: [] } },
-      touchedFieldIds: new Set(['would_recommend', 'stood_out']),
+      curated: { could_be_better: { selected: [], custom: [] } },
+      touchedFieldIds: new Set(['would_recommend', 'could_be_better']),
     });
     expect(patch.action).toBe('write');
     if (patch.action === 'write') {
@@ -185,14 +185,14 @@ describe('patch building', () => {
       ...base,
       read,
       choices: { would_recommend: 'yes' },
-      curated: { stood_out: { selected: ['overhyped'], custom: [] } },
-      touchedFieldIds: new Set(['stood_out']),
+      curated: { could_be_better: { selected: ['overhyped'], custom: [] } },
+      touchedFieldIds: new Set(['could_be_better']),
     });
     expect(patch.action).toBe('write');
     if (patch.action === 'write') {
       expect(patch.envelope.answers.a_future_field).toEqual({ anything: [1, 2, 3] });
       expect(patch.envelope.answers.would_recommend).toBe('yes');
-      expect(patch.envelope.answers.stood_out).toEqual({ selected: ['overhyped'] });
+      expect(patch.envelope.answers.could_be_better).toEqual({ selected: ['overhyped'] });
     }
   });
 
