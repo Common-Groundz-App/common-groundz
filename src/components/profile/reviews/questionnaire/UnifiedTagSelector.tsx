@@ -40,6 +40,8 @@ export interface UnifiedTagSelectorProps {
   /** No new selections or custom entries; removal stays available. */
   atLimit: boolean;
   limitPlaceholder?: string;
+  /** Custom input only (e.g. a lower custom cap). Defaults to `atLimit`. */
+  customDisabled?: boolean;
   maxCustomLength?: number;
   hint?: string | null;
 }
@@ -55,6 +57,7 @@ const UnifiedTagSelector: React.FC<UnifiedTagSelectorProps> = ({
   onSubmitCustom,
   atLimit,
   limitPlaceholder = 'Limit reached. Remove one to add more.',
+  customDisabled,
   maxCustomLength,
   hint,
 }) => {
@@ -63,8 +66,9 @@ const UnifiedTagSelector: React.FC<UnifiedTagSelectorProps> = ({
   const labelId = `${baseId}-label`;
   const helpId = `${baseId}-help`;
 
+  const inputBlocked = customDisabled ?? atLimit;
   const submit = () => {
-    if (atLimit) return;
+    if (inputBlocked) return;
     if (onSubmitCustom(draft)) setDraft('');
   };
 
@@ -129,10 +133,10 @@ const UnifiedTagSelector: React.FC<UnifiedTagSelectorProps> = ({
         <Input
           value={draft}
           maxLength={maxCustomLength}
-          disabled={atLimit}
+          disabled={inputBlocked}
           aria-label={`Add your own tag for ${label}`}
           aria-describedby={hint || helperText ? helpId : undefined}
-          placeholder={atLimit ? limitPlaceholder : 'Add your own…'}
+          placeholder={inputBlocked ? limitPlaceholder : 'Add your own…'}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -147,7 +151,7 @@ const UnifiedTagSelector: React.FC<UnifiedTagSelectorProps> = ({
           type="button"
           variant="outline"
           size="icon"
-          disabled={atLimit}
+          disabled={inputBlocked}
           onClick={submit}
           aria-label="Add tag"
         >
