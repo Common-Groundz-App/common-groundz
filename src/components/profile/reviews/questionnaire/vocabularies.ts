@@ -27,12 +27,28 @@ export interface CuratedTag {
   sentiment: TagSentiment;
 }
 
-/** Selection caps for `CuratedTagSelector`. `FoodTagSelector` is exempt. */
-export const CURATED_TAG_LIMITS = {
+export interface CuratedTagLimits {
+  maxCombined: number;
+  maxCustom: number;
+  maxCustomLength: number;
+}
+
+/**
+ * Default selection caps for `CuratedTagSelector` (still used by `best_for`).
+ * `FoodTagSelector` is exempt.
+ */
+export const CURATED_TAG_LIMITS: CuratedTagLimits = {
   maxCombined: 5,
   maxCustom: 3,
   maxCustomLength: 40,
-} as const;
+};
+
+/** Phase 4B.1 — `stood_out` lets every one of its 5 slots be custom. */
+export const STOOD_OUT_TAG_LIMITS: CuratedTagLimits = {
+  maxCombined: 5,
+  maxCustom: 5,
+  maxCustomLength: 40,
+};
 
 const STOOD_OUT_PLACE: readonly CuratedTag[] = [
   { value: 'great_ambience', label: 'Great ambience', emoji: '🕯️', sentiment: 'positive' },
@@ -286,4 +302,9 @@ export function getCuratedVocabulary(tagSet: CuratedTagSet): readonly CuratedTag
 /** Label lookup for rendering stored codes. Unknown codes are NOT invented here. */
 export function findCuratedTag(tagSet: CuratedTagSet, value: string): CuratedTag | undefined {
   return CURATED_TAG_VOCABULARIES[tagSet].find((t) => t.value === value);
+}
+
+/** Per-purpose caps, keyed by the tag set's field prefix. */
+export function getCuratedTagLimits(tagSet: CuratedTagSet): CuratedTagLimits {
+  return tagSet.startsWith('stood_out:') ? STOOD_OUT_TAG_LIMITS : CURATED_TAG_LIMITS;
 }
