@@ -128,6 +128,7 @@ const UnifiedTagSelector: React.FC<UnifiedTagSelectorProps> = ({
               </button>
             );
           })}
+          </div>
         </div>
       )}
 
