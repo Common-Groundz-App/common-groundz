@@ -96,3 +96,16 @@ describe('custom tags', () => {
     expect(removeCustomTag(answer, 'Great Coffee').answer.custom).toEqual([]);
   });
 });
+
+describe('Phase 4B.1 per-field limits', () => {
+  it('stood_out allows 5 custom; best_for keeps 3', async () => {
+    const { getCuratedTagLimits } = await import('@/components/profile/reviews/questionnaire/vocabularies');
+    expect(getCuratedTagLimits('stood_out:place')).toEqual({ maxCombined: 5, maxCustom: 5, maxCustomLength: 40 });
+    expect(getCuratedTagLimits('best_for:place')).toEqual({ maxCombined: 5, maxCustom: 3, maxCustomLength: 40 });
+    let answer: CuratedTagAnswer = empty;
+    const limits = getCuratedTagLimits('stood_out:movie');
+    for (const v of ['a', 'b', 'c', 'd', 'e']) answer = addCustomTag(answer, v, limits).answer;
+    expect(answer.custom).toHaveLength(5);
+    expect(addCustomTag(answer, 'f', limits).changed).toBe(false);
+  });
+});

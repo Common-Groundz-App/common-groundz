@@ -1,15 +1,13 @@
 /**
- * Phase 3C Stage 2 — curated tag picker for `stood_out` / `best_for`.
+ * Curated tag picker for `stood_out` / `best_for` — questionnaire adapter.
  *
- * All rules live in `curatedTagInput.ts`; this file is presentation plus the
- * custom-tag input. `FoodTagSelector` is NOT rewritten as a wrapper in this
- * stage — it stays regression-identical and exempt from these caps.
+ * Phase 4B.1: presentation is delegated to the shared `UnifiedTagSelector`.
+ * This adapter owns the `{ selected, custom }` answer shape and routes every
+ * mutation through `curatedTagInput.ts` with the field's own caps
+ * (`getCuratedTagLimits`). `FoodTagSelector` is untouched and exempt.
  */
 import React, { useState } from 'react';
-import { Plus, X } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import UnifiedTagSelector, { type UnifiedSelectedTag } from './UnifiedTagSelector';
 import {
   addCustomTag,
   isAtCombinedCap,
@@ -18,8 +16,9 @@ import {
   removeCustomTag,
   toggleCuratedTag,
   type CuratedTagAnswer,
+  type CuratedTagMutation,
 } from './curatedTagInput';
-import { CURATED_TAG_LIMITS, getCuratedVocabulary, type CuratedTagSet } from './vocabularies';
+import { getCuratedTagLimits, getCuratedVocabulary, type CuratedTagSet } from './vocabularies';
 
 interface CuratedTagSelectorProps {
   tagSet: CuratedTagSet;
@@ -29,6 +28,9 @@ interface CuratedTagSelectorProps {
   onChange: (next: CuratedTagAnswer) => void;
 }
 
+const CURATED_PREFIX = 'curated:';
+const CUSTOM_PREFIX = 'custom:';
+
 const CuratedTagSelector: React.FC<CuratedTagSelectorProps> = ({
   tagSet,
   label,
@@ -36,112 +38,59 @@ const CuratedTagSelector: React.FC<CuratedTagSelectorProps> = ({
   value,
   onChange,
 }) => {
-  const [draft, setDraft] = useState('');
   const [hint, setHint] = useState<string | null>(null);
 
   const vocabulary = getCuratedVocabulary(tagSet);
-  const atCombined = isAtCombinedCap(value);
-  const atCustom = isAtCustomCap(value);
+  const limits = getCuratedTagLimits(tagSet);
+  const atCombined = isAtCombinedCap(value, limits);
+  const atCustom = isAtCustomCap(value, limits);
 
-  const apply = (result: ReturnType<typeof toggleCuratedTag>) => {
+  const apply = (result: CuratedTagMutation): boolean => {
     if (result.changed) {
       setHint(null);
       onChange(result.answer);
-    } else if (result.rejection) {
-      setHint(rejectionMessage(result.rejection));
+      return true;
     }
+    if (result.rejection) setHint(rejectionMessage(result.rejection, limits));
+    return false;
   };
 
-  const submitCustom = () => {
-    const result = addCustomTag(value, draft);
-    if (result.changed) setDraft('');
-    apply(result);
-  };
+  // Selected curated tags (known codes only — unknown stored codes are kept in
+  // the answer untouched, never relabeled), then custom entries.
+  const selectedTags: UnifiedSelectedTag[] = [
+    ...value.selected.flatMap((code) => {
+      const tag = vocabulary.find((t) => t.value === code);
+      return tag ? [{ key: `${CURATED_PREFIX}${code}`, label: tag.label, emoji: tag.emoji }] : [];
+    }),
+    ...value.custom.map((text) => ({ key: `${CUSTOM_PREFIX}${text}`, label: text })),
+  ];
 
   return (
-    <div className="space-y-2">
-      <p className="text-sm font-medium">{label}</p>
-
-      <div className="flex flex-wrap gap-2">
-        {vocabulary.map((tag) => {
-          const isSelected = value.selected.includes(tag.value);
-          return (
-            <button
-              key={tag.value}
-              type="button"
-              aria-pressed={isSelected}
-              onClick={() => apply(toggleCuratedTag(value, tag.value))}
-              className={cn(
-                'rounded-full border px-3 py-1.5 text-sm transition-colors',
-                isSelected
-                  ? 'border-brand-orange bg-brand-orange/10 text-brand-orange font-medium'
-                  : 'border-border text-muted-foreground hover:border-brand-orange/40 hover:text-foreground',
-                !isSelected && atCombined && 'opacity-50',
-              )}
-            >
-              <span className="mr-1">{tag.emoji}</span>
-              {tag.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {value.custom.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {value.custom.map((tag) => (
-            <span
-              key={tag}
-              className="inline-flex items-center gap-1 rounded-full border border-brand-orange/40 bg-brand-orange/5 px-3 py-1.5 text-sm"
-            >
-              {tag}
-              <button
-                type="button"
-                aria-label={`Remove ${tag}`}
-                onClick={() => apply(removeCustomTag(value, tag))}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="flex gap-2">
-        <Input
-          value={draft}
-          maxLength={CURATED_TAG_LIMITS.maxCustomLength}
-          disabled={atCombined || atCustom}
-          placeholder={
-            atCombined || atCustom ? 'Remove one to add your own' : 'Add your own…'
-          }
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              submitCustom();
-            }
-          }}
-          className="border-brand-orange/30 focus-visible:ring-brand-orange/30"
-        />
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          disabled={atCombined || atCustom}
-          onClick={submitCustom}
-          aria-label="Add tag"
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {hint ? (
-        <p className="text-xs text-destructive">{hint}</p>
-      ) : (
-        helperText && <p className="text-xs text-muted-foreground">{helperText}</p>
-      )}
-    </div>
+    <UnifiedTagSelector
+      label={label}
+      helperText={helperText}
+      suggestions={vocabulary.map((t) => ({ id: t.value, label: t.label, emoji: t.emoji }))}
+      selectedSuggestionIds={value.selected}
+      selectedTags={selectedTags}
+      onToggleSuggestion={(id) => apply(toggleCuratedTag(value, id, limits))}
+      onRemoveSelected={(key) => {
+        if (key.startsWith(CURATED_PREFIX)) {
+          apply(toggleCuratedTag(value, key.slice(CURATED_PREFIX.length), limits));
+        } else if (key.startsWith(CUSTOM_PREFIX)) {
+          apply(removeCustomTag(value, key.slice(CUSTOM_PREFIX.length)));
+        }
+      }}
+      onSubmitCustom={(draft) => apply(addCustomTag(value, draft, limits, vocabulary))}
+      atLimit={atCombined}
+      customDisabled={atCombined || atCustom}
+      limitPlaceholder={
+        atCombined
+          ? `Limit reached (${limits.maxCombined}/${limits.maxCombined}). Remove one to add more.`
+          : `Up to ${limits.maxCustom} of your own. Remove one to add more.`
+      }
+      maxCustomLength={limits.maxCustomLength}
+      hint={hint}
+    />
   );
 };
 
