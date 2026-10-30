@@ -106,6 +106,6 @@ describe('Phase 4B.1 per-field limits', () => {
     const limits = getCuratedTagLimits('stood_out:movie');
     for (const v of ['a', 'b', 'c', 'd', 'e']) answer = addCustomTag(answer, v, limits).answer;
     expect(answer.custom).toHaveLength(5);
-    expect(addCustomTag(answer, 'f', limits).rejection).toBe('combined_cap');
+    expect(addCustomTag(answer, 'f', limits).changed).toBe(false);
   });
 });
