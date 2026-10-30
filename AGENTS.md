@@ -17,3 +17,4 @@
 
 - Composer unavailable-video recovery is UI-only, keyed by rejected Mux upload IDs and recognized only from the attachment barrier signal; unrelated field edits cannot unblock the same upload, and database save/rescue remains authoritative.
 - Review tag pickers render through the presentational `UnifiedTagSelector`, with per-purpose adapters owning storage shape and caps (`getCuratedTagLimits` per tag set); one consistent UI without merging questionnaire and Food data models.
+- Review observations are two independent questionnaire fields (`liked`, `could_be_better`) whose vocabularies are derived by sentiment from the frozen legacy `stood_out` lists plus explicit additions; legacy `stood_out` answers are not rendered but pass through saves untouched, so no migration is needed and stable tag ids keep one meaning.
