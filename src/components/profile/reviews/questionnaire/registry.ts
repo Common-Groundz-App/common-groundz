@@ -159,7 +159,8 @@ const bestForField = (tagSet: CuratedTagSet): QuestionnaireField => ({
   kind: 'tags',
   tagSet,
   label: 'Best for',
-  helperText: 'Who would this suit? Pick up to 5, or add your own.',
+  helperText: 'Who or what would you recommend this for?',
+  hideLabel: true,
   required: false,
 });
 
@@ -241,6 +242,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you watch it again?')]),
       ...observationSections('movie'),
+      bestForSection('best_for:movie'),
     ],
   },
   book: {
@@ -250,6 +252,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you read it again?'), WORTH_TIME_FIELD]),
       ...observationSections('book'),
+      bestForSection('best_for:book'),
     ],
   },
   tv_show: {
@@ -259,6 +262,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you keep watching?'), WORTH_TIME_FIELD]),
       ...observationSections('tv_show'),
+      bestForSection('best_for:tv_show'),
     ],
   },
   course: {
@@ -282,6 +286,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
         SOLVES_PROBLEM_FIELD,
       ]),
       ...observationSections('app'),
+      bestForSection('best_for:app'),
     ],
   },
   game: {
@@ -291,6 +296,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you play it again?'), WORTH_TIME_FIELD]),
       ...observationSections('game'),
+      bestForSection('best_for:game'),
     ],
   },
   experience: {
@@ -300,6 +306,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you do it again?'), WORTH_TIME_FIELD]),
       ...observationSections('experience'),
+      bestForSection('best_for:experience'),
     ],
   },
   food: {
@@ -310,6 +317,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you order it again?'), PORTION_FIELD]),
       ...observationSections('food'),
       FOOD_TAGS_SECTION,
+      bestForSection('best_for:food'),
     ],
   },
   product: {
@@ -319,6 +327,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you buy it again?'), VALUE_FIELD]),
       ...observationSections('product'),
+      bestForSection('best_for:product'),
     ],
   },
   place: {
@@ -342,6 +351,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
         TRUST_FIELD,
       ]),
       ...observationSections('brand'),
+      bestForSection('best_for:brand'),
     ],
   },
   event: {
@@ -351,6 +361,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you attend again?'), WORTH_TIME_FIELD]),
       ...observationSections('event'),
+      bestForSection('best_for:event'),
     ],
   },
   service: {
@@ -360,6 +371,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you use this service again?'), VALUE_FIELD]),
       ...observationSections('service'),
+      bestForSection('best_for:service'),
     ],
   },
   professional: {
@@ -373,6 +385,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
         TRUST_FIELD,
       ]),
       ...observationSections('professional'),
+      bestForSection('best_for:professional'),
     ],
   },
   others: {
@@ -382,6 +395,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Choose again?')]),
       ...observationSections('others'),
+      bestForSection('best_for:others'),
     ],
   },
 };
