@@ -230,8 +230,7 @@ const bestForSection = (tagSet: CuratedTagSet): QuestionnaireSectionConfig => ({
 
 /**
  * All 15 canonical types, explicit — the frozen v1 matrix. Every type gets
- * `would_recommend` + `liked` + `could_be_better` (except `food`, whose Food Tags
- * stay separate until Phase 4B.3), its own repeat-intent wording (`course` has none) and
+ * `would_recommend` + `liked` + `could_be_better` (`food` also keeps its separate Food Tags), its own repeat-intent wording (`course` has none) and
  * its extra dimension (`movie` and `others` have none).
  */
 export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireConfig> = {
@@ -309,6 +308,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: true,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you order it again?'), PORTION_FIELD]),
+      ...observationSections('food'),
       FOOD_TAGS_SECTION,
     ],
   },
