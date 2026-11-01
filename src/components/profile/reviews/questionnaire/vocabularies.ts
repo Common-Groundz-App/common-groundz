@@ -285,7 +285,7 @@ const LIKED_FOOD: readonly CuratedTag[] = [
 const COULD_BE_BETTER_FOOD: readonly CuratedTag[] = [
   { value: 'too_salty', label: 'Too salty', emoji: '🧂', sentiment: 'negative' },
   { value: 'too_oily', label: 'Too oily', emoji: '🛢️', sentiment: 'negative' },
-  { value: 'served_cold', label: 'Served cold', emoji: '🥶', sentiment: 'negative' },
+  { value: 'wrong_temperature', label: 'Wrong temperature', emoji: '🌡️', sentiment: 'negative' },
   { value: 'portion_too_small', label: 'Portion too small', emoji: '🤏', sentiment: 'negative' },
   { value: 'lacked_flavor', label: 'Lacked flavor', emoji: '😐', sentiment: 'negative' },
   { value: 'overcooked', label: 'Overcooked', emoji: '🔥', sentiment: 'negative' },
