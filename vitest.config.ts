@@ -72,6 +72,7 @@ const nodeIncludes = [
   'src/components/profile/reviews/__tests__/phase4b2Observations.test.ts',
   'src/components/profile/reviews/__tests__/phase4b3aFoodObservations.test.ts',
   'src/components/profile/reviews/__tests__/phase4b3cFoodDescriptors.test.ts',
+  'src/components/profile/reviews/__tests__/phase5bBestFor.test.ts',
   'src/components/review-composer/__tests__/composerFoundation.test.ts',
   'src/components/review-composer/__tests__/phase2Prompts.test.ts',
   'src/components/review-composer/__tests__/composerPage3b.test.ts',
