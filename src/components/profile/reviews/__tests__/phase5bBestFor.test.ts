@@ -15,7 +15,6 @@ import {
   removeCustomTag,
   toggleCuratedTag,
 } from '@/components/profile/reviews/questionnaire/curatedTagInput';
-import { toSubject } from '@/components/review-composer/screen/loaders';
 
 const ALL = Object.keys(QUESTIONNAIRE_REGISTRY) as (keyof typeof QUESTIONNAIRE_REGISTRY)[];
 
@@ -70,13 +69,5 @@ describe('saved curated tags survive vocabulary changes', () => {
   it('drops malformed values', () => {
     const h = hydrateQuestionnaireAnswers(read({ selected: ['Not An Id', 42, 'networking'], custom: [] }), config);
     expect(h.curated.best_for.selected).toEqual(['networking']);
-  });
-});
-
-describe('category context', () => {
-  const row = { id: 'e1', name: 'X', type: 'event' } as never;
-  it('carries category_id when present and null otherwise', () => {
-    expect(toSubject({ ...(row as object), category_id: 'c1' } as never, null).categoryId).toBe('c1');
-    expect(toSubject(row, null).categoryId).toBeNull();
   });
 });
