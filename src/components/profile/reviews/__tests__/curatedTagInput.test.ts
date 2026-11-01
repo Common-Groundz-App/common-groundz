@@ -76,10 +76,11 @@ describe('custom tags', () => {
     expect(addCustomTag(withSelected, 'Quiet').rejection).toBe('duplicate');
   });
 
-  it('caps custom entries at 3 even when the combined cap is not reached', () => {
+  it('caps custom entries when the custom cap is lower than the combined cap', () => {
+    const limits = { maxCombined: 5, maxCustom: 3, maxCustomLength: 40 };
     let answer: CuratedTagAnswer = empty;
-    for (const v of ['one', 'two', 'three']) answer = addCustomTag(answer, v).answer;
-    const rejected = addCustomTag(answer, 'four');
+    for (const v of ['one', 'two', 'three']) answer = addCustomTag(answer, v, limits).answer;
+    const rejected = addCustomTag(answer, 'four', limits);
     expect(rejected.changed).toBe(false);
     expect(rejected.rejection).toBe('custom_cap');
   });
@@ -98,10 +99,10 @@ describe('custom tags', () => {
 });
 
 describe('Phase 4B.1 per-field limits', () => {
-  it('stood_out allows 5 custom; best_for keeps 3', async () => {
+  it('stood_out allows 5 custom; best_for also allows 5', async () => {
     const { getCuratedTagLimits } = await import('@/components/profile/reviews/questionnaire/vocabularies');
     expect(getCuratedTagLimits('stood_out:place')).toEqual({ maxCombined: 5, maxCustom: 5, maxCustomLength: 40 });
-    expect(getCuratedTagLimits('best_for:place')).toEqual({ maxCombined: 5, maxCustom: 3, maxCustomLength: 40 });
+    expect(getCuratedTagLimits('best_for:place')).toEqual({ maxCombined: 5, maxCustom: 5, maxCustomLength: 40 });
     let answer: CuratedTagAnswer = empty;
     const limits = getCuratedTagLimits('stood_out:movie');
     for (const v of ['a', 'b', 'c', 'd', 'e']) answer = addCustomTag(answer, v, limits).answer;

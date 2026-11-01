@@ -39,7 +39,7 @@ export interface CuratedTagLimits {
  */
 export const CURATED_TAG_LIMITS: CuratedTagLimits = {
   maxCombined: 5,
-  maxCustom: 3,
+  maxCustom: 5,
   maxCustomLength: 40,
 };
 
@@ -269,6 +269,113 @@ const BEST_FOR_COURSE: readonly CuratedTag[] = [
   { value: 'refresher', label: 'A refresher', emoji: '🔁', sentiment: 'neutral' },
 ];
 
+
+/** Phase 5B — Best For starter suggestions for the remaining 13 types. */
+const BEST_FOR_MOVIE: readonly CuratedTag[] = [
+  { value: 'movie_night', label: 'Movie night', emoji: '🍿', sentiment: 'neutral' },
+  { value: 'date_night', label: 'Date night', emoji: '💞', sentiment: 'neutral' },
+  { value: 'family_viewing', label: 'Family viewing', emoji: '👨‍👩‍👧', sentiment: 'neutral' },
+  { value: 'deep_thinkers', label: 'Deep thinkers', emoji: '🧠', sentiment: 'neutral' },
+  { value: 'thrill_seekers', label: 'Thrill seekers', emoji: '⚡', sentiment: 'neutral' },
+  { value: 'solo_watch', label: 'Solo watch', emoji: '🎧', sentiment: 'neutral' },
+];
+const BEST_FOR_TV_SHOW: readonly CuratedTag[] = [
+  { value: 'binge_watching', label: 'Binge watching', emoji: '📺', sentiment: 'neutral' },
+  { value: 'casual_watching', label: 'Casual watching', emoji: '🛋️', sentiment: 'neutral' },
+  { value: 'watching_together', label: 'Watching together', emoji: '🧑‍🤝‍🧑', sentiment: 'neutral' },
+  { value: 'mystery_plot_lovers', label: 'Mystery & plot lovers', emoji: '🕵️', sentiment: 'neutral' },
+  { value: 'background_viewing', label: 'Background viewing', emoji: '🎶', sentiment: 'neutral' },
+  { value: 'solo_watch', label: 'Solo watch', emoji: '🎧', sentiment: 'neutral' },
+];
+const BEST_FOR_BOOK: readonly CuratedTag[] = [
+  { value: 'beginners', label: 'Beginners', emoji: '🌱', sentiment: 'neutral' },
+  { value: 'deep_dive', label: 'Deep dive', emoji: '🔍', sentiment: 'neutral' },
+  { value: 'quick_read', label: 'Quick / travel read', emoji: '✈️', sentiment: 'neutral' },
+  { value: 'professionals', label: 'Professionals', emoji: '💼', sentiment: 'neutral' },
+  { value: 'weekend_reading', label: 'Weekend reading', emoji: '☕', sentiment: 'neutral' },
+  { value: 'book_clubs', label: 'Book clubs', emoji: '📚', sentiment: 'neutral' },
+];
+const BEST_FOR_GAME: readonly CuratedTag[] = [
+  { value: 'playing_with_friends', label: 'Playing with friends', emoji: '🧑‍🤝‍🧑', sentiment: 'neutral' },
+  { value: 'solo_play', label: 'Solo play', emoji: '🎮', sentiment: 'neutral' },
+  { value: 'casual_sessions', label: 'Casual sessions', emoji: '🛋️', sentiment: 'neutral' },
+  { value: 'competitive_players', label: 'Competitive players', emoji: '🏆', sentiment: 'neutral' },
+  { value: 'story_lovers', label: 'Story lovers', emoji: '📖', sentiment: 'neutral' },
+  { value: 'quick_sessions', label: 'Quick sessions', emoji: '⏱️', sentiment: 'neutral' },
+];
+const BEST_FOR_APP: readonly CuratedTag[] = [
+  { value: 'daily_productivity', label: 'Daily productivity', emoji: '✅', sentiment: 'neutral' },
+  { value: 'team_collaboration', label: 'Team collaboration', emoji: '👥', sentiment: 'neutral' },
+  { value: 'beginners', label: 'Beginners', emoji: '🌱', sentiment: 'neutral' },
+  { value: 'power_users', label: 'Power users', emoji: '⚡', sentiment: 'neutral' },
+  { value: 'on_the_go', label: 'On the go', emoji: '📱', sentiment: 'neutral' },
+  { value: 'focused_tasks', label: 'Focused tasks', emoji: '🎯', sentiment: 'neutral' },
+];
+const BEST_FOR_FOOD: readonly CuratedTag[] = [
+  { value: 'sharing', label: 'Sharing', emoji: '🍽️', sentiment: 'neutral' },
+  { value: 'quick_bite', label: 'Quick bite', emoji: '⏱️', sentiment: 'neutral' },
+  { value: 'spice_lovers', label: 'Spice lovers', emoji: '🌶️', sentiment: 'neutral' },
+  { value: 'health_conscious', label: 'Health conscious', emoji: '🥗', sentiment: 'neutral' },
+  { value: 'late_night_cravings', label: 'Late night cravings', emoji: '🌙', sentiment: 'neutral' },
+  { value: 'family_meals', label: 'Family meals', emoji: '👨‍👩‍👧', sentiment: 'neutral' },
+];
+const BEST_FOR_PRODUCT: readonly CuratedTag[] = [
+  { value: 'active_fitness', label: 'Active & fitness', emoji: '🏃', sentiment: 'neutral' },
+  { value: 'travel_commute', label: 'Travel & commute', emoji: '🧳', sentiment: 'neutral' },
+  { value: 'everyday_home', label: 'Everyday home use', emoji: '🏠', sentiment: 'neutral' },
+  { value: 'work_office', label: 'Work & office', emoji: '💼', sentiment: 'neutral' },
+  { value: 'gifting', label: 'Gifting', emoji: '🎁', sentiment: 'neutral' },
+  { value: 'sensitive_gentle', label: 'Sensitive & gentle', emoji: '🌿', sentiment: 'neutral' },
+];
+const BEST_FOR_BRAND: readonly CuratedTag[] = [
+  { value: 'budget_conscious', label: 'Budget conscious', emoji: '💰', sentiment: 'neutral' },
+  { value: 'premium_luxury', label: 'Premium & luxury', emoji: '💎', sentiment: 'neutral' },
+  { value: 'eco_sustainable', label: 'Eco & sustainable', emoji: '♻️', sentiment: 'neutral' },
+  { value: 'gifts_occasions', label: 'Gifts & occasions', emoji: '🎁', sentiment: 'neutral' },
+  { value: 'everyday_essentials', label: 'Everyday essentials', emoji: '🧺', sentiment: 'neutral' },
+  { value: 'professional_workwear', label: 'Professional & workwear', emoji: '👔', sentiment: 'neutral' },
+];
+const BEST_FOR_EVENT: readonly CuratedTag[] = [
+  { value: 'group_outings', label: 'Group outings', emoji: '🧑‍🤝‍🧑', sentiment: 'neutral' },
+  { value: 'date_night', label: 'Date night', emoji: '💞', sentiment: 'neutral' },
+  { value: 'family_friendly', label: 'Family friendly', emoji: '👨‍👩‍👧', sentiment: 'neutral' },
+  { value: 'networking', label: 'Networking', emoji: '🤝', sentiment: 'neutral' },
+  { value: 'solo_attendees', label: 'Solo attendees', emoji: '🚶', sentiment: 'neutral' },
+  { value: 'celebrations', label: 'Celebrations', emoji: '🎉', sentiment: 'neutral' },
+];
+const BEST_FOR_EXPERIENCE: readonly CuratedTag[] = [
+  { value: 'solo_adventures', label: 'Solo adventures', emoji: '🚶', sentiment: 'neutral' },
+  { value: 'couples_dates', label: 'Couples & dates', emoji: '💞', sentiment: 'neutral' },
+  { value: 'group_activities', label: 'Group activities', emoji: '🧑‍🤝‍🧑', sentiment: 'neutral' },
+  { value: 'families_with_kids', label: 'Families with kids', emoji: '👨‍👩‍👧', sentiment: 'neutral' },
+  { value: 'special_celebrations', label: 'Special celebrations', emoji: '🎉', sentiment: 'neutral' },
+  { value: 'first_time_visitors', label: 'First-time visitors', emoji: '🧭', sentiment: 'neutral' },
+];
+const BEST_FOR_SERVICE: readonly CuratedTag[] = [
+  { value: 'home_personal', label: 'Home & personal', emoji: '🏠', sentiment: 'neutral' },
+  { value: 'small_businesses', label: 'Small businesses', emoji: '🏪', sentiment: 'neutral' },
+  { value: 'fast_turnaround', label: 'Urgent / fast turnaround', emoji: '⚡', sentiment: 'neutral' },
+  { value: 'long_term', label: 'Long-term / ongoing', emoji: '🔁', sentiment: 'neutral' },
+  { value: 'budget_friendly', label: 'Budget friendly', emoji: '💰', sentiment: 'neutral' },
+  { value: 'specialized_needs', label: 'Specialized needs', emoji: '🛠️', sentiment: 'neutral' },
+];
+const BEST_FOR_PROFESSIONAL: readonly CuratedTag[] = [
+  { value: 'startups_founders', label: 'Startups & founders', emoji: '🚀', sentiment: 'neutral' },
+  { value: 'small_businesses', label: 'Small businesses', emoji: '🏪', sentiment: 'neutral' },
+  { value: 'enterprise_corporate', label: 'Enterprise & corporate', emoji: '🏢', sentiment: 'neutral' },
+  { value: 'individuals_freelancers', label: 'Individuals & freelancers', emoji: '🧑‍💻', sentiment: 'neutral' },
+  { value: 'fast_turnaround', label: 'Fast turnaround', emoji: '⚡', sentiment: 'neutral' },
+  { value: 'complex_advisory', label: 'Complex advisory', emoji: '🧩', sentiment: 'neutral' },
+];
+const BEST_FOR_OTHERS: readonly CuratedTag[] = [
+  { value: 'beginners', label: 'Beginners', emoji: '🌱', sentiment: 'neutral' },
+  { value: 'professionals', label: 'Professionals', emoji: '💼', sentiment: 'neutral' },
+  { value: 'everyday_use', label: 'Everyday use', emoji: '🗓️', sentiment: 'neutral' },
+  { value: 'gifting', label: 'Gifting', emoji: '🎁', sentiment: 'neutral' },
+  { value: 'quick_convenient', label: 'Quick & convenient', emoji: '⏱️', sentiment: 'neutral' },
+  { value: 'niche_enthusiasts', label: 'Niche & enthusiasts', emoji: '🔎', sentiment: 'neutral' },
+];
+
 /**
  * Food observations (Phase 4B.3A). Explicit lists — food has no legacy
  * `stood_out` set. Separate from the untouched `FoodTagSelector` vocabulary.
@@ -381,6 +488,19 @@ export const CURATED_TAG_VOCABULARIES = {
   'stood_out:others': STOOD_OUT_OTHERS,
   'best_for:place': BEST_FOR_PLACE,
   'best_for:course': BEST_FOR_COURSE,
+  'best_for:movie': BEST_FOR_MOVIE,
+  'best_for:tv_show': BEST_FOR_TV_SHOW,
+  'best_for:book': BEST_FOR_BOOK,
+  'best_for:game': BEST_FOR_GAME,
+  'best_for:app': BEST_FOR_APP,
+  'best_for:food': BEST_FOR_FOOD,
+  'best_for:product': BEST_FOR_PRODUCT,
+  'best_for:brand': BEST_FOR_BRAND,
+  'best_for:event': BEST_FOR_EVENT,
+  'best_for:experience': BEST_FOR_EXPERIENCE,
+  'best_for:service': BEST_FOR_SERVICE,
+  'best_for:professional': BEST_FOR_PROFESSIONAL,
+  'best_for:others': BEST_FOR_OTHERS,
   'liked:place': likedFor('place'),
   'liked:product': likedFor('product'),
   'liked:brand': likedFor('brand'),

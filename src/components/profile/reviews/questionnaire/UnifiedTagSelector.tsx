@@ -31,6 +31,8 @@ export interface UnifiedSelectedTag {
 export interface UnifiedTagSelectorProps {
   label: string;
   helperText?: string;
+  /** Visually hide the label (still announced) when the section heading already shows it. */
+  hideLabel?: boolean;
   suggestions: readonly UnifiedTagSuggestion[];
   selectedSuggestionIds: readonly string[];
   selectedTags: readonly UnifiedSelectedTag[];
@@ -50,6 +52,7 @@ export interface UnifiedTagSelectorProps {
 const UnifiedTagSelector: React.FC<UnifiedTagSelectorProps> = ({
   label,
   helperText,
+  hideLabel = false,
   suggestions,
   selectedSuggestionIds,
   selectedTags,
@@ -75,7 +78,7 @@ const UnifiedTagSelector: React.FC<UnifiedTagSelectorProps> = ({
 
   return (
     <div className="space-y-3" role="group" aria-labelledby={labelId}>
-      <p id={labelId} className="text-sm font-medium">{label}</p>
+      <p id={labelId} className={hideLabel ? 'sr-only' : 'text-sm font-medium'}>{label}</p>
 
       {selectedTags.length > 0 && (
         <div className="space-y-1.5">

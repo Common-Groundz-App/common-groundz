@@ -21,7 +21,7 @@ export interface LoadedSubject {
 
 export type SubjectLoad = { status: 'ok'; value: LoadedSubject } | { status: 'not_found' } | { status: 'error' };
 
-const ENTITY_COLUMNS = 'id, name, type, venue, image_url, description, metadata, is_deleted';
+const ENTITY_COLUMNS = 'id, name, type, venue, image_url, description, metadata, category_id, is_deleted';
 
 /** Provider ("Dish at Toit") context for offerings; best-effort. */
 export async function resolveProvider(subjectId: string, type: string | null) {
@@ -48,6 +48,7 @@ export function toSubject(row: EntityAdapter, providerName: string | null): Comp
     venue: row.venue ?? null,
     metadata: (row.metadata as ComposerSubject['metadata']) ?? null,
     providerName,
+    categoryId: (row as { category_id?: string | null }).category_id ?? null,
   };
 }
 
@@ -60,7 +61,8 @@ function rowToAdapter(data: Record<string, any>): EntityAdapter {
     image_url: data.image_url ?? undefined,
     description: data.description ?? undefined,
     metadata: data.metadata ?? undefined,
-  };
+    category_id: data.category_id ?? null,
+  } as EntityAdapter;
 }
 
 export async function loadSubject(entityId: string): Promise<SubjectLoad> {

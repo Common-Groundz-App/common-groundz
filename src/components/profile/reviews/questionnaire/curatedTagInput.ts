@@ -15,6 +15,15 @@
  *   over the cap are displayed and preserved intact, never truncated.
  * - `FoodTagSelector` is exempt from all of this and is not routed through here.
  */
+/** Saved curated ids are lowercase snake_case codes. */
+export const CURATED_ID_RE = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
+
+/** Readable fallback for a saved curated id no longer in the vocabulary. */
+export function humanizeTagId(id: string): string {
+  const words = id.split('_').filter(Boolean).join(' ');
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : id;
+}
+
 import { CURATED_TAG_LIMITS, type CuratedTag, type CuratedTagLimits } from './vocabularies';
 
 export interface CuratedTagAnswer {
