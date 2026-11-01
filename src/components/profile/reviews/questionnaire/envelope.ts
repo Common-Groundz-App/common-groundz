@@ -18,7 +18,7 @@
 import { isPlainMetadataObject } from './metadata';
 import type { QuestionnaireConfig } from './registry';
 import { CURATED_TAG_VOCABULARIES, type CuratedTagSet } from './vocabularies';
-import type { CuratedTagAnswer } from './curatedTagInput';
+import { CURATED_ID_RE, type CuratedTagAnswer } from './curatedTagInput';
 
 export const QUESTIONNAIRE_VERSION = 1;
 export const QUESTIONNAIRE_METADATA_KEY = 'questionnaire';
