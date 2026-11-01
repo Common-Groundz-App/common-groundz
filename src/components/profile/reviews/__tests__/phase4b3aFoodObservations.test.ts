@@ -22,7 +22,7 @@ describe('food observation vocabulary', () => {
   });
   it('could_be_better:food is exactly the 6 approved tags', () => {
     expect(CURATED_TAG_VOCABULARIES['could_be_better:food'].map((t) => t.label)).toEqual([
-      'Too salty', 'Too oily', 'Served cold', 'Portion too small', 'Lacked flavor', 'Overcooked',
+      'Too salty', 'Too oily', 'Wrong temperature', 'Portion too small', 'Lacked flavor', 'Overcooked',
     ]);
   });
   it('does not include Authentic flavor', () => {
