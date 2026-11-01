@@ -165,14 +165,14 @@ const bestForField = (tagSet: CuratedTagSet): QuestionnaireField => ({
 
 const FOOD_TAGS_SECTION: QuestionnaireSectionConfig = {
   id: 'food_tags',
-  title: 'Food tags',
+  title: 'How would you describe it?',
   icon: '🏷️',
   fields: [
     {
       id: 'food_tags',
       kind: 'tags',
       tagSet: 'food',
-      label: 'Food tags',
+      label: 'How would you describe it?',
       required: false,
     },
   ],

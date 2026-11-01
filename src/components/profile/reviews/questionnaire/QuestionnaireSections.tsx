@@ -60,6 +60,8 @@ const FieldRenderer: React.FC<{
             selectedTags={answers.tags[field.id] ?? []}
             onAddTag={(tag) => onAddTag(field.id, tag)}
             onRemoveTag={(tag) => onRemoveTag(field.id, tag)}
+            label={field.label}
+            helperText={field.helperText}
           />
         );
       }
