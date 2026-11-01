@@ -29,8 +29,8 @@ describe('food observation vocabulary', () => {
     expect(CURATED_TAG_VOCABULARIES['liked:food'].some((t) => t.value === 'authentic_flavor')).toBe(false);
   });
   it('each group allows 5 total and 5 custom', () => {
-    expect(getCuratedTagLimits('liked:food')).toMatchObject({ maxTotal: 5, maxCustom: 5 });
-    expect(getCuratedTagLimits('could_be_better:food')).toMatchObject({ maxTotal: 5, maxCustom: 5 });
+    expect(getCuratedTagLimits('liked:food')).toMatchObject({ maxCombined: 5, maxCustom: 5 });
+    expect(getCuratedTagLimits('could_be_better:food')).toMatchObject({ maxCombined: 5, maxCustom: 5 });
   });
   it('food keeps portion and food_tags', () => {
     const ids = QUESTIONNAIRE_REGISTRY.food.sections.flatMap((s) => s.fields).map((f) => f.id);
