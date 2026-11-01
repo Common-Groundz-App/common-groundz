@@ -270,6 +270,28 @@ const BEST_FOR_COURSE: readonly CuratedTag[] = [
 ];
 
 /**
+ * Food observations (Phase 4B.3A). Explicit lists — food has no legacy
+ * `stood_out` set. Separate from the untouched `FoodTagSelector` vocabulary.
+ */
+const LIKED_FOOD: readonly CuratedTag[] = [
+  { value: 'great_taste', label: 'Great taste', emoji: '😋', sentiment: 'positive' },
+  { value: 'fresh_ingredients', label: 'Fresh ingredients', emoji: '🥬', sentiment: 'positive' },
+  { value: 'generous_portion', label: 'Generous portion', emoji: '🍽️', sentiment: 'positive' },
+  { value: 'good_presentation', label: 'Good presentation', emoji: '✨', sentiment: 'positive' },
+  { value: 'great_aroma', label: 'Great aroma', emoji: '👃', sentiment: 'positive' },
+  { value: 'good_texture', label: 'Good texture', emoji: '🤌', sentiment: 'positive' },
+];
+
+const COULD_BE_BETTER_FOOD: readonly CuratedTag[] = [
+  { value: 'too_salty', label: 'Too salty', emoji: '🧂', sentiment: 'negative' },
+  { value: 'too_oily', label: 'Too oily', emoji: '🛢️', sentiment: 'negative' },
+  { value: 'served_cold', label: 'Served cold', emoji: '🥶', sentiment: 'negative' },
+  { value: 'portion_too_small', label: 'Portion too small', emoji: '🤏', sentiment: 'negative' },
+  { value: 'lacked_flavor', label: 'Lacked flavor', emoji: '😐', sentiment: 'negative' },
+  { value: 'overcooked', label: 'Overcooked', emoji: '🔥', sentiment: 'negative' },
+];
+
+/**
  * Every curated vocabulary, keyed by tag-set name. `food` is deliberately ABSENT:
  * the existing `FoodTagSelector` owns its own 13-tag vocabulary and stays
  * regression-identical, exempt from the curated caps.
@@ -373,6 +395,7 @@ export const CURATED_TAG_VOCABULARIES = {
   'liked:event': likedFor('event'),
   'liked:experience': likedFor('experience'),
   'liked:others': likedFor('others'),
+  'liked:food': LIKED_FOOD,
   'could_be_better:place': couldBeBetterFor('place'),
   'could_be_better:product': couldBeBetterFor('product'),
   'could_be_better:brand': couldBeBetterFor('brand'),
@@ -387,6 +410,7 @@ export const CURATED_TAG_VOCABULARIES = {
   'could_be_better:event': couldBeBetterFor('event'),
   'could_be_better:experience': couldBeBetterFor('experience'),
   'could_be_better:others': couldBeBetterFor('others'),
+  'could_be_better:food': COULD_BE_BETTER_FOOD,
 } as const satisfies Record<string, readonly CuratedTag[]>;
 
 export type CuratedTagSet = keyof typeof CURATED_TAG_VOCABULARIES;
