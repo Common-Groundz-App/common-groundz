@@ -30,6 +30,8 @@ export interface ComposerSubject {
   metadata?: { formatted_address?: string | null } | null;
   /** Provider (parent) name resolved from the hierarchy, when applicable. */
   providerName?: string | null;
+  /** Entity category link (`entities.category_id`); context only, not used for suggestions yet. */
+  categoryId?: string | null;
 }
 
 export interface QuestionnaireDraft {

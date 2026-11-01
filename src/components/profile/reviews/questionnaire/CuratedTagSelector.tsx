@@ -18,12 +18,14 @@ import {
   type CuratedTagAnswer,
   type CuratedTagMutation,
 } from './curatedTagInput';
+import { humanizeTagId } from './curatedTagInput';
 import { getCuratedTagLimits, getCuratedVocabulary, type CuratedTagSet } from './vocabularies';
 
 interface CuratedTagSelectorProps {
   tagSet: CuratedTagSet;
   label: string;
   helperText?: string;
+  hideLabel?: boolean;
   value: CuratedTagAnswer;
   onChange: (next: CuratedTagAnswer) => void;
 }
@@ -35,6 +37,7 @@ const CuratedTagSelector: React.FC<CuratedTagSelectorProps> = ({
   tagSet,
   label,
   helperText,
+  hideLabel,
   value,
   onChange,
 }) => {
@@ -55,12 +58,14 @@ const CuratedTagSelector: React.FC<CuratedTagSelectorProps> = ({
     return false;
   };
 
-  // Selected curated tags (known codes only — unknown stored codes are kept in
-  // the answer untouched, never relabeled), then custom entries.
+  // Selected curated tags — retired saved codes stay visible with a readable
+  // fallback label (the stored id is never rewritten), then custom entries.
   const selectedTags: UnifiedSelectedTag[] = [
-    ...value.selected.flatMap((code) => {
+    ...value.selected.map((code) => {
       const tag = vocabulary.find((t) => t.value === code);
-      return tag ? [{ key: `${CURATED_PREFIX}${code}`, label: tag.label, emoji: tag.emoji }] : [];
+      return tag
+        ? { key: `${CURATED_PREFIX}${code}`, label: tag.label, emoji: tag.emoji }
+        : { key: `${CURATED_PREFIX}${code}`, label: humanizeTagId(code) };
     }),
     ...value.custom.map((text) => ({ key: `${CUSTOM_PREFIX}${text}`, label: text })),
   ];
@@ -69,6 +74,7 @@ const CuratedTagSelector: React.FC<CuratedTagSelectorProps> = ({
     <UnifiedTagSelector
       label={label}
       helperText={helperText}
+      hideLabel={hideLabel}
       suggestions={vocabulary.map((t) => ({ id: t.value, label: t.label, emoji: t.emoji }))}
       selectedSuggestionIds={value.selected}
       selectedTags={selectedTags}

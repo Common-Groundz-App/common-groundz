@@ -70,6 +70,7 @@ const FieldRenderer: React.FC<{
           tagSet={field.tagSet}
           label={field.label}
           helperText={field.helperText}
+          hideLabel={field.hideLabel}
           value={answers.curated[field.id] ?? { selected: [], custom: [] }}
           onChange={(next) => onCuratedChange(field.id, next)}
         />

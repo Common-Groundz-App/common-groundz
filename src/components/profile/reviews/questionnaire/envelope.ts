@@ -73,11 +73,13 @@ function hydrateCurated(value: unknown, tagSet: CuratedTagSet): CuratedTagAnswer
   const rawSelected = Array.isArray((value as any).selected) ? (value as any).selected : [];
   const rawCustom = Array.isArray((value as any).custom) ? (value as any).custom : [];
   return {
-    // Grandfathered: every RECOGNIZED value is rendered, even beyond the cap.
-    // Unrecognized ids are not rendered; they survive because an untouched
-    // field is written back byte-identical.
-    selected: rawSelected.filter((v: unknown): v is string =>
-      typeof v === 'string' && vocabulary.includes(v),
+    // Every saved curated id is kept — current ones and retired ones that are
+    // still well-formed codes — even beyond the cap, so editing never drops
+    // a selection. Duplicates collapse; malformed values are not rendered.
+    selected: rawSelected.filter((v: unknown, i: number, arr: unknown[]): v is string =>
+      typeof v === 'string' &&
+      (vocabulary.includes(v) || CURATED_ID_RE.test(v)) &&
+      arr.indexOf(v) === i,
     ),
     // Custom entries are shown intact — never truncated, never re-cased.
     custom: rawCustom.filter((v: unknown): v is string => typeof v === 'string' && v.length > 0),

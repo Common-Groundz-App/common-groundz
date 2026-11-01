@@ -52,6 +52,8 @@ export interface QuestionnaireField {
   label: string;
   placeholder?: string;
   helperText?: string;
+  /** Visually hide the field label when it repeats the section title (kept for screen readers). */
+  hideLabel?: boolean;
   required: boolean;
   /** Only for `single-choice` / `select` / `multi-select`. */
   options?: readonly QuestionnaireOption[];
