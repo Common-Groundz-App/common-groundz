@@ -14,7 +14,7 @@ import {
 
 const EXPECTED: Record<string, { fields: string[]; repeatIntentLabel: string | null }> = {
   food: {
-    fields: ['would_recommend', 'repeat_intent', 'portion', 'food_tags'],
+    fields: ['would_recommend', 'repeat_intent', 'portion', 'liked', 'could_be_better', 'food_tags'],
     repeatIntentLabel: 'Would you order it again?',
   },
   place: {
@@ -126,10 +126,12 @@ describe('frozen v1 questionnaire matrix', () => {
     });
   }
 
-  it('keeps food on the untouched FoodTagSelector vocabulary and gives it no generic stood_out', () => {
+  it('keeps food on the untouched FoodTagSelector vocabulary, with food observations and no stood_out', () => {
     const fields = QUESTIONNAIRE_REGISTRY.food.sections.flatMap((s) => s.fields);
     expect(fields.find((f) => f.id === 'food_tags')?.tagSet).toBe('food');
-    expect(fields.some((f) => ['stood_out', 'liked', 'could_be_better'].includes(f.id))).toBe(false);
+    expect(fields.some((f) => f.id === 'stood_out')).toBe(false);
+    expect(fields.find((f) => f.id === 'liked')?.tagSet).toBe('liked:food');
+    expect(fields.find((f) => f.id === 'could_be_better')?.tagSet).toBe('could_be_better:food');
     expect(fields.some((f) => f.id === 'value')).toBe(false);
   });
 
