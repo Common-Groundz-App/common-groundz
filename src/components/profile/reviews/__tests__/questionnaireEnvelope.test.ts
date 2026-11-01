@@ -76,7 +76,7 @@ describe('hydration', () => {
     });
   });
 
-  it('does not render unknown tag ids or invalid choice codes', () => {
+  it('keeps saved (retired) tag ids but drops invalid choice codes', () => {
     const read = readQuestionnaireEnvelope(
       {
         questionnaire: {
@@ -92,7 +92,7 @@ describe('hydration', () => {
     );
     const hydrated = hydrateQuestionnaireAnswers(read, movie);
     expect(hydrated.choices).toEqual({});
-    expect(hydrated.curated.could_be_better).toEqual({ selected: [], custom: ['x'] });
+    expect(hydrated.curated.could_be_better).toEqual({ selected: ['from_a_future_build'], custom: ['x'] });
   });
 
   it('renders every recognized value even when the stored field is over cap', () => {

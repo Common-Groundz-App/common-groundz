@@ -64,11 +64,11 @@ describe('observation vocabularies', () => {
     expect(elsewhere).toEqual([]);
   });
 
-  it('limits: 5 total / 5 custom for both; best_for unchanged', () => {
+  it('limits: 5 total / 5 custom for both; best_for matches (Phase 5B)', () => {
     const five = { maxCombined: 5, maxCustom: 5, maxCustomLength: 40 };
     expect(getCuratedTagLimits('liked:place')).toEqual(five);
     expect(getCuratedTagLimits('could_be_better:movie')).toEqual(five);
-    expect(getCuratedTagLimits('best_for:place')).toEqual({ maxCombined: 5, maxCustom: 3, maxCustomLength: 40 });
+    expect(getCuratedTagLimits('best_for:place')).toEqual(five);
   });
 });
 
