@@ -131,6 +131,7 @@ export default defineConfig({
             'src/hooks/useEntitySearchWritePaths.test.tsx',
             'src/components/feed/SelectedEntityChipProof.test.tsx',
             'src/components/search/group2aEntityThumbnails.test.tsx',
+            'src/components/review-composer/__tests__/subjectCategoryPassthrough.test.tsx',
             'src/components/entity/group2bEntityThumbnails.test.tsx',
             'src/components/mystuff/saved/group3aCardThumbnails.test.tsx',
             'src/components/profile/reviews/group3bLargeFallback.test.tsx',

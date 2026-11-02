@@ -48,7 +48,7 @@ export function toSubject(row: EntityAdapter, providerName: string | null): Comp
     venue: row.venue ?? null,
     metadata: (row.metadata as ComposerSubject['metadata']) ?? null,
     providerName,
-    categoryId: (row as { category_id?: string | null }).category_id ?? null,
+    categoryId: row.category_id ?? null,
   };
 }
 
@@ -62,7 +62,7 @@ function rowToAdapter(data: Record<string, any>): EntityAdapter {
     description: data.description ?? undefined,
     metadata: data.metadata ?? undefined,
     category_id: data.category_id ?? null,
-  } as EntityAdapter;
+  };
 }
 
 export async function loadSubject(entityId: string): Promise<SubjectLoad> {
