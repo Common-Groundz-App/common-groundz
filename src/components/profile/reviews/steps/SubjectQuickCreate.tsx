@@ -218,6 +218,7 @@ const SubjectQuickCreate: React.FC<SubjectQuickCreateProps> = ({
         api_source: (result.entity as any).api_source ?? undefined,
         api_ref: (result.entity as any).api_ref ?? undefined,
         metadata: (result.entity as any).metadata,
+        category_id: result.entity.category_id ?? null,
       });
       onOpenChange(false);
     } catch (err: any) {

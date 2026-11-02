@@ -18,4 +18,6 @@ export interface EntityAdapter {
   api_ref?: string;
   api_source?: string;
   metadata?: Record<string, any>;
+  /** Persisted category of the entity, when known. Never inferred. */
+  category_id?: string | null;
 }

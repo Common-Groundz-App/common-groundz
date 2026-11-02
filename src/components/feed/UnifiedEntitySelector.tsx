@@ -378,6 +378,7 @@ export function UnifiedEntitySelector({
         image_url: entity.image_url || undefined,
         description: entity.description || undefined,
         venue: entity.venue || undefined,
+        category_id: entity.category_id ?? null,
       });
     } catch (err) {
       console.error('Error selecting external result:', err);
@@ -574,6 +575,7 @@ export function UnifiedEntitySelector({
         image_url: it.image_url || undefined,
         description: it.description || undefined,
         venue: it.venue || undefined,
+        category_id: it.category_id ?? null,
       });
     } else {
       handleExternalSelect({ ...it, type: it.type || target.categoryKey.replace(/s$/, '') });
@@ -958,6 +960,7 @@ export function UnifiedEntitySelector({
                                   image_url: item.image_url || undefined,
                                   description: item.description || undefined,
                                   venue: item.venue || undefined,
+                                  category_id: item.category_id ?? null,
                                 })
                             : () => handleExternalSelect({ ...item, type: item.type || cat.key.replace(/s$/, '') });
                         return renderEntityRow(
