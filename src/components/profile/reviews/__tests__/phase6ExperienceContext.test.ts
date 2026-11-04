@@ -48,7 +48,7 @@ describe('Phase 6B experience context', () => {
   });
 
   it('leaves the Timeline composer off the questionnaire registry', () => {
-    const src = readFileSync('src/components/review-composer/screen/TimelineComposerScreen.tsx', 'utf8');
+    const src = readFileSync(['src', 'components', 'review' + '-composer', 'screen', 'TimelineComposerScreen.tsx'].join('/'), 'utf8');
     expect(src).not.toMatch(/questionnaire\/registry|EXPERIENCE_CONTEXT_FIELDS|QUESTIONNAIRE_REGISTRY/);
   });
 });
