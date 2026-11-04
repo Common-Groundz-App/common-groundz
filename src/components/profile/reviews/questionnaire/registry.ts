@@ -231,6 +231,134 @@ const bestForSection = (tagSet: CuratedTagSet): QuestionnaireSectionConfig => ({
   fields: [bestForField(tagSet)],
 });
 
+/* ------------------------------------------------------------------ *
+ * Phase 6B — Experience Context. Factual, self-reported, neutral (never
+ * evaluative). Stored flat under `answers[fieldId]`; codes are immutable.
+ * Root Review only — the Timeline composer does not read this registry.
+ * ------------------------------------------------------------------ */
+
+const opts = (pairs: ReadonlyArray<[string, string]>): readonly QuestionnaireOption[] =>
+  pairs.map(([value, label]) => ({ value, label }));
+
+const ctxField = (id: string, label: string, options: readonly QuestionnaireOption[]): QuestionnaireField => ({
+  id,
+  kind: 'single-choice',
+  label,
+  required: false,
+  options,
+});
+
+const COUNT_OPTIONS = opts([
+  ['first_time', '1st time'],
+  ['second_time', '2nd time'],
+  ['three_or_more', '3+ times'],
+]);
+
+/** Non-overlapping: [0,1) · [1,6) · [6,12) · [12,∞) months. */
+export const USAGE_DURATION_OPTIONS = opts([
+  ['under_1_month', 'Less than 1 month'],
+  ['1_to_under_6_months', '1 to under 6 months'],
+  ['6_to_under_12_months', '6 to under 12 months'],
+  ['1_year_or_more', '1 year or more'],
+]);
+
+const USAGE_DURATION_FIELD = ctxField('usage_duration', 'How long have you used it?', USAGE_DURATION_OPTIONS);
+
+const experienceSection = (fields: readonly QuestionnaireField[]): QuestionnaireSectionConfig => ({
+  id: 'experience_context',
+  title: 'Your experience',
+  icon: '🧭',
+  fields,
+});
+
+export const EXPERIENCE_CONTEXT_FIELDS: Record<CanonicalEntityType, readonly QuestionnaireField[]> = {
+  movie: [ctxField('watch_count', 'Which viewing is this?', COUNT_OPTIONS)],
+  tv_show: [
+    ctxField('watch_count', 'Which viewing of this show is this?', COUNT_OPTIONS),
+    ctxField('viewing_progress', 'Where are you with this show?', opts([
+      ['just_started', 'Just started'],
+      ['partway', 'Partway through'],
+      ['caught_up', 'Caught up with released episodes'],
+      ['finished_series', 'Finished the entire series'],
+      ['stopped_watching', 'Stopped watching'],
+    ])),
+  ],
+  book: [
+    ctxField('reading_count', 'Which reading is this?', COUNT_OPTIONS),
+    ctxField('reading_progress', 'Where are you with this book?', opts([
+      ['just_started', 'Just started'],
+      ['partway', 'Partway through'],
+      ['finished', 'Finished it'],
+      ['stopped_early', 'Stopped reading'],
+    ])),
+  ],
+  game: [
+    ctxField('game_familiarity', 'How familiar are you with this game?', opts([
+      ['just_started', 'Just started'],
+      ['played_before', 'Played before'],
+      ['regular_player', 'Regular player'],
+    ])),
+    ctxField('play_progress', 'Where are you with this game?', opts([
+      ['just_started', 'Just started'],
+      ['in_progress', 'In progress'],
+      ['completed', 'Completed (where applicable)'],
+      ['stopped_early', 'Stopped early'],
+    ])),
+  ],
+  course: [
+    ctxField('course_progress', 'Where are you with this course?', opts([
+      ['just_started', 'Just started'],
+      ['in_progress', 'In progress'],
+      ['completed', 'Completed it'],
+      ['stopped_early', 'Stopped early'],
+    ])),
+  ],
+  product: [USAGE_DURATION_FIELD],
+  app: [USAGE_DURATION_FIELD],
+  place: [ctxField('visit_familiarity', 'How familiar are you with this place?', opts([
+    ['first_visit', 'First visit'],
+    ['few_visits', 'Visited a few times'],
+    ['regularly', 'Visit regularly'],
+  ]))],
+  food: [ctxField('dish_familiarity', 'How familiar are you with this dish?', opts([
+    ['first_time', 'First time'],
+    ['had_before', 'Had it before'],
+    ['regularly', 'Have it regularly'],
+  ]))],
+  brand: [ctxField('brand_familiarity', 'How familiar are you with this brand?', opts([
+    ['first_purchase', 'First purchase'],
+    ['few_purchases', 'Bought a few times'],
+    ['regular_customer', 'Regular customer'],
+  ]))],
+  event: [ctxField('event_familiarity', 'Have you attended this before?', opts([
+    ['first_time', 'First time'],
+    ['attended_before', 'Attended before'],
+    ['regularly', 'Attend regularly'],
+  ]))],
+  experience: [ctxField('experience_familiarity', 'Have you done this before?', opts([
+    ['first_time', 'First time'],
+    ['done_before', 'Done it before'],
+    ['multiple_times', 'Done it multiple times'],
+  ]))],
+  service: [ctxField('service_engagement', 'How often have you used this service?', opts([
+    ['first_time', 'First time'],
+    ['used_a_few_times', 'Used a few times'],
+    ['ongoing_client', 'Ongoing client'],
+  ]))],
+  professional: [ctxField('professional_engagement', 'How have you worked with them?', opts([
+    ['first_consultation', 'First consultation'],
+    ['worked_together_before', 'Worked together before'],
+    ['ongoing_client', 'Ongoing client'],
+  ]))],
+  others: [ctxField('other_familiarity', 'Have you experienced this before?', opts([
+    ['first_time', 'First time'],
+    ['experienced_before', 'Experienced before'],
+    ['regularly', 'Experience it regularly'],
+  ]))],
+};
+
+const ctx = (type: CanonicalEntityType) => experienceSection(EXPERIENCE_CONTEXT_FIELDS[type]);
+
 /**
  * All 15 canonical types, explicit — the frozen v1 matrix. Every type gets
  * `would_recommend` + `liked` + `could_be_better` (`food` also keeps its separate Food Tags), its own repeat-intent wording (`course` has none) and
