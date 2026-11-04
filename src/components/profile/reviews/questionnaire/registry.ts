@@ -371,6 +371,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you watch it again?')]),
+      ctx('movie'),
       ...observationSections('movie'),
       bestForSection('best_for:movie'),
     ],
@@ -381,6 +382,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you read it again?'), WORTH_TIME_FIELD]),
+      ctx('book'),
       ...observationSections('book'),
       bestForSection('best_for:book'),
     ],
@@ -391,6 +393,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you keep watching?'), WORTH_TIME_FIELD]),
+      ctx('tv_show'),
       ...observationSections('tv_show'),
       bestForSection('best_for:tv_show'),
     ],
@@ -401,6 +404,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, WORTH_TIME_FIELD]),
+      ctx('course'),
       ...observationSections('course'),
       bestForSection('best_for:course'),
     ],
@@ -415,6 +419,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
         repeatIntentField('Would you keep using it?'),
         SOLVES_PROBLEM_FIELD,
       ]),
+      ctx('app'),
       ...observationSections('app'),
       bestForSection('best_for:app'),
     ],
@@ -425,6 +430,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you play it again?'), WORTH_TIME_FIELD]),
+      ctx('game'),
       ...observationSections('game'),
       bestForSection('best_for:game'),
     ],
@@ -435,6 +441,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: true,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you do it again?'), WORTH_TIME_FIELD]),
+      ctx('experience'),
       ...observationSections('experience'),
       bestForSection('best_for:experience'),
     ],
@@ -445,6 +452,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: true,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you order it again?'), PORTION_FIELD]),
+      ctx('food'),
       ...observationSections('food'),
       FOOD_TAGS_SECTION,
       bestForSection('best_for:food'),
@@ -456,6 +464,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you buy it again?'), VALUE_FIELD]),
+      ctx('product'),
       ...observationSections('product'),
       bestForSection('best_for:product'),
     ],
@@ -466,6 +475,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: true,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you visit again?')]),
+      ctx('place'),
       ...observationSections('place'),
       bestForSection('best_for:place'),
     ],
@@ -480,6 +490,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
         repeatIntentField('Would you buy from this brand again?'),
         TRUST_FIELD,
       ]),
+      ctx('brand'),
       ...observationSections('brand'),
       bestForSection('best_for:brand'),
     ],
@@ -490,6 +501,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: true,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you attend again?'), WORTH_TIME_FIELD]),
+      ctx('event'),
       ...observationSections('event'),
       bestForSection('best_for:event'),
     ],
@@ -500,6 +512,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you use this service again?'), VALUE_FIELD]),
+      ctx('service'),
       ...observationSections('service'),
       bestForSection('best_for:service'),
     ],
@@ -514,6 +527,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
         repeatIntentField('Would you work with them again?'),
         TRUST_FIELD,
       ]),
+      ctx('professional'),
       ...observationSections('professional'),
       bestForSection('best_for:professional'),
     ],
@@ -524,6 +538,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Choose again?')]),
+      ctx('others'),
       ...observationSections('others'),
       bestForSection('best_for:others'),
     ],
