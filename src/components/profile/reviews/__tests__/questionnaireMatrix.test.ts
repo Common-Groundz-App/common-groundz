@@ -14,63 +14,63 @@ import {
 
 const EXPECTED: Record<string, { fields: string[]; repeatIntentLabel: string | null }> = {
   food: {
-    fields: ['would_recommend', 'repeat_intent', 'portion', 'liked', 'could_be_better', 'food_tags', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'portion', 'dish_familiarity', 'liked', 'could_be_better', 'food_tags', 'best_for'],
     repeatIntentLabel: 'Would you order it again?',
   },
   place: {
-    fields: ['would_recommend', 'repeat_intent', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'visit_familiarity', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you visit again?',
   },
   product: {
-    fields: ['would_recommend', 'repeat_intent', 'value', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'value', 'usage_duration', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you buy it again?',
   },
   brand: {
-    fields: ['would_recommend', 'repeat_intent', 'trust', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'trust', 'brand_familiarity', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you buy from this brand again?',
   },
   movie: {
-    fields: ['would_recommend', 'repeat_intent', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'watch_count', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you watch it again?',
   },
   tv_show: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'watch_count', 'viewing_progress', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you keep watching?',
   },
   book: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'reading_count', 'reading_progress', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you read it again?',
   },
   game: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'game_familiarity', 'play_progress', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you play it again?',
   },
   app: {
-    fields: ['would_recommend', 'repeat_intent', 'solves_problem', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'solves_problem', 'usage_duration', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you keep using it?',
   },
   course: {
-    fields: ['would_recommend', 'worth_time', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'worth_time', 'course_progress', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: null,
   },
   service: {
-    fields: ['would_recommend', 'repeat_intent', 'value', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'value', 'service_engagement', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you use this service again?',
   },
   professional: {
-    fields: ['would_recommend', 'repeat_intent', 'trust', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'trust', 'professional_engagement', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you work with them again?',
   },
   event: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'event_familiarity', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you attend again?',
   },
   experience: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'experience_familiarity', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you do it again?',
   },
   others: {
-    fields: ['would_recommend', 'repeat_intent', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'other_familiarity', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Choose again?',
   },
 };
@@ -84,6 +84,9 @@ const STORED_VALUES: Record<string, string[]> = {
   solves_problem: ['yes', 'partly', 'no'],
   portion: ['small', 'just_right', 'large'],
 };
+
+import { EXPERIENCE_CONTEXT_FIELDS } from '@/components/profile/reviews/questionnaire/registry';
+for (const fs of Object.values(EXPERIENCE_CONTEXT_FIELDS)) for (const f of fs) STORED_VALUES[f.id] ??= (f.options ?? []).map((o) => o.value);
 
 describe('frozen v1 questionnaire matrix', () => {
   it('covers all 15 canonical types and nothing else', () => {
