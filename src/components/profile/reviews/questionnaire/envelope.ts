@@ -59,6 +59,40 @@ export function readQuestionnaireEnvelope(
 }
 
 /* ------------------------------------------------------------------ *
+ * Phase 7B — attribute ratings
+ *
+ * Draft state rides inside `choices` under composite keys
+ * (`attribute_ratings:<attributeId>` → "1".."5") so it inherits the existing
+ * dirty tracking, subject reset and save plumbing. Only the composite keys
+ * the reviewer touched are rewritten; every other stored entry (retired ids,
+ * even malformed values) is carried through untouched.
+ * ------------------------------------------------------------------ */
+
+export function attributeRatingKey(fieldId: string, attributeId: string): string {
+  return `${fieldId}:${attributeId}`;
+}
+
+/** The only shape treated as a valid rating: an integer 1–5. */
+export function isValidAttributeRating(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5;
+}
+
+/** Valid entries only — for display and any future insight/analytics reader. */
+export function readValidAttributeRatings(value: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!isPlainMetadataObject(value)) return out;
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    if (CURATED_ID_RE.test(k) && isValidAttributeRating(v)) out[k] = v;
+  }
+  return out;
+}
+
+function parseDraftRating(value: string | undefined): number | undefined {
+  if (typeof value !== 'string' || !/^[1-5]$/.test(value)) return undefined;
+  return Number(value);
+}
+
+/* ------------------------------------------------------------------ *
  * Hydration — stored values → renderable answers
  * ------------------------------------------------------------------ */
 
@@ -104,6 +138,13 @@ export function hydrateQuestionnaireAnswers(
         }
       } else if (field.kind === 'tags' && field.tagSet && field.tagSet !== 'food') {
         hydrated.curated[field.id] = hydrateCurated(stored, field.tagSet);
+      } else if (field.kind === 'attribute-ratings') {
+        const valid = readValidAttributeRatings(stored);
+        for (const attr of field.attributes ?? []) {
+          if (valid[attr.id] !== undefined) {
+            hydrated.choices[attributeRatingKey(field.id, attr.id)] = String(valid[attr.id]);
+          }
+        }
       }
     }
   }
@@ -159,6 +200,24 @@ export function buildQuestionnairePatch({
 
   for (const section of config.sections) {
     for (const field of section.fields) {
+      if (field.kind === 'attribute-ratings') {
+        const touchedAttrs = (field.attributes ?? []).filter((attr) =>
+          touchedFieldIds.has(attributeRatingKey(field.id, attr.id)),
+        );
+        if (touchedAttrs.length === 0) continue; // byte-identical passthrough
+        const existing = answers[field.id];
+        const map: Record<string, unknown> = isPlainMetadataObject(existing)
+          ? { ...(existing as Record<string, unknown>) }
+          : {};
+        for (const attr of touchedAttrs) {
+          const rating = parseDraftRating(choices[attributeRatingKey(field.id, attr.id)]);
+          if (rating !== undefined) map[attr.id] = rating;
+          else delete map[attr.id];
+        }
+        if (Object.keys(map).length > 0) answers[field.id] = map;
+        else delete answers[field.id];
+        continue;
+      }
       if (!touchedFieldIds.has(field.id)) continue; // byte-identical passthrough
 
       if (field.kind === 'single-choice') {
