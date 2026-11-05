@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CompactConnectedRingsRating from '../questionnaire/CompactConnectedRingsRating';
-import { reducer as _unused } from './phase7StoreShim';
 
 function Harness() {
   const [v, setV] = useState<number | undefined>(undefined);
