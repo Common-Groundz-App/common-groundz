@@ -31,7 +31,8 @@ export type QuestionnaireFieldKind =
   | 'select'
   | 'multi-select'
   | 'single-choice'
-  | 'tags';
+  | 'tags'
+  | 'attribute-ratings';
 
 /**
  * Curated tag vocabularies. `food` names the EXISTING `FoodTagSelector`
@@ -59,6 +60,14 @@ export interface QuestionnaireField {
   options?: readonly QuestionnaireOption[];
   /** Only for `tags` — names a vocabulary, never a component. */
   tagSet?: QuestionnaireTagSet;
+  /** Only for `attribute-ratings` — optional 1–5 dimensions. IDs are immutable once shipped. */
+  attributes?: readonly QuestionnaireAttribute[];
+}
+
+export interface QuestionnaireAttribute {
+  /** Stored key inside `answers.attribute_ratings`. Immutable once shipped. */
+  id: string;
+  label: string;
 }
 
 export interface QuestionnaireSectionConfig {
@@ -357,6 +366,64 @@ export const EXPERIENCE_CONTEXT_FIELDS: Record<CanonicalEntityType, readonly Que
   ]))],
 };
 
+/* ------------------------------------------------------------------ *
+ * Phase 7B — optional attribute ratings (integer 1–5 per attribute).
+ * Stored at `answers.attribute_ratings` as `{ [attributeId]: number }`.
+ * Attribute ids are interpreted in the context of the canonical type.
+ * `others` intentionally has none.
+ * ------------------------------------------------------------------ */
+
+export const ATTRIBUTE_RATINGS_FIELD_ID = 'attribute_ratings';
+
+const a = (id: string, label: string): QuestionnaireAttribute => ({ id, label });
+
+export const ATTRIBUTE_RATINGS: Record<CanonicalEntityType, readonly QuestionnaireAttribute[]> = {
+  movie: [a('story', 'Story'), a('acting', 'Acting'), a('visuals', 'Visuals'), a('pacing', 'Pacing')],
+  tv_show: [a('story', 'Story'), a('acting', 'Acting'), a('visuals', 'Visuals'), a('pacing', 'Pacing')],
+  book: [a('writing_style', 'Writing style'), a('depth', 'Depth'), a('pacing', 'Pacing')],
+  food: [
+    a('taste_flavor', 'Taste & flavor'),
+    a('texture', 'Texture'),
+    a('freshness', 'Freshness'),
+    a('presentation', 'Presentation'),
+  ],
+  place: [a('atmosphere', 'Atmosphere'), a('cleanliness', 'Cleanliness'), a('service', 'Service')],
+  product: [a('quality', 'Quality'), a('effectiveness', 'Effectiveness'), a('ease_of_use', 'Ease of use')],
+  app: [a('ease_of_use', 'Ease of use'), a('reliability', 'Reliability'), a('design', 'Design')],
+  game: [a('gameplay', 'Gameplay'), a('visuals', 'Visuals'), a('performance', 'Performance')],
+  brand: [a('overall_quality', 'Overall quality'), a('customer_support', 'Customer support')],
+  service: [a('quality_of_work', 'Quality of work'), a('communication', 'Communication'), a('reliability', 'Reliability')],
+  professional: [a('expertise', 'Expertise'), a('communication', 'Communication'), a('professionalism', 'Professionalism')],
+  event: [a('organization', 'Organization'), a('atmosphere', 'Atmosphere')],
+  experience: [a('organization', 'Organization'), a('atmosphere', 'Atmosphere')],
+  course: [a('content_quality', 'Content quality'), a('teaching', 'Teaching'), a('structure', 'Structure')],
+  others: [],
+};
+
+/** Returns the section, or nothing for types without attributes (`others`). */
+const attributeSection = (type: CanonicalEntityType): QuestionnaireSectionConfig[] => {
+  const attributes = ATTRIBUTE_RATINGS[type];
+  if (attributes.length === 0) return [];
+  return [
+    {
+      id: 'attribute_ratings',
+      title: 'Rate the details',
+      icon: '🎯',
+      description: 'Optional — rate only what matters to you.',
+      fields: [
+        {
+          id: ATTRIBUTE_RATINGS_FIELD_ID,
+          kind: 'attribute-ratings',
+          label: 'Rate the details',
+          hideLabel: true,
+          required: false,
+          attributes,
+        },
+      ],
+    },
+  ];
+};
+
 const ctx = (type: CanonicalEntityType) => experienceSection(EXPERIENCE_CONTEXT_FIELDS[type]);
 
 /**
@@ -371,6 +438,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you watch it again?')]),
+      ...attributeSection('movie'),
       ctx('movie'),
       ...observationSections('movie'),
       bestForSection('best_for:movie'),
@@ -382,6 +450,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you read it again?'), WORTH_TIME_FIELD]),
+      ...attributeSection('book'),
       ctx('book'),
       ...observationSections('book'),
       bestForSection('best_for:book'),
@@ -393,6 +462,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you keep watching?'), WORTH_TIME_FIELD]),
+      ...attributeSection('tv_show'),
       ctx('tv_show'),
       ...observationSections('tv_show'),
       bestForSection('best_for:tv_show'),
@@ -404,6 +474,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, WORTH_TIME_FIELD]),
+      ...attributeSection('course'),
       ctx('course'),
       ...observationSections('course'),
       bestForSection('best_for:course'),
@@ -419,6 +490,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
         repeatIntentField('Would you keep using it?'),
         SOLVES_PROBLEM_FIELD,
       ]),
+      ...attributeSection('app'),
       ctx('app'),
       ...observationSections('app'),
       bestForSection('best_for:app'),
@@ -430,6 +502,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you play it again?'), WORTH_TIME_FIELD]),
+      ...attributeSection('game'),
       ctx('game'),
       ...observationSections('game'),
       bestForSection('best_for:game'),
@@ -441,6 +514,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: true,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you do it again?'), WORTH_TIME_FIELD]),
+      ...attributeSection('experience'),
       ctx('experience'),
       ...observationSections('experience'),
       bestForSection('best_for:experience'),
@@ -452,6 +526,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: true,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you order it again?'), PORTION_FIELD]),
+      ...attributeSection('food'),
       ctx('food'),
       ...observationSections('food'),
       FOOD_TAGS_SECTION,
@@ -464,6 +539,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you buy it again?'), VALUE_FIELD]),
+      ...attributeSection('product'),
       ctx('product'),
       ...observationSections('product'),
       bestForSection('best_for:product'),
@@ -475,6 +551,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: true,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you visit again?')]),
+      ...attributeSection('place'),
       ctx('place'),
       ...observationSections('place'),
       bestForSection('best_for:place'),
@@ -490,6 +567,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
         repeatIntentField('Would you buy from this brand again?'),
         TRUST_FIELD,
       ]),
+      ...attributeSection('brand'),
       ctx('brand'),
       ...observationSections('brand'),
       bestForSection('best_for:brand'),
@@ -501,6 +579,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: true,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you attend again?'), WORTH_TIME_FIELD]),
+      ...attributeSection('event'),
       ctx('event'),
       ...observationSections('event'),
       bestForSection('best_for:event'),
@@ -512,6 +591,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you use this service again?'), VALUE_FIELD]),
+      ...attributeSection('service'),
       ctx('service'),
       ...observationSections('service'),
       bestForSection('best_for:service'),
@@ -527,6 +607,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
         repeatIntentField('Would you work with them again?'),
         TRUST_FIELD,
       ]),
+      ...attributeSection('professional'),
       ctx('professional'),
       ...observationSections('professional'),
       bestForSection('best_for:professional'),
@@ -538,6 +619,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     showLocationPrompt: false,
     sections: [
       choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Choose again?')]),
+      ...attributeSection('others'),
       ctx('others'),
       ...observationSections('others'),
       bestForSection('best_for:others'),
