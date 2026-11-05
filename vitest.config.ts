@@ -74,6 +74,7 @@ const nodeIncludes = [
   'src/components/profile/reviews/__tests__/phase4b3cFoodDescriptors.test.ts',
   'src/components/profile/reviews/__tests__/phase6ExperienceContext.test.ts',
   'src/components/profile/reviews/__tests__/phase7AttributeRatings.test.ts',
+  'src/components/review-composer/__tests__/phase7AttributeReset.test.ts',
   'src/components/profile/reviews/__tests__/phase5bBestFor.test.ts',
   'src/components/review-composer/__tests__/composerFoundation.test.ts',
   'src/components/review-composer/__tests__/subjectCategory.test.ts',
