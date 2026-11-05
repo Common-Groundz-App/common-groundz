@@ -14,59 +14,59 @@ import {
 
 const EXPECTED: Record<string, { fields: string[]; repeatIntentLabel: string | null }> = {
   food: {
-    fields: ['would_recommend', 'repeat_intent', 'portion', 'dish_familiarity', 'liked', 'could_be_better', 'food_tags', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'portion', 'dish_familiarity', 'attribute_ratings', 'liked', 'could_be_better', 'food_tags', 'best_for'],
     repeatIntentLabel: 'Would you order it again?',
   },
   place: {
-    fields: ['would_recommend', 'repeat_intent', 'visit_familiarity', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'visit_familiarity', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you visit again?',
   },
   product: {
-    fields: ['would_recommend', 'repeat_intent', 'value', 'usage_duration', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'value', 'usage_duration', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you buy it again?',
   },
   brand: {
-    fields: ['would_recommend', 'repeat_intent', 'trust', 'brand_familiarity', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'trust', 'brand_familiarity', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you buy from this brand again?',
   },
   movie: {
-    fields: ['would_recommend', 'repeat_intent', 'watch_count', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'watch_count', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you watch it again?',
   },
   tv_show: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'watch_count', 'viewing_progress', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'watch_count', 'viewing_progress', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you keep watching?',
   },
   book: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'reading_count', 'reading_progress', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'reading_count', 'reading_progress', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you read it again?',
   },
   game: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'game_familiarity', 'play_progress', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'game_familiarity', 'play_progress', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you play it again?',
   },
   app: {
-    fields: ['would_recommend', 'repeat_intent', 'solves_problem', 'usage_duration', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'solves_problem', 'usage_duration', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you keep using it?',
   },
   course: {
-    fields: ['would_recommend', 'worth_time', 'course_progress', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'worth_time', 'course_progress', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: null,
   },
   service: {
-    fields: ['would_recommend', 'repeat_intent', 'value', 'service_engagement', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'value', 'service_engagement', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you use this service again?',
   },
   professional: {
-    fields: ['would_recommend', 'repeat_intent', 'trust', 'professional_engagement', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'trust', 'professional_engagement', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you work with them again?',
   },
   event: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'event_familiarity', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'event_familiarity', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you attend again?',
   },
   experience: {
-    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'experience_familiarity', 'liked', 'could_be_better', 'best_for'],
+    fields: ['would_recommend', 'repeat_intent', 'worth_time', 'experience_familiarity', 'attribute_ratings', 'liked', 'could_be_better', 'best_for'],
     repeatIntentLabel: 'Would you do it again?',
   },
   others: {
