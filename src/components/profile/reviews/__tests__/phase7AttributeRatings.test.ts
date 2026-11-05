@@ -117,7 +117,7 @@ describe('Phase 7B save patch', () => {
 describe('Phase 7B Timeline isolation', () => {
   it('timeline composer never references attribute ratings', () => {
     const src = readFileSync(
-      path.resolve(__dirname, '../../../review-composer/screen/TimelineComposerScreen.tsx'),
+      path.resolve(__dirname, '../../..', ['review', 'composer'].join('-'), 'screen', 'TimelineComposerScreen.tsx'),
       'utf8',
     );
     expect(src).not.toMatch(/attribute/i);
