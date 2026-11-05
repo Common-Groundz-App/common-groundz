@@ -23,8 +23,9 @@ export interface CompactConnectedRingsRatingProps {
 }
 
 const RING_STEP = 44; // px — also the hit-target width
-const RING_RADIUS = 18;
-const STROKE = 3.5;
+// Outer diameter slightly exceeds the step so neighbouring rings touch ("connected").
+const RING_RADIUS = 20.5;
+const STROKE = 3;
 
 const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = ({
   label,
@@ -67,7 +68,7 @@ const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = 
             width={width}
             height={RING_STEP}
             viewBox={`0 0 ${width} ${RING_STEP}`}
-            className="pointer-events-none absolute inset-0"
+            className="pointer-events-none absolute inset-0 overflow-visible"
             aria-hidden="true"
           >
             {[1, 2, 3, 4, 5].map((n) => {
@@ -75,7 +76,7 @@ const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = 
               return (
                 <circle
                   key={n}
-                  cx={RING_STEP / 2 + (n - 1) * RING_STEP * 0.78 + RING_STEP * 0.44}
+                  cx={RING_STEP / 2 + (n - 1) * RING_STEP}
                   cy={RING_STEP / 2}
                   r={RING_RADIUS}
                   fill="none"

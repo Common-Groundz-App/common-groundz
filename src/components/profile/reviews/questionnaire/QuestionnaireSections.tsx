@@ -16,6 +16,8 @@ import { Textarea } from '@/components/ui/textarea';
 import FoodTagSelector from '@/components/profile/reviews/FoodTagSelector';
 import ChoiceChips from './ChoiceChips';
 import CuratedTagSelector from './CuratedTagSelector';
+import CompactConnectedRingsRating from './CompactConnectedRingsRating';
+import { attributeRatingKey } from './envelope';
 import type { CuratedTagAnswer } from './curatedTagInput';
 import type { QuestionnaireConfig, QuestionnaireField } from './registry';
 
@@ -118,6 +120,25 @@ const FieldRenderer: React.FC<{
           {field.helperText && (
             <p className="text-xs text-muted-foreground">{field.helperText}</p>
           )}
+        </div>
+      );
+    case 'attribute-ratings':
+      return (
+        <div className="space-y-3" role="group" aria-label={field.label}>
+          {(field.attributes ?? []).map((attr) => {
+            const key = attributeRatingKey(field.id, attr.id);
+            const raw = answers.choices[key];
+            const value = raw && /^[1-5]$/.test(raw) ? Number(raw) : undefined;
+            return (
+              <CompactConnectedRingsRating
+                key={attr.id}
+                idPrefix={`q-${field.id}-${attr.id}`}
+                label={attr.label}
+                value={value}
+                onChange={(next) => onChoiceChange(key, next === undefined ? undefined : String(next))}
+              />
+            );
+          })}
         </div>
       );
     default:
