@@ -22,10 +22,16 @@ export interface CompactConnectedRingsRatingProps {
   idPrefix: string;
 }
 
-const RING_STEP = 44; // px — also the hit-target width
-// Outer diameter slightly exceeds the step so neighbouring rings touch ("connected").
-const RING_RADIUS = 20.5;
-const STROKE = 3;
+// Geometry copied from ConnectedRingsRating's `sm`/`md` configs (same
+// stroke/radius ≈ 0.2 and overlap/diameter ≈ 0.37 ratios), sized between them.
+const RING_SIZE = 24; // outer radius, as in ConnectedRingsRating `ringSize`
+const STROKE = 4.75;
+const OVERLAP = 18;
+const RING_STEP = RING_SIZE * 2 - OVERLAP; // 30px centre-to-centre
+const RING_RADIUS = RING_SIZE - STROKE / 2;
+const DIAMETER = RING_SIZE * 2;
+const HIT_HEIGHT = 44;
+const EDGE = (DIAMETER - RING_STEP) / 2; // first/last ring overhang
 
 const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = ({
   label,
@@ -36,7 +42,7 @@ const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = 
   const [hover, setHover] = useState(0);
   const display = hover || value || 0;
   const activeColor = display > 0 ? getSentimentColor(display) : undefined;
-  const width = RING_STEP * 5;
+  const width = RING_STEP * 4 + DIAMETER;
   const labelId = `${idPrefix}-label`;
 
   return (
@@ -61,35 +67,44 @@ const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = 
           role="group"
           aria-labelledby={labelId}
           className="relative shrink-0"
-          style={{ width, height: RING_STEP }}
+          style={{ width, height: HIT_HEIGHT }}
           onMouseLeave={() => setHover(0)}
         >
           <svg
             width={width}
-            height={RING_STEP}
-            viewBox={`0 0 ${width} ${RING_STEP}`}
+            height={HIT_HEIGHT}
+            viewBox={`0 0 ${width} ${HIT_HEIGHT}`}
             className="pointer-events-none absolute inset-0 overflow-visible"
             aria-hidden="true"
           >
             {[1, 2, 3, 4, 5].map((n) => {
               const filled = n <= display;
+              // Same dimming rule as the primary rings: unfilled rings fade
+              // once a value exists (never at 5).
+              const dim = value !== undefined && value < 5 && !filled ? 0.5 : 1;
               return (
                 <circle
                   key={n}
-                  cx={RING_STEP / 2 + (n - 1) * RING_STEP}
-                  cy={RING_STEP / 2}
+                  cx={RING_SIZE + (n - 1) * RING_STEP}
+                  cy={HIT_HEIGHT / 2}
                   r={RING_RADIUS}
-                  fill="none"
+                  fill="transparent"
                   strokeWidth={STROKE}
+                  strokeLinecap="round"
                   style={{
-                    stroke: filled ? activeColor : 'hsl(var(--border))',
-                    transition: 'stroke 150ms ease',
+                    stroke: filled
+                      ? activeColor
+                      : value
+                        ? 'hsl(var(--border))'
+                        : 'hsl(var(--muted-foreground) / 0.6)',
+                    opacity: dim,
+                    transition: 'stroke 0.2s ease-out, opacity 0.3s ease-out',
                   }}
                 />
               );
             })}
           </svg>
-          <div className="absolute inset-0 flex">
+          <div className="absolute inset-0 flex" style={{ paddingLeft: EDGE, paddingRight: EDGE }}>
             {[1, 2, 3, 4, 5].map((n) => {
               const selected = value === n;
               return (
@@ -101,7 +116,8 @@ const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = 
                   onClick={() => onChange(selected ? undefined : n)}
                   onMouseEnter={() => setHover(n)}
                   onFocus={() => setHover(0)}
-                  className="h-11 w-11 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  style={{ width: RING_STEP }}
+                  className="h-11 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
               );
             })}
