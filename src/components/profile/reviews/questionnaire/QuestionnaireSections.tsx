@@ -124,7 +124,7 @@ const FieldRenderer: React.FC<{
       );
     case 'attribute-ratings':
       return (
-        <div className="space-y-3" role="group" aria-label={field.label}>
+        <div className="space-y-5" role="group" aria-label={field.label}>
           {(field.attributes ?? []).map((attr) => {
             const key = attributeRatingKey(field.id, attr.id);
             const raw = answers.choices[key];

@@ -24,10 +24,10 @@ export interface CompactConnectedRingsRatingProps {
 
 // Geometry copied from ConnectedRingsRating's `sm`/`md` configs (same
 // stroke/radius ≈ 0.2 and overlap/diameter ≈ 0.37 ratios), sized between them.
-const RING_SIZE = 24; // outer radius, as in ConnectedRingsRating `ringSize`
-const STROKE = 4.75;
-const OVERLAP = 18;
-const RING_STEP = RING_SIZE * 2 - OVERLAP; // 30px centre-to-centre
+const RING_SIZE = 18; // outer radius → 36px diameter
+const STROKE = 3.4;
+const OVERLAP = 13.5; // ≈37.5% interlocking, same ratio as before
+const RING_STEP = RING_SIZE * 2 - OVERLAP; // 22.5px centre-to-centre
 const RING_RADIUS = RING_SIZE - STROKE / 2;
 const DIAMETER = RING_SIZE * 2;
 const HIT_HEIGHT = 44;
@@ -104,7 +104,7 @@ const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = 
               );
             })}
           </svg>
-          <div className="absolute inset-0 flex" style={{ paddingLeft: EDGE, paddingRight: EDGE }}>
+          <div className="absolute inset-0 flex">
             {[1, 2, 3, 4, 5].map((n) => {
               const selected = value === n;
               return (
@@ -116,7 +116,8 @@ const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = 
                   onClick={() => onChange(selected ? undefined : n)}
                   onMouseEnter={() => setHover(n)}
                   onFocus={() => setHover(0)}
-                  style={{ width: RING_STEP }}
+                  // Contiguous, non-overlapping zones: outer zones absorb the ring overhang.
+                  style={{ width: n === 1 || n === 5 ? RING_STEP + EDGE : RING_STEP }}
                   className="h-11 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
               );
