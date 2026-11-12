@@ -37,4 +37,20 @@ describe('CompactConnectedRingsRating', () => {
     fireEvent.keyDown(three, { key: 'Escape' });
     expect(screen.getByTestId('val')).toHaveTextContent('3');
   });
+
+  it('touch tap-to-clear leaves no rings lit (no sticky hover)', () => {
+    render(<Harness />);
+    const four = () => screen.getByRole('button', { name: /Texture: 4 of 5/ });
+    fireEvent.pointerEnter(four(), { pointerType: 'touch' });
+    fireEvent.mouseOver(four());
+    fireEvent.click(four());
+    fireEvent.pointerEnter(four(), { pointerType: 'touch' });
+    fireEvent.mouseOver(four());
+    fireEvent.click(four());
+    expect(screen.getByTestId('val')).toHaveTextContent('none');
+    const lit = Array.from(document.querySelectorAll('circle')).filter(
+      (c) => !(c as SVGElement).style.stroke.includes('var('),
+    );
+    expect(lit.length).toBe(0);
+  });
 });
