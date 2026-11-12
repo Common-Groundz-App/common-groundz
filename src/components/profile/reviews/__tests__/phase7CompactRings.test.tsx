@@ -42,13 +42,15 @@ describe('CompactConnectedRingsRating', () => {
     render(<Harness />);
     const four = () => screen.getByRole('button', { name: /Texture: 4 of 5/ });
     fireEvent.pointerEnter(four(), { pointerType: 'touch' });
-    fireEvent.mouseEnter(four());
+    fireEvent.mouseOver(four());
     fireEvent.click(four());
     fireEvent.pointerEnter(four(), { pointerType: 'touch' });
-    fireEvent.mouseEnter(four());
+    fireEvent.mouseOver(four());
     fireEvent.click(four());
     expect(screen.getByTestId('val')).toHaveTextContent('none');
-    const lit = document.querySelectorAll('circle[style*="rgb"], circle[style*="#"]');
+    const lit = Array.from(document.querySelectorAll('circle')).filter(
+      (c) => !(c as SVGElement).style.stroke.includes('var('),
+    );
     expect(lit.length).toBe(0);
   });
 });
