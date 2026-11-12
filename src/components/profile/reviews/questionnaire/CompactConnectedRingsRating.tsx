@@ -68,7 +68,7 @@ const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = 
           aria-labelledby={labelId}
           className="relative shrink-0"
           style={{ width, height: HIT_HEIGHT }}
-          onMouseLeave={() => setHover(0)}
+          onPointerLeave={() => setHover(0)}
         >
           <svg
             width={width}
@@ -113,8 +113,14 @@ const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = 
                   type="button"
                   aria-label={`${label}: ${n} of 5${selected ? ' (selected, tap to clear)' : ''}`}
                   aria-pressed={selected}
-                  onClick={() => onChange(selected ? undefined : n)}
-                  onMouseEnter={() => setHover(n)}
+                  onClick={() => {
+                    setHover(0);
+                    onChange(selected ? undefined : n);
+                  }}
+                  // Touch taps fire synthetic mouse events with no leave; hover only for real mice.
+                  onPointerEnter={(e) => {
+                    if (e.pointerType === 'mouse') setHover(n);
+                  }}
                   onFocus={() => setHover(0)}
                   // Contiguous, non-overlapping zones: outer zones absorb the ring overhang.
                   style={{ width: n === 1 || n === 5 ? RING_STEP + EDGE : RING_STEP }}
@@ -133,7 +139,10 @@ const CompactConnectedRingsRating: React.FC<CompactConnectedRingsRatingProps> = 
         </span>
         <button
           type="button"
-          onClick={() => onChange(undefined)}
+          onClick={() => {
+            setHover(0);
+            onChange(undefined);
+          }}
           aria-label={`Clear ${label} rating`}
           className={cn(
             'h-11 px-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded',
