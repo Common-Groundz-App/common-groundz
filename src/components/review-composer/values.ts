@@ -50,6 +50,8 @@ export interface ReviewComposerValues {
   foodTags: string[];
   visibility: ReviewVisibility;
   recommendation: RecommendationDraft;
+  /** Review-level spoiler flag (Movie/TV/Book/Game). Stored as `metadata.contains_spoilers: true`. */
+  containsSpoilers: boolean;
 }
 
 export type SectionId = keyof ReviewComposerValues;
@@ -66,6 +68,7 @@ export const SECTION_IDS: readonly SectionId[] = [
   'foodTags',
   'visibility',
   'recommendation',
+  'containsSpoilers',
 ];
 
 export function emptyComposerValues(): ReviewComposerValues {
@@ -80,6 +83,7 @@ export function emptyComposerValues(): ReviewComposerValues {
     foodTags: [],
     visibility: 'public',
     recommendation: { baseOnRating: false, choice: null },
+    containsSpoilers: false,
   };
 }
 

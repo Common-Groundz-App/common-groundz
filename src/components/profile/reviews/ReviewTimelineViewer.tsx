@@ -49,6 +49,8 @@ import { AISummaryCard } from '@/components/ui/ai-summary-card';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
+import { SpoilerBarrier } from '@/components/reviews/SpoilerBarrier';
+import { hasSpoilerFlag } from '@/utils/spoilers';
 import { ReviewMediaBlock } from '@/components/media/ReviewMediaBlock';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaUploader } from '@/components/media/MediaUploader';
@@ -108,6 +110,10 @@ export const ReviewTimelineViewer = ({
   const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  // Guards the initial review + AI summary only; Timeline Updates are not flagged yet.
+  const [spoilerRevealed, setSpoilerRevealed] = useState(false);
+  useEffect(() => { setSpoilerRevealed(false); }, [reviewId]);
+  const initialSpoilerHidden = hasSpoilerFlag(reviewData?.metadata) && !spoilerRevealed;
 
   const MAX_MEDIA_COUNT = 4;
 
@@ -496,7 +502,7 @@ export const ReviewTimelineViewer = ({
           ) : (
             <>
               {/* AI Summary Section - Now using reusable component */}
-              {showAISummary && (
+              {showAISummary && !initialSpoilerHidden && (
                 <AISummaryCard summary={reviewData.ai_summary} />
               )}
 
@@ -570,6 +576,9 @@ export const ReviewTimelineViewer = ({
                       </span>
                     </div>
                     
+                    {initialSpoilerHidden ? (
+                      <SpoilerBarrier onReveal={() => setSpoilerRevealed(true)} />
+                    ) : (<>
                     {reviewData?.description && (
                       <p className="text-sm text-muted-foreground">
                         {reviewData.description}
@@ -592,6 +601,7 @@ export const ReviewTimelineViewer = ({
                         </div>
                       );
                     })()}
+                    </>)}
                   </div>
                 </div>
               </div>

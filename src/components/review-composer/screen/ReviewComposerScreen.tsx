@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 import StepOne from '@/components/profile/reviews/steps/StepOne';
 import SubjectSelectStep from '@/components/profile/reviews/steps/SubjectSelectStep';
+import { Switch } from '@/components/ui/switch';
 import StepFour from '@/components/profile/reviews/steps/StepFour';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
@@ -265,6 +266,7 @@ export function ReviewComposerScreen(props: Props) {
   const q = getQuestionnaireContext(ctx);
   const qEnabled = sectionAvailability('questionnaire', ctx) === 'enabled';
   const foodEnabled = sectionAvailability('foodTags', ctx) === 'enabled';
+  const spoilersEnabled = sectionAvailability('containsSpoilers', ctx) === 'enabled';
   const renderedConfig: QuestionnaireConfig | null = useMemo(() => {
     if (!q.resolution || q.resolution.mode === 'invalid') return null;
     const config = q.resolution.config;
@@ -621,6 +623,19 @@ export function ReviewComposerScreen(props: Props) {
             </h2>
             <StepFour
               part="text"
+              belowText={spoilersEnabled ? (
+                <div className="flex items-center justify-between gap-3 pt-1">
+                  <label htmlFor="composer-contains-spoilers" className="space-y-0.5">
+                    <span className="block text-sm font-medium text-foreground">Contains spoilers</span>
+                    <span className="block text-xs text-muted-foreground">Readers will tap to reveal your thoughts and media.</span>
+                  </label>
+                  <Switch
+                    id="composer-contains-spoilers"
+                    checked={state.values.containsSpoilers}
+                    onCheckedChange={(v) => setValue('containsSpoilers', v)}
+                  />
+                </div>
+              ) : null}
               config={renderedConfig}
               thoughtsLabel={thoughtsPrompt.label}
               thoughtsPlaceholder={thoughtsPrompt.placeholder}

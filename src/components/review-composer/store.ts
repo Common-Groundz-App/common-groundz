@@ -216,6 +216,7 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
           // Answers given for the previous subject never carry over.
           questionnaire: { choices: {}, curated: {} },
           foodTags: [],
+          containsSpoilers: false,
         },
         questionnaireTouched: [],
         subjectOrigin: action.subject ? 'user-selected' : 'none',
@@ -223,6 +224,7 @@ export function composerReducer(state: ComposerState, action: ComposerAction): C
           ...touch(state, 'subject'),
           questionnaire: { touched: false, error: null },
           foodTags: { touched: false, error: null },
+          containsSpoilers: { touched: false, error: null },
         },
       };
     }
