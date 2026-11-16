@@ -41,6 +41,7 @@ const REVIEW_SECTIONS: Record<SectionId, Requirement> = {
   foodTags: 'optional',
   visibility: 'required',
   recommendation: 'off',
+  containsSpoilers: 'optional',
 };
 
 const TIMELINE_SECTIONS: Record<SectionId, Requirement> = {
@@ -54,13 +55,14 @@ const TIMELINE_SECTIONS: Record<SectionId, Requirement> = {
   foodTags: 'off',
   visibility: 'off',
   recommendation: 'optional',
+  containsSpoilers: 'off',
 };
 
 const REVIEW_STEPS = [
   ['rating'],
   ['subject'],
   ['media'],
-  ['headline', 'text', 'experienceDate', 'questionnaire', 'foodTags', 'visibility'],
+  ['headline', 'text', 'containsSpoilers', 'experienceDate', 'questionnaire', 'foodTags', 'visibility'],
 ] as const satisfies readonly (readonly SectionId[])[];
 
 const TIMELINE_STEPS = [

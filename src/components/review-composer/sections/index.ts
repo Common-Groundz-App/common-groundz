@@ -23,6 +23,7 @@ import {
   readQuestionnaireEnvelope,
 } from '@/components/profile/reviews/questionnaire/envelope';
 import { resolvePersistedCategory, type SubjectOrigin } from '@/components/profile/reviews/categoryPersistence';
+import { hasSpoilerFlag, supportsSpoilerToggle } from '@/utils/spoilers';
 import { isPlainMetadataObject } from '@/components/profile/reviews/questionnaire/metadata';
 
 /**
@@ -221,6 +222,18 @@ export const SECTIONS: { [K in SectionId]: SectionDefinition<K> } = {
     },
     validate: () => null,
     availability: simpleAvailability('recommendation'),
+  },
+  containsSpoilers: {
+    id: 'containsSpoilers',
+    label: 'Contains spoilers',
+    hydrate: (r) => hasSpoilerFlag(r.review?.metadata),
+    validate: () => null,
+    availability: (ctx) => {
+      if (modeOff(ctx, 'containsSpoilers')) return 'mode-disabled';
+      const res = getQuestionnaireContext(ctx).resolution;
+      const type = res && res.mode === 'canonical' ? res.type : null;
+      return supportsSpoilerToggle(type) ? 'enabled' : 'subject-incompatible';
+    },
   },
 };
 
