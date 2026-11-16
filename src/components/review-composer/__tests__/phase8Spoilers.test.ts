@@ -56,7 +56,8 @@ describe('Phase 8B composer', () => {
     let s = initialComposerState({ sessionKey: 'k', mode: 'create-review' });
     s = composerReducer(s, { type: 'SUBJECT_CHANGED', sessionKey: 'k', subject: MOVIE });
     const r = buildCreateReviewPayload({ values: set(s, 'rating', 4).values, userId: 'u', subjectOrigin: 'user-selected', questionnaireTouched: new Set() });
-    expect(r.ok && r.payload.metadata && 'contains_spoilers' in r.payload.metadata).toBe(false);
+    expect(r.ok).toBe(true);
+    expect(r.ok ? r.payload.metadata?.contains_spoilers : 'x').toBeUndefined();
   });
   it('switching subject resets the flag; food never saves it', () => {
     let s = initialComposerState({ sessionKey: 'k', mode: 'create-review' });
@@ -67,7 +68,8 @@ describe('Phase 8B composer', () => {
     expect(sectionAvailability('containsSpoilers', ctxOf(s))).toBe('subject-incompatible');
     s = set(set(s, 'containsSpoilers', true), 'rating', 4);
     const r = buildCreateReviewPayload({ values: s.values, userId: 'u', subjectOrigin: 'user-selected', questionnaireTouched: new Set() });
-    expect(r.ok && r.payload.metadata && 'contains_spoilers' in r.payload.metadata).toBe(false);
+    expect(r.ok).toBe(true);
+    expect(r.ok ? r.payload.metadata?.contains_spoilers : 'x').toBeUndefined();
   });
   it('edit: hydrates true, unrelated edit preserves it and all other metadata', () => {
     const meta = { contains_spoilers: true, provenance: { source: 'x' }, questionnaire: { version: 1, type: 'book', answers: { future_key: 'keep' } } };
