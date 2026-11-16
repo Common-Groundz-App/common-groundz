@@ -15,6 +15,8 @@
 import type { MediaItem } from '@/types/media';
 import { buildReviewMetadataForSave } from '@/components/profile/reviews/questionnaire/saveMetadata';
 import { readQuestionnaireEnvelope } from '@/components/profile/reviews/questionnaire/envelope';
+import { applySpoilerFlag } from '@/utils/spoilers';
+import { isPlainMetadataObject } from '@/components/profile/reviews/questionnaire/metadata';
 import { resolveReviewIdentity } from '@/components/profile/reviews/questionnaire/identityPersistence';
 import { parseEntityTypeAtBoundary } from '@/services/entityType';
 import { toTimelineRecommendationValue, type WouldRecommendValue } from '@/services/review/timeline';
@@ -82,6 +84,22 @@ const coverField = (media: MediaItem[]): { image_url?: string | null } =>
 const copyMedia = (media: MediaItem[], stored: readonly MediaItem[] = []): MediaItem[] =>
   serializeMediaForSave(media, stored);
 
+/**
+ * Applies the review-level spoiler flag on top of the merged metadata. Only
+ * when the section is enabled (narrative subject in a review mode); otherwise
+ * metadata — including any stored flag — passes through untouched.
+ */
+function withSpoilerFlag(
+  ctx: SectionContext,
+  metadata: Record<string, unknown> | null | undefined,
+  storedMetadata: unknown,
+): Record<string, unknown> | null | undefined {
+  if (sectionAvailability('containsSpoilers', ctx) !== 'enabled') return metadata;
+  const base = metadata ?? (isPlainMetadataObject(storedMetadata) ? (storedMetadata as Record<string, unknown>) : undefined);
+  if (!base && !ctx.values.containsSpoilers) return metadata;
+  return applySpoilerFlag(base, ctx.values.containsSpoilers);
+}
+
 function metadataFor(
   ctx: SectionContext,
   storedMetadata: unknown,
@@ -131,7 +149,7 @@ export function buildCreateReviewPayload(input: {
     providerName: subject.providerName ?? null,
     isLegacyUnlinked: false,
   });
-  const metadata = metadataFor(ctx, undefined, null, questionnaireTouched);
+  const metadata = withSpoilerFlag(ctx, metadataFor(ctx, undefined, null, questionnaireTouched), undefined);
   return {
     ok: true,
     payload: {
@@ -162,9 +180,11 @@ export function buildEditReviewPayload(input: {
   const ctx: SectionContext = { caps: MODES['edit-review'], values, stored, subjectOrigin: stored.entity_id ? 'loaded' : 'none' };
   const q = getQuestionnaireContext(ctx);
   if (q.resolution?.mode === 'invalid') return { ok: false, reason: 'subject_invalid' };
-  const metadata = q.category
-    ? metadataFor(ctx, stored.metadata, stored.category, questionnaireTouched)
-    : undefined;
+  const metadata = withSpoilerFlag(
+    ctx,
+    q.category ? metadataFor(ctx, stored.metadata, stored.category, questionnaireTouched) : undefined,
+    stored.metadata,
+  );
   return {
     ok: true,
     payload: {
