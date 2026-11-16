@@ -42,6 +42,8 @@ interface StepFourProps {
   thoughtsPlaceholder?: string;
   /** New composer only: questionnaire field ids rendered elsewhere. */
   excludeFieldIds?: readonly string[];
+  /** New composer only: rendered directly below the thoughts textarea (e.g. spoiler toggle). */
+  belowText?: React.ReactNode;
 }
 
 const StepFour = ({
@@ -66,6 +68,7 @@ const StepFour = ({
   thoughtsLabel,
   thoughtsPlaceholder,
   excludeFieldIds,
+  belowText,
 }: StepFourProps) => {
   const locked = !!nonPublicLockedReason;
   const all = part === 'all';
@@ -111,6 +114,7 @@ const StepFour = ({
           rows={5}
           className="border-brand-orange/30 focus-visible:ring-brand-orange/30 resize-none transition-all duration-200"
         />
+        {belowText}
       </div>
       )}
       
