@@ -19,6 +19,8 @@ import { ReviewOwnerMenu } from '@/components/reviews/ReviewOwnerMenu';
 import { updateReviewStatus } from '@/services/reviewService';
 import ReviewForm from './ReviewForm';
 import { formatRelativeDate } from '@/utils/dateUtils';
+import { SpoilerBarrier } from '@/components/reviews/SpoilerBarrier';
+import { hasSpoilerFlag } from '@/utils/spoilers';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { MediaItem } from '@/types/media';
 import { visibleReviewMedia } from '@/utils/reviewMediaDisplay';
@@ -67,6 +69,9 @@ const ReviewCard = ({
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   
   const isOwner = user?.id === review.user_id;
+  const [spoilerRevealed, setSpoilerRevealed] = useState(false);
+  const spoilerHidden = hasSpoilerFlag(review.metadata) && !spoilerRevealed;
+  const spoilerBarrier = <SpoilerBarrier onReveal={() => setSpoilerRevealed(true)} />;
   const [isAdmin, setIsAdmin] = useState(false);
   
   React.useEffect(() => {
@@ -215,11 +220,11 @@ const ReviewCard = ({
                   {/* Remove the duplicate large rating number - this was causing the double "1.0" display */}
                 </div>
                 {/* Display Review Headline/Title (subtitle) if available */}
-                {review.subtitle && (
+                {review.subtitle && !spoilerHidden && (
                   <h3 className="font-bold text-lg leading-tight mb-1">{review.subtitle}</h3>
                 )}
                 {/* Content name (title) - less prominent if subtitle exists */}
-                <h4 className={cn(review.subtitle ? "text-sm text-muted-foreground" : "font-bold text-lg leading-tight")}>
+                <h4 className={cn(review.subtitle && !spoilerHidden ? "text-sm text-muted-foreground" : "font-bold text-lg leading-tight")}>
                   {review.title}
                 </h4>
               </div>
@@ -275,7 +280,8 @@ const ReviewCard = ({
             </div>
             
             {/* Description - More prominent and longer */}
-            {review.description && (
+            {spoilerHidden && <div className="mb-3">{spoilerBarrier}</div>}
+            {review.description && !spoilerHidden && (
               <div className="text-sm text-gray-700 dark:text-gray-300 mb-3">
                 <p className="line-clamp-6">{review.description}</p>
               </div>
@@ -297,7 +303,7 @@ const ReviewCard = ({
             )}
             
             {/* Media - smaller and less prominent */}
-            {shouldShowMedia && (
+            {shouldShowMedia && !spoilerHidden && (
               <div className="mb-3">
                 <PostMediaDisplay 
                   media={mediaItems} 
@@ -459,12 +465,12 @@ const ReviewCard = ({
           {/* Title and Category */}
           <div className="mt-4">
             {/* Display Review Headline/Title (subtitle) if available */}
-            {review.subtitle && (
+            {review.subtitle && !spoilerHidden && (
               <h3 className="font-semibold text-lg">{review.subtitle}</h3>
             )}
             
             {/* Always display the content name (title) */}
-            <h3 className={cn(review.subtitle ? "text-base mt-1" : "font-semibold text-lg")}>
+            <h3 className={cn(review.subtitle && !spoilerHidden ? "text-base mt-1" : "font-semibold text-lg")}>
               {review.title}
             </h3>
             
@@ -514,7 +520,8 @@ const ReviewCard = ({
           )}
           
           {/* Media - conditionally rendered based on shouldShowMedia */}
-          {shouldShowMedia && (
+          {spoilerHidden && <div className="mt-3">{spoilerBarrier}</div>}
+          {shouldShowMedia && !spoilerHidden && (
             <div className="mt-3">
               <PostMediaDisplay 
                 media={mediaItems} 
@@ -542,7 +549,7 @@ const ReviewCard = ({
           )}
           
           {/* Description */}
-          {review.description && (
+          {review.description && !spoilerHidden && (
             <div className="text-sm text-muted-foreground mt-3">
               <p className="line-clamp-3">{review.description}</p>
             </div>
