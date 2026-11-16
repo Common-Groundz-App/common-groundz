@@ -17,6 +17,8 @@ import { canEditReview, canEditTimelineUpdate } from '@/utils/reviewEditPolicy';
 import { MediaItem } from '@/types/media';
 import { ReviewOwnerMenu } from '@/components/reviews/ReviewOwnerMenu';
 import type { Review } from '@/services/reviewService';
+import { SpoilerBarrier } from '@/components/reviews/SpoilerBarrier';
+import { hasSpoilerFlag } from '@/utils/spoilers';
 import { useAuth } from '@/contexts/AuthContext';
 import UsernameLink from '@/components/common/UsernameLink';
 
@@ -55,6 +57,9 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   const { user } = useAuth();
   
   const isOwner = user?.id === review.user_id;
+  // Spoiler flag guards the initial review entry only; Timeline Updates are not flagged yet.
+  const [spoilerRevealed, setSpoilerRevealed] = useState(false);
+  const initialSpoilerHidden = hasSpoilerFlag(review.metadata) && !spoilerRevealed;
 
   // Using shared getInitialsFromName from profileUtils
 
@@ -254,6 +259,9 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
                       </div>
                     )}
                   </div>
+                   {entry.mediaKind === 'review' && initialSpoilerHidden ? (
+                     <SpoilerBarrier onReveal={() => setSpoilerRevealed(true)} />
+                   ) : (<>
                    {entry.title && (
                      <h5 className="font-medium text-gray-900 text-sm mb-1">
                        {entry.title}
@@ -276,6 +284,7 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
                        />
                      </div>
                    )}
+                   </>)}
                 </div>
               ))}
               

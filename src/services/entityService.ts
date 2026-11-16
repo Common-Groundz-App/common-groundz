@@ -238,6 +238,7 @@ export const fetchEntityReviews = async (
         visibility: rev.visibility as any,
         media: rev.media ? (rev.media as unknown as MediaItem[]) : [],
         ai_summary: rev.ai_summary,
+        metadata: rev.metadata,
         all_content: allContent, // Aggregated searchable content including timeline updates
         created_at: rev.created_at,
         updated_at: rev.updated_at

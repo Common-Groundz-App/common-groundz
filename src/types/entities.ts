@@ -33,6 +33,8 @@ export interface ReviewWithUser extends WithUserProfile, InteractionData, Timest
   subtitle?: string;
   description?: string;
   image_url?: string;
+  /** Raw review metadata (e.g. `contains_spoilers`). */
+  metadata?: unknown;
   category: string;
   rating: number;
   venue?: string;

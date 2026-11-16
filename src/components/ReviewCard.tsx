@@ -13,6 +13,8 @@ import { formatDateLong } from '@/utils/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReviewOwnerMenu } from '@/components/reviews/ReviewOwnerMenu';
 import type { Review } from '@/services/reviewService';
+import { SpoilerBarrier } from '@/components/reviews/SpoilerBarrier';
+import { hasSpoilerFlag } from '@/utils/spoilers';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
@@ -37,6 +39,8 @@ interface ReviewCardProps {
 const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimelineClick, onDeleted }) => {
   const { user } = useAuth();
   const isOwner = 'user' in review && !!user && user.id === review.user_id;
+  const [spoilerRevealed, setSpoilerRevealed] = React.useState(false);
+  const spoilerHidden = 'user' in review && hasSpoilerFlag(review.metadata) && !spoilerRevealed;
 
   // Using shared getInitialsFromName from profileUtils
 
@@ -131,6 +135,9 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimel
             </div>
           </div>
           
+          {spoilerHidden ? (
+            <SpoilerBarrier onReveal={() => setSpoilerRevealed(true)} />
+          ) : (<>
           {/* Review Headline */}
           {transformedReview.title && (
             <h3 className="font-semibold text-gray-900 text-base mb-2">{transformedReview.title}</h3>
@@ -149,6 +156,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimel
               canEdit={canEditThis}
             />
           )}
+          </>)}
         </div>
       </div>
 
