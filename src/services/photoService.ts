@@ -1,3 +1,4 @@
+import { hasSpoilerFlag } from '@/utils/spoilers';
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
@@ -333,7 +334,7 @@ export const fetchEntityReviewMedia = async (entityId: string): Promise<PhotoWit
     // First get reviews with media, then get user profiles separately
     const { data: reviews, error: reviewsError } = await supabase
       .from('reviews')
-      .select('id, title, media, created_at, user_id')
+      .select('id, title, media, created_at, user_id, metadata')
       .eq('entity_id', entityId)
       .eq('status', 'published')
       .not('media', 'is', null)
@@ -394,6 +395,8 @@ export const fetchEntityReviewMedia = async (entityId: string): Promise<PhotoWit
     // Process reviews and extract media
     if (reviews && reviews.length > 0) {
       reviews.forEach((review: any) => {
+        // Spoiler-marked reviews keep their media; it is only shown inside the review after reveal.
+        if (hasSpoilerFlag(review.metadata)) return;
         console.log('📸 Processing review:', review.id, 'media:', review.media);
         
         if (review.media && Array.isArray(review.media)) {

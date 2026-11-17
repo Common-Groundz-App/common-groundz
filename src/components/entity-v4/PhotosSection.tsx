@@ -1,3 +1,4 @@
+import { REVIEWS_CHANGED_EVENT } from '@/services/review/reviewChangeEvents';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Camera, Flag, ExternalLink, User, Calendar, RefreshCw, Filter, Trash2, Edit3, MoreVertical, SortAsc, SortDesc, ChevronDown, X, Plus, FileImage } from 'lucide-react';
 import { isMuxPreparing } from '@/utils/muxMedia';
@@ -241,6 +242,14 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
       (entity.metadata as any)?.photo_reference,
       (entity.metadata as any)?.photo_references,
       (entity.metadata as any)?.stored_photo_urls]);
+
+  // Refresh review media after any review edit (e.g. spoiler flag toggled) so the gallery never shows stale photos.
+  useEffect(() => {
+    const handleReviewsChanged = () => { loadPhotos(false); };
+    window.addEventListener(REVIEWS_CHANGED_EVENT, handleReviewsChanged);
+    return () => window.removeEventListener(REVIEWS_CHANGED_EVENT, handleReviewsChanged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entity.id]);
 
   useEffect(() => {
     // Pass whether this is initial load or a background refresh
