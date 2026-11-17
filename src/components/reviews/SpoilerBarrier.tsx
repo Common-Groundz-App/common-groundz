@@ -20,7 +20,7 @@ export const SpoilerBarrier: React.FC<SpoilerBarrierProps> = ({ onReveal, noun =
     role="note"
     aria-label={`This ${noun} contains spoilers`}
     className={cn(
-      'flex flex-wrap items-center justify-between gap-3 rounded-md border border-dashed border-border bg-muted/40 px-3 py-2',
+      'flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2',
       className,
     )}
   >
