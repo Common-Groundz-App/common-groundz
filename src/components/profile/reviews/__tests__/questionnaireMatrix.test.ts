@@ -71,7 +71,7 @@ const EXPECTED: Record<string, { fields: string[]; repeatIntentLabel: string | n
   },
   others: {
     fields: ['would_recommend', 'repeat_intent', 'other_familiarity', 'liked', 'could_be_better', 'best_for'],
-    repeatIntentLabel: 'Choose again?',
+    repeatIntentLabel: 'Would you choose it again?',
   },
 };
 

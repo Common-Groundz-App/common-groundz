@@ -618,7 +618,7 @@ export const QUESTIONNAIRE_REGISTRY: Record<CanonicalEntityType, QuestionnaireCo
     subjectLabel: 'experience',
     showLocationPrompt: false,
     sections: [
-      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Choose again?')]),
+      choiceSection([WOULD_RECOMMEND_FIELD, repeatIntentField('Would you choose it again?')]),
       ctx('others'),
       ...attributeSection('others'),
       ...observationSections('others'),
