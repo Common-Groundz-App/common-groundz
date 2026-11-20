@@ -58,6 +58,8 @@ import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { MediaItem } from '@/types/media';
 import UsernameLink from '@/components/common/UsernameLink';
 import ChoiceChips from './questionnaire/ChoiceChips';
+import ReviewQuestionnaireDetails from './questionnaire/ReviewQuestionnaireDetails';
+import { resolveReviewReaderDetails } from './questionnaire/readerDetails';
 import {
   BASED_ON_RATING_EVENT_LABEL,
   BASE_ON_RATING_ACTION_LABEL,
@@ -462,6 +464,9 @@ export const ReviewTimelineViewer = ({
   };
 
   const showAISummary = shouldShowAISummary();
+  // Phase 10B — standalone = no loaded Timeline Updates (runtime truth, not the cached count).
+  const isStandalone = timelineUpdates.length === 0;
+  const readerDetails = resolveReviewReaderDetails(reviewData?.metadata, reviewData?.category);
   const initialReviewName = reviewData?.user?.displayName || reviewData?.user?.username || 'User';
 
   /**
@@ -480,7 +485,7 @@ export const ReviewTimelineViewer = ({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-xl">
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
-            Timeline for "{reviewTitle}"
+            {isStandalone ? 'Review for' : 'Timeline for'} "{reviewTitle}"
           </DialogTitle>
         </DialogHeader>
         
@@ -507,7 +512,7 @@ export const ReviewTimelineViewer = ({
               )}
 
               {/* Phase 3C — materialized recommendation with provenance */}
-              {reviewData && (
+              {reviewData && !isStandalone && (
                 <Card className="bg-muted/30 border-muted">
                   <CardContent className="pt-4">
                     <div className="text-sm">
@@ -521,7 +526,7 @@ export const ReviewTimelineViewer = ({
               )}
 
               {/* Show message when AI summary should appear but doesn't */}
-              {!showAISummary && reviewData && reviewData.timeline_count && reviewData.timeline_count >= 1 && (
+              {!isStandalone && !showAISummary && reviewData && reviewData.timeline_count && reviewData.timeline_count >= 1 && (
                 <Card className="bg-gray-50 border-gray-200">
                   <CardContent className="pt-4">
                     <div className="text-sm text-gray-600 flex items-center gap-2">
@@ -552,7 +557,7 @@ export const ReviewTimelineViewer = ({
                         className="text-sm"
                       />
                       <Badge variant="outline" className="bg-blue-100 text-blue-700 text-xs border-blue-300">
-                        Initial Review
+                        {isStandalone ? 'Review' : 'Initial Review'}
                       </Badge>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Calendar className="h-3 w-3" />
@@ -579,6 +584,11 @@ export const ReviewTimelineViewer = ({
                     {initialSpoilerHidden ? (
                       <SpoilerBarrier onReveal={() => setSpoilerRevealed(true)} />
                     ) : (<>
+                    {reviewData?.subtitle && (
+                      <p className="text-sm font-medium text-foreground mb-1">
+                        {reviewData.subtitle}
+                      </p>
+                    )}
                     {reviewData?.description && (
                       <p className="text-sm text-muted-foreground">
                         {reviewData.description}
@@ -601,6 +611,11 @@ export const ReviewTimelineViewer = ({
                         </div>
                       );
                     })()}
+                    {!readerDetails.isEmpty && (
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <ReviewQuestionnaireDetails details={readerDetails} />
+                      </div>
+                    )}
                     </>)}
                   </div>
                 </div>
@@ -750,7 +765,7 @@ export const ReviewTimelineViewer = ({
                 </div>
               )}
 
-              {!loadFailed && timelineUpdates.length === 0 && (
+              {!loadFailed && timelineUpdates.length === 0 && isOwner && (
                 <div className="text-center py-8 text-muted-foreground">
                   <p>No timeline updates yet.</p>
                   {isOwner && (
