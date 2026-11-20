@@ -1,7 +1,7 @@
 
 import { MediaItem } from '@/types/media';
 import type { SubjectRelation } from '@/services/reviewSubjectRelation';
-import type { ReviewMetadata } from '@/components/profile/reviews/questionnaire/metadata';
+import type { Json } from '@/integrations/supabase/types';
 
 // Base review interface
 export interface Review {
@@ -30,7 +30,7 @@ export interface Review {
   /** Phase 2.5A — how the subject relation was resolved (see reviewSubjectRelation). */
   subjectRelation?: SubjectRelation;
   /** Stored `reviews.metadata` (questionnaire envelope, food_tags, contains_spoilers). Read-only here. */
-  metadata?: ReviewMetadata | null;
+  metadata?: Json | null;
 }
 
 // Data for creating a new review
