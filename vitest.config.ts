@@ -137,6 +137,7 @@ export default defineConfig({
             'src/components/search/group2aEntityThumbnails.test.tsx',
             'src/components/review-composer/__tests__/subjectCategoryPassthrough.test.tsx',
             'src/components/profile/reviews/__tests__/phase7CompactRings.test.tsx',
+            'src/components/profile/reviews/__tests__/phase10ReaderDetails.test.tsx',
             'src/components/reviews/__tests__/phase8SpoilerBarrier.test.tsx',
             'src/components/entity/group2bEntityThumbnails.test.tsx',
             'src/components/mystuff/saved/group3aCardThumbnails.test.tsx',
