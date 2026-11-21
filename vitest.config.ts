@@ -156,6 +156,7 @@ export default defineConfig({
             'src/components/feed/PostedEntityPill.test.tsx',
             'src/components/profile/reviews/__tests__/ReviewTimelineViewer.test.tsx',
             'src/components/profile/reviews/__tests__/phase10bViewerDetails.test.tsx',
+            'src/components/profile/reviews/__tests__/phase10bCardSignals.test.tsx',
             'src/components/reviews/ReviewOwnerMenu.test.tsx',
             'src/components/profile/reviews/__tests__/ReviewFormSubjectReset.test.tsx',
   'src/components/profile/reviews/__tests__/ReviewFormExistingReview.test.tsx',

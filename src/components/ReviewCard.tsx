@@ -15,6 +15,7 @@ import { ReviewOwnerMenu } from '@/components/reviews/ReviewOwnerMenu';
 import type { Review } from '@/services/reviewService';
 import { SpoilerBarrier } from '@/components/reviews/SpoilerBarrier';
 import { hasSpoilerFlag } from '@/utils/spoilers';
+import CompactReviewSignals from '@/components/profile/reviews/questionnaire/CompactReviewSignals';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
@@ -30,7 +31,7 @@ interface ReviewCardProps {
     media?: MediaItem[];
   };
   onHelpfulClick?: (reviewId: string) => void;
-  /** Opens the timeline viewer for this review (owner's Add timeline update). */
+  /** Opens the shared review/timeline viewer (View Details, owner Add timeline update). */
   onTimelineClick?: (review: ReviewWithUser) => void;
   /** Called after the review is deleted (or found already deleted). */
   onDeleted?: (reviewId: string) => void;
@@ -144,6 +145,10 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimel
           )}
           
           <p className="text-gray-700 text-sm leading-relaxed">{transformedReview.content}</p>
+
+          {'user' in review && (
+            <CompactReviewSignals className="mt-3" metadata={review.metadata} category={review.category} />
+          )}
           
           {/* Media Display */}
           {validMedia.length > 0 && (
@@ -157,6 +162,19 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimel
             />
           )}
           </>)}
+
+          {'user' in review && onTimelineClick && (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => onTimelineClick(review)}
+                className="text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                aria-label={`View details of ${transformedReview.name}'s review`}
+              >
+                View Details →
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

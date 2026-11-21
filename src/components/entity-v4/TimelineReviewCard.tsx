@@ -19,6 +19,7 @@ import { ReviewOwnerMenu } from '@/components/reviews/ReviewOwnerMenu';
 import type { Review } from '@/services/reviewService';
 import { SpoilerBarrier } from '@/components/reviews/SpoilerBarrier';
 import { hasSpoilerFlag } from '@/utils/spoilers';
+import CompactReviewSignals from '@/components/profile/reviews/questionnaire/CompactReviewSignals';
 import { useAuth } from '@/contexts/AuthContext';
 import UsernameLink from '@/components/common/UsernameLink';
 
@@ -270,6 +271,9 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
                    <p className="text-gray-700 text-sm leading-relaxed">
                      {entry.content}
                    </p>
+                   {entry.mediaKind === 'review' && (
+                     <CompactReviewSignals className="mt-2" metadata={review.metadata} category={review.category} />
+                   )}
                   
                    {/* Media for this timeline entry */}
                    {entry.media && entry.media.length > 0 && (
