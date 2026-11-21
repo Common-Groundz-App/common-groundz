@@ -64,7 +64,7 @@ describe('reader components', () => {
     const { container } = render(<ReviewQuestionnaireDetails details={resolveReviewReaderDetails({}, 'movie')} />);
     expect(container).toBeEmptyDOMElement();
     render(<ReviewQuestionnaireDetails details={resolveReviewReaderDetails(env('movie', { attribute_ratings: { story: 5 } }), 'movie')} />);
-    expect(screen.getByText('Details')).toBeInTheDocument();
+    expect(screen.getByText('Attribute ratings')).toBeInTheDocument();
     expect(screen.queryByText('Verdict')).toBeNull();
   });
 });

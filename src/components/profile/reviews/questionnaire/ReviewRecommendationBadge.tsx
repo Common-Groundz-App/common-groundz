@@ -8,7 +8,7 @@ import type { RecommendationValue } from './readerDetails';
 
 const COPY: Record<RecommendationValue, { label: string; className: string }> = {
   yes: { label: 'Recommends', className: 'border-primary/30 bg-primary/10 text-primary' },
-  maybe: { label: 'Maybe recommends', className: 'border-border bg-muted text-muted-foreground' },
+  maybe: { label: 'Might recommend', className: 'border-border bg-muted text-muted-foreground' },
   no: { label: "Doesn't recommend", className: 'border-destructive/30 bg-destructive/10 text-destructive' },
 };
 

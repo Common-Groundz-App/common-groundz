@@ -765,15 +765,6 @@ export const ReviewTimelineViewer = ({
                 </div>
               )}
 
-              {!loadFailed && timelineUpdates.length === 0 && isOwner && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No timeline updates yet.</p>
-                  {isOwner && (
-                    <p className="text-sm mt-1">Be the first to add an update!</p>
-                  )}
-                </div>
-              )}
-
               {/* Add Update Section for Review Owner - Now inside scrollable area */}
               {isOwner && (
                 <div className="border-t pt-4 mt-6">

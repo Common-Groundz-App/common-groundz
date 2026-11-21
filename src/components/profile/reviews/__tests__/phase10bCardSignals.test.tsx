@@ -29,8 +29,13 @@ describe('Phase 10B Step 3 — entity review card signals', () => {
 
   it('shows the saved Maybe repeat-intent answer', () => {
     renderCard(make({ repeat_intent: 'maybe' }));
-    expect(screen.getByTestId('repeat-intent-badge').textContent).toMatch(/Maybe/);
+    expect(screen.getByTestId('repeat-intent-badge')).toHaveTextContent('Might watch again');
     expect(screen.queryByTestId('recommendation-badge')).toBeNull();
+  });
+
+  it('shows Might recommend for a saved Maybe recommendation', () => {
+    renderCard(make({ would_recommend: 'maybe' }));
+    expect(screen.getByTestId('recommendation-badge')).toHaveTextContent('Might recommend');
   });
 
   it('shows no badges when nothing was answered, but View Details still opens the viewer', async () => {

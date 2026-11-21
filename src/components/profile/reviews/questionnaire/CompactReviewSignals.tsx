@@ -8,6 +8,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import ReviewRecommendationBadge from './ReviewRecommendationBadge';
 import { resolveReviewReaderDetails } from './readerDetails';
+import { repeatIntentStatement } from './repeatIntentStatement';
 
 export interface CompactReviewSignalsProps {
   metadata: unknown;
@@ -17,16 +18,17 @@ export interface CompactReviewSignalsProps {
 
 const CompactReviewSignals: React.FC<CompactReviewSignalsProps> = ({ metadata, category, className }) => {
   const { recommendation, repeatIntent } = resolveReviewReaderDetails(metadata, category);
-  if (!recommendation && !repeatIntent) return null;
+  const repeatText = repeatIntent ? repeatIntentStatement(category, repeatIntent.value) : null;
+  if (!recommendation && !repeatText) return null;
   return (
     <div data-testid="compact-review-signals" className={cn('flex flex-wrap items-center gap-1.5', className)}>
       <ReviewRecommendationBadge value={recommendation} />
-      {repeatIntent && (
+      {repeatText && (
         <span
           data-testid="repeat-intent-badge"
           className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
         >
-          {repeatIntent.question} {repeatIntent.answer}
+          {repeatText}
         </span>
       )}
     </div>
