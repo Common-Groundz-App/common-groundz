@@ -43,6 +43,8 @@ import { RatingEvolutionDisplay } from './RatingEvolutionDisplay';
 import { getEntityTypeLabel, getCanonicalType } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
 import { resolveReviewDisplayType, displayTypeValue } from './reviewDisplayType';
+import { resolveReviewReaderDetails } from './questionnaire/readerDetails';
+import ReviewRecommendationBadge from './questionnaire/ReviewRecommendationBadge';
 
 interface ReviewCardProps {
   review: Review;
@@ -50,7 +52,7 @@ interface ReviewCardProps {
   refreshReviews: () => Promise<void>;
   hideEntityFallbacks?: boolean;
   compact?: boolean;
-  showTimelineFeatures?: boolean; // New prop to control timeline features display
+  showTimelineFeatures?: boolean; // Owner-only authoring entry points (Start Timeline)
   onStartTimeline?: (reviewId: string) => void; // New prop for starting timeline
 }
 
@@ -69,6 +71,11 @@ const ReviewCard = ({
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   
   const isOwner = user?.id === review.user_id;
+  // Phase 10B Step 4 — reader access (View Details / View Timeline) is open to
+  // anyone who can already see this card (RLS decides visibility); authoring
+  // stays owner-only via showTimelineFeatures + canStartTimeline.
+  const hasTimelineUpdates = !!(review.has_timeline && review.timeline_count && review.timeline_count > 0);
+  const recommendation = resolveReviewReaderDetails(review.metadata, review.category).recommendation;
   const [spoilerRevealed, setSpoilerRevealed] = useState(false);
   const spoilerHidden = hasSpoilerFlag(review.metadata) && !spoilerRevealed;
   const spoilerBarrier = <SpoilerBarrier onReveal={() => setSpoilerRevealed(true)} />;
@@ -232,7 +239,7 @@ const ReviewCard = ({
               {/* Right section with Timeline Badge and Options Menu */}
               <div className="flex items-center gap-2 ml-2">
                 {/* Timeline Badge for Dynamic Reviews */}
-                {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
+                {hasTimelineUpdates && (
                   <TimelineBadge 
                     updateCount={review.timeline_count} 
                     variant="secondary"
@@ -286,9 +293,21 @@ const ReviewCard = ({
                 <p className="line-clamp-6">{review.description}</p>
               </div>
             )}
+            {!spoilerHidden && recommendation && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                <ReviewRecommendationBadge value={recommendation} />
+              </div>
+            )}
+            {!hasTimelineUpdates && (
+              <div className="mb-3">
+                <Button variant="outline" size="sm" onClick={() => setIsTimelineViewerOpen(true)} className="text-xs h-6 px-2">
+                  View Details
+                </Button>
+              </div>
+            )}
             
             {/* Timeline Features for Dynamic Reviews */}
-            {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
+            {hasTimelineUpdates && (
               <div className="mb-3">
                 <Button
                   variant="outline"
@@ -374,7 +393,7 @@ const ReviewCard = ({
         </Card>
 
         {/* Timeline Viewer Modal */}
-        {showTimelineFeatures && (
+        {(
           <ReviewTimelineViewer
             isOpen={isTimelineViewerOpen}
             onClose={handleTimelineViewerClose}
@@ -430,7 +449,7 @@ const ReviewCard = ({
                 <div className="mt-1 flex items-center gap-2">
                   <RatingDisplay rating={review.rating} latestRating={review.latest_rating} />
                   {/* Timeline Badge for Dynamic Reviews */}
-                  {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
+                  {hasTimelineUpdates && (
                     <TimelineBadge 
                       updateCount={review.timeline_count} 
                       variant="secondary"
@@ -490,7 +509,7 @@ const ReviewCard = ({
           </div>
 
           {/* Timeline Features for Dynamic Reviews */}
-          {showTimelineFeatures && review.has_timeline && review.timeline_count && review.timeline_count > 0 && (
+          {hasTimelineUpdates && (
             <div className="mt-4">
               <Button
                 variant="outline"
@@ -504,9 +523,13 @@ const ReviewCard = ({
             </div>
           )}
           
-          {/* Start Timeline Button for Static Reviews */}
-          {showTimelineFeatures && canStartTimeline && (
-            <div className="mt-4">
+          {/* Standalone review: reader-facing details + owner-only Start Timeline */}
+          {!hasTimelineUpdates && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setIsTimelineViewerOpen(true)}>
+                View Details
+              </Button>
+              {showTimelineFeatures && canStartTimeline && (
               <Button
                 variant="outline"
                 size="sm"
@@ -516,6 +539,7 @@ const ReviewCard = ({
                 <Plus className="h-4 w-4" />
                 Start Timeline
               </Button>
+              )}
             </div>
           )}
           
@@ -552,6 +576,11 @@ const ReviewCard = ({
           {review.description && !spoilerHidden && (
             <div className="text-sm text-muted-foreground mt-3">
               <p className="line-clamp-3">{review.description}</p>
+            </div>
+          )}
+          {!spoilerHidden && recommendation && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <ReviewRecommendationBadge value={recommendation} />
             </div>
           )}
           
@@ -615,7 +644,7 @@ const ReviewCard = ({
       </Card>
 
       {/* Timeline Viewer Modal */}
-      {showTimelineFeatures && (
+      {(
         <ReviewTimelineViewer
           isOpen={isTimelineViewerOpen}
           onClose={() => setIsTimelineViewerOpen(false)}

@@ -157,6 +157,7 @@ export default defineConfig({
             'src/components/profile/reviews/__tests__/ReviewTimelineViewer.test.tsx',
             'src/components/profile/reviews/__tests__/phase10bViewerDetails.test.tsx',
             'src/components/profile/reviews/__tests__/phase10bCardSignals.test.tsx',
+            'src/components/profile/reviews/__tests__/phase10bProfileCard.test.tsx',
             'src/components/profile/reviews/__tests__/phase10bRepeatStatement.test.ts',
             'src/components/reviews/ReviewOwnerMenu.test.tsx',
             'src/components/profile/reviews/__tests__/ReviewFormSubjectReset.test.tsx',
