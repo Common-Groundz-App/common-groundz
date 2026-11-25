@@ -1,5 +1,12 @@
 # Roadmap
 
+## Phase 10 — Visibility simplification stabilization (original Phases 11–13 paused)
+- [ ] 10.1 — Convert only the approved Nandi Hills dummy review; public-only canonical viewer endorsements; preserve correct RLS; targeted database permission verification
+- [ ] 10.2 — Review/Experience queries, Timeline/media privacy and public counts
+- [ ] 10.3 — Public + Private authoring controls for reviews and Experiences; coordinate strict database visibility enforcement with client removal of Circle Only
+- [ ] 10.4 — Owner private-review first card with Private badge (not community ranking); reader-side Circle integration without changing working Circle rating
+- [ ] 10.5 — Cross-surface regression and final signoff; then resume original Phases 11 → 12 → 13
+
 ## One-time historical Mux reconciliation (approved 2026-10-25)
 - [x] Recheck the exact 72 historical assets, references and exclusions
 - [x] Reconcile 68 externally missing assets with truthful audits; four survivors receive fresh 24-hour grace

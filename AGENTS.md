@@ -1,5 +1,7 @@
 # Project architecture rules
 
+- Viewer canonical endorsement RPCs select published public reviews only, with caller-author filters distinguishing Circle from extended/community discovery; preserve canonical-first deduplication and identity checks so private history never seeds social proof.
+
 - Mux upload creation preallocates the persisted row UUID for server-only correlation metadata; a failed/uncertain insert returns no signed URL and logs correlation only, avoiding a hidden lineage gap without fake upload IDs.
 - Mux cleanup inventory is an admin-only observational Edge endpoint with independent reference/existence dimensions and fail-closed protection; it has no mutation or scheduling capability, so dry-run cannot become accidental cleanup.
 
