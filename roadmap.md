@@ -1,7 +1,8 @@
 # Roadmap
 
 ## Phase 10 — Visibility simplification stabilization (original Phases 11–13 paused)
-- [ ] 10.1 — Convert only the approved Nandi Hills dummy review; public-only canonical viewer endorsements; preserve correct RLS; targeted database permission verification
+- [x] 10.1 — Approved Nandi Hills dummy converted; public-only canonical viewer endorsements; correct RLS preserved; 39 database-role checks, six guest API checks and public details browser verification passed (docs/verification/phase-10-1-visibility.md)
+- [ ] 10.1 signed-in browser acceptance — owner/Hana/outsider profile and Circle checks blocked by external unmanaged Supabase session minting; database-role checks are not real login sessions
 - [ ] 10.2 — Review/Experience queries, Timeline/media privacy and public counts
 - [ ] 10.3 — Public + Private authoring controls for reviews and Experiences; coordinate strict database visibility enforcement with client removal of Circle Only
 - [ ] 10.4 — Owner private-review first card with Private badge (not community ranking); reader-side Circle integration without changing working Circle rating
