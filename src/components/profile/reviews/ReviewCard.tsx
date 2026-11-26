@@ -44,6 +44,7 @@ import { getEntityTypeLabel, getCanonicalType } from '@/services/entityTypeHelpe
 import { EntityType } from '@/services/recommendation/types';
 import { resolveReviewDisplayType, displayTypeValue } from './reviewDisplayType';
 import { resolveReviewReaderDetails } from './questionnaire/readerDetails';
+import { PrivateBadge } from '@/components/entity-v4/PrivateReviewBanner';
 import ReviewRecommendationBadge from './questionnaire/ReviewRecommendationBadge';
 
 interface ReviewCardProps {
@@ -285,9 +286,7 @@ const ReviewCard = ({
                 {formatRelativeDate(review.created_at)}
               </span>
               {isOwner && review.visibility !== 'public' && (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" title="Only visible to you">
-                  <Lock className="h-3 w-3" aria-hidden="true" />Private
-                </span>
+                <PrivateBadge />
               )}
             </div>
             
@@ -450,9 +449,7 @@ const ReviewCard = ({
                   <div className="text-muted-foreground text-xs mt-0.5">
                     <span>{formatRelativeDate(review.created_at)}</span>
                     {isOwner && review.visibility !== 'public' && (
-                      <span className="ml-2 inline-flex items-center gap-1" title="Only visible to you">
-                        <Lock className="h-3 w-3" aria-hidden="true" />Private
-                      </span>
+                      <span className="ml-2 inline-flex"><PrivateBadge /></span>
                     )}
                   </div>
                 </div>

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from "@/components/ui/button";
 import { Eye, Clock, Users } from 'lucide-react';
+import { PrivateReviewBanner, PRIVATE_CARD_CLASSES } from './PrivateReviewBanner';
 import { ReviewWithUser } from '@/types/entities';
 import { ReviewUpdate } from '@/services/review/types';
 import { fetchReviewUpdates } from '@/services/review/timeline';
@@ -29,6 +30,8 @@ interface TimelineReviewCardProps {
   isCircleReview?: boolean;
   circleUserName?: string;
   onDeleted?: () => void;
+  /** Owner's pinned private review: amber privacy banner. */
+  isPrivateReview?: boolean;
 }
 
 interface TimelineEntry {
@@ -50,7 +53,8 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   onTimelineClick,
   isCircleReview = false,
   circleUserName,
-  onDeleted
+  onDeleted,
+  isPrivateReview = false
 }) => {
   const [timelineData, setTimelineData] = useState<ReviewUpdate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -169,11 +173,12 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   return (
     <Card 
       className={`border-l-4 border-l-blue-500 cursor-pointer hover:shadow-md transition-shadow ${
-        isCircleReview ? 'border-2 border-blue-200 bg-blue-50/30' : ''
+        isCircleReview ? 'border-2 border-blue-200 bg-blue-50/30' : isPrivateReview ? PRIVATE_CARD_CLASSES : ''
       }`}
       onClick={handleCardClick}
     >
       <CardContent className="p-6">
+        {isPrivateReview && !isCircleReview && <PrivateReviewBanner />}
         {/* Circle Review Badge - Show at top if this is a circle review */}
         {isCircleReview && (
           <div className="flex items-center gap-2 mb-4">

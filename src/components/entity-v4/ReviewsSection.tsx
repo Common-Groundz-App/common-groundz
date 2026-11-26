@@ -507,20 +507,18 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
         <div className="space-y-6">
           {pinnedPrivate && (
             <div data-testid="pinned-private-review" className="space-y-2">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Lock className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Private · Only visible to you</span>
-              </div>
               {pinnedPrivate.has_timeline ? (
                 <TimelineReviewCard
                   review={pinnedPrivate}
                   onTimelineClick={handleTimelineClick}
                   onDeleted={() => handleReviewDeleted(pinnedPrivate.id)}
                   isCircleReview={false}
+                  isPrivateReview
                 />
               ) : (
                 <ReviewCard
                   review={pinnedPrivate}
+                  isPrivateReview
                   onHelpfulClick={onHelpfulClick}
                   onTimelineClick={handleTimelineClick}
                   onDeleted={handleReviewDeleted}
@@ -586,18 +584,24 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             ))
           ) : (
             !hybridReviews.length && !circleOnlyReviews.length && !timelineOnlyReviews.length && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8">
                 {visibleReviews.length === 0 && pinnedPrivate ? (
                   <>
-                    <p>No public reviews yet.</p>
+                    <h4 className="text-base font-semibold text-foreground">No public reviews yet</h4>
                     {pinnedCanGoPublic && (
-                      <p className="text-sm mt-1">Your review is private. You can make it public anytime.</p>
+                      <p className="text-sm text-muted-foreground mt-1">Your review is private. You can make it public anytime.</p>
                     )}
                   </>
                 ) : visibleReviews.length === 0 ? (
-                  <p>No reviews yet. Be the first to share your experience!</p>
+                  <>
+                    <h4 className="text-base font-semibold text-foreground">No reviews yet</h4>
+                    <p className="text-sm text-muted-foreground mt-1">Be the first to share your experience!</p>
+                  </>
                 ) : (
-                  <p>No reviews match your current filters.</p>
+                  <>
+                    <h4 className="text-base font-semibold text-foreground">No matching reviews</h4>
+                    <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters to find what you're looking for.</p>
+                  </>
                 )}
               </div>
             )

@@ -15,6 +15,7 @@ import { ReviewOwnerMenu } from '@/components/reviews/ReviewOwnerMenu';
 import type { Review } from '@/services/reviewService';
 import { SpoilerBarrier } from '@/components/reviews/SpoilerBarrier';
 import { hasSpoilerFlag } from '@/utils/spoilers';
+import { PrivateReviewBanner, PRIVATE_CARD_CLASSES } from '@/components/entity-v4/PrivateReviewBanner';
 import CompactReviewSignals from '@/components/profile/reviews/questionnaire/CompactReviewSignals';
 
 interface ReviewCardProps {
@@ -35,9 +36,11 @@ interface ReviewCardProps {
   onTimelineClick?: (review: ReviewWithUser) => void;
   /** Called after the review is deleted (or found already deleted). */
   onDeleted?: (reviewId: string) => void;
+  /** Owner's pinned private review: amber privacy banner. */
+  isPrivateReview?: boolean;
 }
 
-const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimelineClick, onDeleted }) => {
+const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimelineClick, onDeleted, isPrivateReview = false }) => {
   const { user } = useAuth();
   const isOwner = 'user' in review && !!user && user.id === review.user_id;
   const [spoilerRevealed, setSpoilerRevealed] = React.useState(false);
@@ -81,7 +84,8 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimel
   };
 
   return (
-    <div className="bg-white border rounded-lg p-6">
+    <div className={isPrivateReview ? `${PRIVATE_CARD_CLASSES} rounded-lg p-6` : "bg-white border rounded-lg p-6"}>
+      {isPrivateReview && <PrivateReviewBanner />}
       <div className="flex items-start gap-4">
         <Avatar className="w-12 h-12 flex-shrink-0">
           <AvatarImage src={transformedReview.avatar || undefined} alt={transformedReview.name} />
