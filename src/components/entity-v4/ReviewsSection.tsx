@@ -589,7 +589,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   <>
                     <h4 className="text-base font-semibold text-foreground">No public reviews yet</h4>
                     {pinnedCanGoPublic && (
-                      <p className="text-sm text-muted-foreground mt-1">Your review is private. You can make it public anytime.</p>
+                      <p className="text-sm text-muted-foreground mt-1">Your review is private. Only you can see it.</p>
                     )}
                   </>
                 ) : visibleReviews.length === 0 ? (
