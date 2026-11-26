@@ -6,7 +6,7 @@
 - [x] 10.2 — Review/Experience queries, Timeline/media privacy and public counts
 - [ ] Before Launch checklist (docs/roadmap/before-launch.md) — private photos required before real-user Private photos; private Mux video assessment
 - [x] 10.3 — Public + Private authoring controls for reviews and Experiences; coordinate strict database visibility enforcement with client removal of Circle Only
-- [ ] 10.4 — Owner private-review first card with Private badge (not community ranking); reader-side Circle integration without changing working Circle rating
+- [x] 10.4 — Owner private-review first card with Private badge (not community ranking); reader-side Circle integration without changing working Circle rating
 - [ ] 10.5 — Cross-surface regression and final signoff; then resume original Phases 11 → 12 → 13
 
 ## One-time historical Mux reconciliation (approved 2026-10-25)
