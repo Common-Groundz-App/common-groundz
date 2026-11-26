@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { REVIEWS_CHANGED_EVENT } from '@/services/review/reviewChangeEvents';
 
 interface EntityTimelineSummary {
   averageInitialRating: number;
@@ -17,6 +18,13 @@ export const useEntityTimelineSummary = (entityId: string | null) => {
   const [summary, setSummary] = useState<EntityTimelineSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+  // Public <-> Private changes emit the shared review event; refetch then.
+  useEffect(() => {
+    const bump = () => setRefreshTick(t => t + 1);
+    window.addEventListener(REVIEWS_CHANGED_EVENT, bump);
+    return () => window.removeEventListener(REVIEWS_CHANGED_EVENT, bump);
+  }, []);
 
   useEffect(() => {
     if (!entityId) {
@@ -24,9 +32,12 @@ export const useEntityTimelineSummary = (entityId: string | null) => {
       return;
     }
 
+    // Each rerun retires the previous request (stale-response guard).
+    let cancelled = false;
+    const live = () => !cancelled;
     const fetchSummary = async () => {
-      setIsLoading(true);
-      setError(null);
+      live() && setIsLoading(true);
+      live() && setError(null);
 
       try {
         // First get entity-level AI summary data
@@ -46,12 +57,13 @@ export const useEntityTimelineSummary = (entityId: string | null) => {
           .select('id, rating, created_at, has_timeline')
           .eq('entity_id', entityId)
           .eq('status', 'published')
+          .eq('visibility', 'public')
           .eq('has_timeline', true);
 
         if (reviewsError) throw reviewsError;
 
         if (!reviews || reviews.length === 0) {
-          setSummary(null);
+          live() && setSummary(null);
           return;
         }
 
@@ -103,7 +115,7 @@ export const useEntityTimelineSummary = (entityId: string | null) => {
           totalUpdates: updates?.length || 0
         });
 
-        setSummary({
+        live() && setSummary({
           averageInitialRating,
           averageLatestRating,
           averageUpdateDays,
@@ -116,14 +128,15 @@ export const useEntityTimelineSummary = (entityId: string | null) => {
 
       } catch (err) {
         console.error('Error fetching entity timeline summary:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch timeline summary');
+        live() && setError(err instanceof Error ? err.message : 'Failed to fetch timeline summary');
       } finally {
-        setIsLoading(false);
+        live() && setIsLoading(false);
       }
     };
 
     fetchSummary();
-  }, [entityId]);
+    return () => { cancelled = true; };
+  }, [entityId, refreshTick]);
 
   return { summary, isLoading, error };
 };

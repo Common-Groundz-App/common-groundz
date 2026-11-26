@@ -114,33 +114,15 @@ const isValidUUID = (str: string): boolean => {
 /**
  * Fetch all reviews related to an entity with enhanced unified profile service
  */
-export const fetchEntityReviews = async (
-  entityId: string, 
-  userId: string | null = null
+/**
+ * Shared row -> ReviewWithUser enrichment (profiles, latest timeline rating,
+ * likes). Used by the public entity list and the owner-private pinned card so
+ * both render through identical card data.
+ */
+export const enrichEntityReviewRows = async (
+  reviewsData: any[],
+  userId: string | null
 ): Promise<ReviewWithUser[]> => {
-  console.log('Fetching entity reviews for entityId:', entityId, 'userId:', userId);
-  
-  try {
-    // Fetch reviews with aggregated timeline comments for comprehensive search
-    const { data: reviewsData, error } = await supabase
-      .from('reviews')
-      .select(`
-        *,
-        review_updates(comment)
-      `)
-      .eq('entity_id', entityId)
-      .eq('visibility', 'public');
-    
-    if (error) {
-      console.error('Error fetching entity reviews:', error);
-      return [];
-    }
-    
-    if (!reviewsData || reviewsData.length === 0) {
-      return [];
-    }
-
-    console.log('Found reviews:', reviewsData.length);
     
     // Attach profiles using enhanced unified service
     const reviewsWithProfiles = await attachProfilesToEntities(reviewsData);
@@ -245,6 +227,37 @@ export const fetchEntityReviews = async (
       } as ReviewWithUser & { all_content: string };
     });
     
+    return finalReviews;
+};
+
+export const fetchEntityReviews = async (
+  entityId: string, 
+  userId: string | null = null
+): Promise<ReviewWithUser[]> => {
+  console.log('Fetching entity reviews for entityId:', entityId, 'userId:', userId);
+  
+  try {
+    // Fetch reviews with aggregated timeline comments for comprehensive search
+    const { data: reviewsData, error } = await supabase
+      .from('reviews')
+      .select(`
+        *,
+        review_updates(comment)
+      `)
+      .eq('entity_id', entityId)
+      .eq('visibility', 'public');
+    
+    if (error) {
+      console.error('Error fetching entity reviews:', error);
+      return [];
+    }
+    
+    if (!reviewsData || reviewsData.length === 0) {
+      return [];
+    }
+
+    console.log('Found reviews:', reviewsData.length);
+    const finalReviews = await enrichEntityReviewRows(reviewsData, userId);
     console.log('Processed reviews with enhanced unified profiles:', finalReviews.length);
     return finalReviews;
   } catch (err) {

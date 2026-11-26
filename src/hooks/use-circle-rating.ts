@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { REVIEWS_CHANGED_EVENT } from '@/services/review/reviewChangeEvents';
 import { CircleContributor, CircleRatingData } from './use-circle-rating-types';
 
 export const useCircleRating = (entityId: string): CircleRatingData => {
@@ -10,16 +11,30 @@ export const useCircleRating = (entityId: string): CircleRatingData => {
   const [circleRatingCount, setCircleRatingCount] = useState<number>(0);
   const [circleContributors, setCircleContributors] = useState<CircleContributor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshTick, setRefreshTick] = useState(0);
+  // Public <-> Private changes emit the shared review event; refetch then.
+  useEffect(() => {
+    const bump = () => setRefreshTick(t => t + 1);
+    window.addEventListener(REVIEWS_CHANGED_EVENT, bump);
+    return () => window.removeEventListener(REVIEWS_CHANGED_EVENT, bump);
+  }, []);
 
   useEffect(() => {
+    // Every rerun (refresh, entity or account change, unmount) retires the
+    // previous request so a late response can never overwrite newer data.
+    let cancelled = false;
+    const live = () => !cancelled;
     const fetchCircleRating = async () => {
       if (!user || !entityId) {
-        setIsLoading(false);
+        live() && setCircleRating(null);
+        live() && setCircleRatingCount(0);
+        live() && setCircleContributors([]);
+        live() && setIsLoading(false);
         return;
       }
 
       console.log('🔵 Fetching circle rating for entity:', entityId);
-      setIsLoading(true);
+      live() && setIsLoading(true);
 
       try {
         // Use the database function to get the circle rating
@@ -31,10 +46,10 @@ export const useCircleRating = (entityId: string): CircleRatingData => {
 
         if (ratingError) {
           console.error('Error fetching circle rating:', ratingError);
-          setCircleRating(null);
-          setCircleRatingCount(0);
-          setCircleContributors([]);
-          setIsLoading(false);
+          live() && setCircleRating(null);
+          live() && setCircleRatingCount(0);
+          live() && setCircleContributors([]);
+          live() && setIsLoading(false);
           return;
         }
 
@@ -48,19 +63,19 @@ export const useCircleRating = (entityId: string): CircleRatingData => {
 
         if (followError) {
           console.error('Error fetching followed users:', followError);
-          setCircleRating(circleRatingValue);
-          setCircleRatingCount(circleRatingValue > 0 ? 1 : 0);
-          setCircleContributors([]);
-          setIsLoading(false);
+          live() && setCircleRating(circleRatingValue);
+          live() && setCircleRatingCount(circleRatingValue > 0 ? 1 : 0);
+          live() && setCircleContributors([]);
+          live() && setIsLoading(false);
           return;
         }
 
         if (!followedUsers || followedUsers.length === 0) {
           console.log('🔵 User follows no one, circle rating is 0');
-          setCircleRating(null);
-          setCircleRatingCount(0);
-          setCircleContributors([]);
-          setIsLoading(false);
+          live() && setCircleRating(null);
+          live() && setCircleRatingCount(0);
+          live() && setCircleContributors([]);
+          live() && setIsLoading(false);
           return;
         }
 
@@ -111,25 +126,26 @@ export const useCircleRating = (entityId: string): CircleRatingData => {
           .sort((a, b) => b.rating - a.rating)
           .slice(0, 5);
 
-        setCircleRating(circleRatingValue > 0 ? circleRatingValue : null);
-        setCircleRatingCount(ratingCount);
-        setCircleContributors(sortedContributors);
+        live() && setCircleRating(circleRatingValue > 0 ? circleRatingValue : null);
+        live() && setCircleRatingCount(ratingCount);
+        live() && setCircleContributors(sortedContributors);
         
         console.log('🔵 Circle rating from DB function:', circleRatingValue);
         console.log('🔵 Circle contributors found:', contributors.length);
         console.log('🔵 Top contributors:', sortedContributors);
       } catch (error) {
         console.error('Error calculating circle rating:', error);
-        setCircleRating(null);
-        setCircleRatingCount(0);
-        setCircleContributors([]);
+        live() && setCircleRating(null);
+        live() && setCircleRatingCount(0);
+        live() && setCircleContributors([]);
       } finally {
-        setIsLoading(false);
+        live() && setIsLoading(false);
       }
     };
 
     fetchCircleRating();
-  }, [entityId, user?.id]);
+    return () => { cancelled = true; };
+  }, [entityId, user?.id, refreshTick]);
 
   return {
     circleRating,

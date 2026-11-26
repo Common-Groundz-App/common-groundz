@@ -37,6 +37,8 @@ import { EntityHeader } from './EntityHeader';
 import { MediaPreviewSection } from './MediaPreviewSection';
 import { TrustSummaryCard } from './TrustSummaryCard';
 import { ReviewsSection } from './ReviewsSection';
+import { useUserEntityReview } from '@/hooks/useUserEntityReview';
+import { subjectRelationFromKnownEntity } from '@/services/reviewSubjectRelation';
 import { EntitySidebar } from './EntitySidebar';
 import { EntityTabsContent } from './EntityTabsContent';
 import { EntityModerationBanner } from '@/components/entity/EntityModerationBanner';
@@ -413,6 +415,19 @@ const EntityV4 = () => {
   };
 
   // Function to scroll to Reviews & Social Proof section
+  // Phase 10.4: the signed-in author's private review, pinned first in the
+  // review list. Kept out of `reviews` so it never enters public arrays,
+  // counts, sorting or Circle data; skipped if the public list already has it.
+  const { privateReview: ownerPrivateRow } = useUserEntityReview(entity?.id);
+  const pinnedPrivateReview = React.useMemo(() => {
+    if (!ownerPrivateRow || !entity) return null;
+    if (reviews.some(r => r.id === ownerPrivateRow.id)) return null;
+    return {
+      ...ownerPrivateRow,
+      subjectRelation: subjectRelationFromKnownEntity(entity.type as unknown as string),
+    };
+  }, [ownerPrivateRow, entity, reviews]);
+
   const scrollToReviewsSection = () => {
     console.log('🔄 Scroll to reviews triggered');
     
@@ -685,6 +700,7 @@ const EntityV4 = () => {
                 {/* SECTION 5: Reviews & Social Proof - Now with Enhanced Authentication Handling */}
                 <ReviewsSection 
                   reviews={reviews}
+                  ownerPrivateReview={pinnedPrivateReview}
                   entityName={entity?.name || ''}
                   entityId={entity?.id || ''}
                   onHelpfulClick={(reviewId) => {

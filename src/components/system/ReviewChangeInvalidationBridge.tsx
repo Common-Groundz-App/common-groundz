@@ -10,6 +10,9 @@ import { REVIEWS_CHANGED_EVENT } from '@/services/review/reviewChangeEvents';
  *   - ['entity-detail', slug]  entity page reviews + live stats
  *   - ['reviews', ...]         profile review lists (useReviewsFetch)
  *   - ['entity-stats', id]     sidebar stats on post detail
+ *   - ['trust-metrics', ...]   Trust Summary breakdown / Circle Certified
+ *   (Circle rating, Circle reviews and timeline summary are effect hooks that
+ *   listen to the same event themselves.)
  * No polling, cache warming, visibility listeners, re-emits or reloads.
  */
 const ReviewChangeInvalidationBridge = () => {
@@ -20,6 +23,7 @@ const ReviewChangeInvalidationBridge = () => {
       queryClient.invalidateQueries({ queryKey: ['reviews'] });
       queryClient.invalidateQueries({ queryKey: ['entity-stats'] });
       queryClient.invalidateQueries({ queryKey: ['user-entity-review'] });
+      queryClient.invalidateQueries({ queryKey: ['trust-metrics'] });
     };
     window.addEventListener(REVIEWS_CHANGED_EVENT, handle);
     // Owner-private reviews never outlive the session: cancel in-flight

@@ -30,18 +30,19 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
 
   useEffect(() => {
     let cancelled = false;
+    const live = () => !cancelled;
     const fetchCircleReviews = async () => {
       if (!user || !entityId) {
-        setCircleReviews([]);
-        setCircleUserIds([]);
-        setIsLoading(false);
+        live() && setCircleReviews([]);
+        live() && setCircleUserIds([]);
+        live() && setIsLoading(false);
         return;
       }
 
       console.log('🔵 useCircleReviews - Fetching circle reviews for entity:', entityId);
       console.log('🔵 Current user:', user.id);
-      setIsLoading(true);
-      setError(null);
+      live() && setIsLoading(true);
+      live() && setError(null);
 
       try {
         // First, get the list of users that the current user follows
@@ -53,22 +54,22 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
 
         if (followError) {
           console.error('🔵 Error fetching followed users:', followError);
-          setError('Failed to fetch following data');
-          setIsLoading(false);
+          live() && setError('Failed to fetch following data');
+          live() && setIsLoading(false);
           return;
         }
 
         if (!followedUsers || followedUsers.length === 0) {
           console.log('🔵 User follows no one, no circle reviews');
-          setCircleReviews([]);
-          setCircleUserIds([]);
-          setIsLoading(false);
+          live() && setCircleReviews([]);
+          live() && setCircleUserIds([]);
+          live() && setIsLoading(false);
           return;
         }
 
         const followedUserIds = followedUsers.map(f => f.following_id);
         console.log('🔵 Found followed users:', followedUserIds.length, followedUserIds);
-        setCircleUserIds(followedUserIds);
+        live() && setCircleUserIds(followedUserIds);
 
         // Get reviews from followed users for this entity - simplified approach
         const { data: reviews, error: reviewError } = await supabase
@@ -82,7 +83,7 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
 
         if (reviewError) {
           console.error('🔵 Error fetching circle reviews:', reviewError);
-          setError('Failed to fetch circle reviews');
+          live() && setError('Failed to fetch circle reviews');
         } else if (reviews && reviews.length > 0) {
           // Get profile data separately to avoid foreign key issues
           const { data: profiles, error: profileError } = await supabase
@@ -92,7 +93,7 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
 
           if (profileError) {
             console.error('🔵 Error fetching profiles:', profileError);
-            setError('Failed to fetch user profiles');
+            live() && setError('Failed to fetch user profiles');
           } else {
             const profileMap = new Map((profiles || []).map(p => [p.id, p]));
             
@@ -132,18 +133,18 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
               title: r.title
             })));
 
-            if (!cancelled) setCircleReviews(formattedReviews);
+            live() && setCircleReviews(formattedReviews);
           }
         } else {
-          setCircleReviews([]);
+          live() && setCircleReviews([]);
         }
       } catch (error) {
         console.error('🔵 Error in useCircleReviews:', error);
-        setError('Unexpected error occurred');
-        setCircleReviews([]);
-        setCircleUserIds([]);
+        live() && setError('Unexpected error occurred');
+        live() && setCircleReviews([]);
+        live() && setCircleUserIds([]);
       } finally {
-        setIsLoading(false);
+        live() && setIsLoading(false);
       }
     };
 

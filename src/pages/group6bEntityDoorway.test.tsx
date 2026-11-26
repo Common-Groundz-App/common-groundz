@@ -92,6 +92,7 @@ vi.mock('@/hooks/useAuthPrompt', () => ({ useAuthPrompt: () => ({ requireAuth: (
 vi.mock('@/hooks/recommendations/use-entity-refresh', () => ({ useEntityImageRefresh: () => ({ refreshEntityImage: vi.fn(), isRefreshing: false }) }));
 vi.mock('@/hooks/useUserFollowing', () => ({ useUserFollowing: () => ({ data: [], isLoading: false, error: null, isError: false }) }));
 vi.mock('@/hooks/use-entity-timeline-summary', () => ({ useEntityTimelineSummary: () => ({ summary: null, isLoading: false, error: null }) }));
+vi.mock('@/hooks/useUserEntityReview', () => ({ useUserEntityReview: () => ({ privateReview: null, isLoading: false }) }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock('@tanstack/react-query', async (orig) => ({ ...(await orig<object>()), useQueryClient: () => ({ invalidateQueries: vi.fn(), setQueryData: vi.fn() }) }));
 

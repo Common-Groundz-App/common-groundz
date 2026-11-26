@@ -30,6 +30,8 @@ import { Entity } from '@/services/recommendation/types';
 
 interface ReviewsSectionProps {
   reviews: ReviewWithUser[];
+  /** Signed-in author's private review; pinned first, never counted. */
+  ownerPrivateReview?: ReviewWithUser | null;
   entityName: string;
   entityId: string;
   onHelpfulClick?: (reviewId: string) => void;
@@ -42,6 +44,7 @@ interface ReviewsSectionProps {
 
 export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ 
   reviews = [], 
+  ownerPrivateReview = null,
   entityName = '',
   entityId = '',
   onHelpfulClick,
@@ -87,6 +90,12 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     }
   };
   const visibleReviews = reviews.filter(r => !hiddenReviewIds.has(r.id));
+  const pinnedPrivate =
+    ownerPrivateReview && user && ownerPrivateReview.user_id === user.id && !hiddenReviewIds.has(ownerPrivateReview.id)
+      ? ownerPrivateReview
+      : null;
+  // Switching to Public is refused for reviews carrying a video.
+  const pinnedCanGoPublic = !!pinnedPrivate && !(pinnedPrivate.media || []).some(m => m?.type === 'video');
 
   const hasCircleData = isAuthenticated && !circleLoading && circleUserIds.length > 0;
 
@@ -496,6 +505,30 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
         </div>
 
         <div className="space-y-6">
+          {pinnedPrivate && (
+            <div data-testid="pinned-private-review" className="space-y-2">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Private · Only visible to you</span>
+              </div>
+              {pinnedPrivate.has_timeline ? (
+                <TimelineReviewCard
+                  review={pinnedPrivate}
+                  onTimelineClick={handleTimelineClick}
+                  onDeleted={() => handleReviewDeleted(pinnedPrivate.id)}
+                  isCircleReview={false}
+                />
+              ) : (
+                <ReviewCard
+                  review={pinnedPrivate}
+                  onHelpfulClick={onHelpfulClick}
+                  onTimelineClick={handleTimelineClick}
+                  onDeleted={handleReviewDeleted}
+                />
+              )}
+            </div>
+          )}
+
           {hybridReviews.map(review => (
             <TimelineReviewCard
               key={review.id}
@@ -554,7 +587,14 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           ) : (
             !hybridReviews.length && !circleOnlyReviews.length && !timelineOnlyReviews.length && (
               <div className="text-center py-8 text-gray-500">
-                {visibleReviews.length === 0 ? (
+                {visibleReviews.length === 0 && pinnedPrivate ? (
+                  <>
+                    <p>No public reviews yet.</p>
+                    {pinnedCanGoPublic && (
+                      <p className="text-sm mt-1">Your review is private. You can make it public anytime.</p>
+                    )}
+                  </>
+                ) : visibleReviews.length === 0 ? (
                   <p>No reviews yet. Be the first to share your experience!</p>
                 ) : (
                   <p>No reviews match your current filters.</p>

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchUserEntityReview } from '@/services/ownerPrivateReview';
+import { fetchUserEntityReviewForCard } from '@/services/ownerPrivateReview';
 
 export const USER_ENTITY_REVIEW_KEY = 'user-entity-review';
 
@@ -29,7 +29,7 @@ export function useUserEntityReview(entityId: string | undefined) {
 
   const query = useQuery({
     queryKey: [USER_ENTITY_REVIEW_KEY, entityId, userId],
-    queryFn: ({ signal }) => fetchUserEntityReview(entityId!, userId!, signal),
+    queryFn: ({ signal }) => fetchUserEntityReviewForCard(entityId!, userId!, signal),
     enabled: Boolean(entityId && userId && !authLoading),
     staleTime: 30_000,
   });

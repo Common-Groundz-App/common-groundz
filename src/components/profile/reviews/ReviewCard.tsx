@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, MoreVertical, Pencil, Trash2, Calendar, Flag, AlertTriangle, ImageIcon, Share, Clock, Plus } from 'lucide-react';
+import { Heart, MessageCircle, MoreVertical, Pencil, Trash2, Calendar, Flag, AlertTriangle, ImageIcon, Share, Clock, Plus, Lock } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -284,6 +284,11 @@ const ReviewCard = ({
               <span className="text-xs text-muted-foreground">
                 {formatRelativeDate(review.created_at)}
               </span>
+              {isOwner && review.visibility !== 'public' && (
+                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" title="Only visible to you">
+                  <Lock className="h-3 w-3" aria-hidden="true" />Private
+                </span>
+              )}
             </div>
             
             {/* Description - More prominent and longer */}
@@ -444,6 +449,11 @@ const ReviewCard = ({
                   <UsernameLink userId={review.user_id} username={review.user?.username} displayName={review.user?.displayName || null} showHandle={true} className="text-sm" />
                   <div className="text-muted-foreground text-xs mt-0.5">
                     <span>{formatRelativeDate(review.created_at)}</span>
+                    {isOwner && review.visibility !== 'public' && (
+                      <span className="ml-2 inline-flex items-center gap-1" title="Only visible to you">
+                        <Lock className="h-3 w-3" aria-hidden="true" />Private
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="mt-1 flex items-center gap-2">

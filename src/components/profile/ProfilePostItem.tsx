@@ -135,15 +135,15 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   const getVisibilityIcon = () => {
     switch(post.visibility) {
       case 'private': return <Lock className="h-4 w-4" />;
-      case 'circle_only': return <Users className="h-4 w-4" />;
+      case 'circle_only': return <Lock className="h-4 w-4" />; // legacy, never public
       default: return <Globe className="h-4 w-4" />;
     }
   };
 
   const getVisibilityLabel = () => {
     switch(post.visibility) {
-      case 'private': return 'Only Me';
-      case 'circle_only': return 'Circle Only';
+      case 'private':
+      case 'circle_only': return 'Private';
       default: return 'Public';
     }
   };

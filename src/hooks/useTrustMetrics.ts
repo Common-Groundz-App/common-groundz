@@ -38,6 +38,7 @@ export const useTrustMetrics = (entityId: string | null, userId: string | null) 
             .select('rating, latest_rating')
             .eq('entity_id', entityId)
             .eq('status', 'published')
+        .eq('visibility', 'public')
             .in('user_id', followedUserIds);
 
           if (!circleError && circleData) {
@@ -67,7 +68,8 @@ export const useTrustMetrics = (entityId: string | null, userId: string | null) 
         .from('reviews')
         .select('rating, latest_rating')
         .eq('entity_id', entityId)
-        .eq('status', 'published');
+        .eq('status', 'published')
+        .eq('visibility', 'public');
 
       let ratingBreakdown: { [key: number]: number } = {};
       if (!ratingError && ratingData && ratingData.length > 0) {
@@ -95,6 +97,7 @@ export const useTrustMetrics = (entityId: string | null, userId: string | null) 
         .select('rating, created_at')
         .eq('entity_id', entityId)
         .eq('status', 'published')
+        .eq('visibility', 'public')
         .gte('created_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: false });
 
@@ -132,6 +135,7 @@ export const useTrustMetrics = (entityId: string | null, userId: string | null) 
         .select('updated_at')
         .eq('entity_id', entityId)
         .eq('status', 'published')
+        .eq('visibility', 'public')
         .order('updated_at', { ascending: false })
         .limit(1);
 
@@ -140,7 +144,8 @@ export const useTrustMetrics = (entityId: string | null, userId: string | null) 
         .from('reviews')
         .select('id')
         .eq('entity_id', entityId)
-        .eq('status', 'published');
+        .eq('status', 'published')
+        .eq('visibility', 'public');
 
       const reviewIds = entityReviews?.map(r => r.id) || [];
 
