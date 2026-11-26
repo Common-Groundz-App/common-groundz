@@ -26,9 +26,9 @@ interface StepFourProps {
   onDescriptionChange: (value: string) => void;
   experienceDate: Date | undefined;
   onExperienceDateChange: (date: Date) => void;
-  visibility: "public" | "circle_only" | "private";
-  onVisibilityChange: (value: "public" | "circle_only" | "private") => void;
-  /** Optional (new composer only): when set, only "Everyone" can be chosen and this reason is shown. */
+  visibility: "public" | "private";
+  onVisibilityChange: (value: "public" | "private") => void;
+  /** Optional (new composer only): when set, only "Public" can be chosen and this reason is shown. */
   nonPublicLockedReason?: string | null;
   /**
    * Which slice to render. Defaults to `all` (legacy popup, unchanged). The
@@ -154,38 +154,27 @@ const StepFour = ({
         <RadioGroup
           value={visibility}
           onValueChange={onVisibilityChange}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+          className="grid grid-cols-1 sm:grid-cols-2 gap-3"
         >
-          {/* Everyone Option */}
+          {/* Public Option */}
           <div className="flex flex-col space-y-2 border border-brand-orange/30 p-4 rounded-lg hover:bg-brand-orange/5 transition-colors">
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="public" id="public" className="text-brand-orange" />
-              <Label htmlFor="public" className="cursor-pointer font-medium">Everyone</Label>
+              <Label htmlFor="public" className="cursor-pointer font-medium">Public</Label>
             </div>
             <p className="text-xs text-muted-foreground pl-6">
-              Your review will be visible to all users of the platform
+              Visible to everyone and contributes to community insights.
             </p>
           </div>
-          
-          {/* My Circle Option */}
-          <div className="flex flex-col space-y-2 border border-brand-orange/30 p-4 rounded-lg hover:bg-brand-orange/5 transition-colors">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="circle_only" id="circle" className="text-brand-orange" disabled={locked && visibility !== 'circle_only'} />
-              <Label htmlFor="circle" className="cursor-pointer font-medium">My Circle</Label>
-            </div>
-            <p className="text-xs text-muted-foreground pl-6">
-              Only people who follow you or you follow can see this review
-            </p>
-          </div>
-          
-          {/* Just Me Option */}
+
+          {/* Private Option */}
           <div className="flex flex-col space-y-2 border border-brand-orange/30 p-4 rounded-lg hover:bg-brand-orange/5 transition-colors">
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="private" id="private" className="text-brand-orange" disabled={locked && visibility !== 'private'} />
-              <Label htmlFor="private" className="cursor-pointer font-medium">Just Me</Label>
+              <Label htmlFor="private" className="cursor-pointer font-medium">Private</Label>
             </div>
             <p className="text-xs text-muted-foreground pl-6">
-              Only you can see this private review
+              Only visible to you. Excluded from public feeds and insights.
             </p>
           </div>
         </RadioGroup>

@@ -35,7 +35,7 @@ vi.mock('@/components/profile/reviews/steps/StepFour', () => ({
         {!p.hideHeadline && <input aria-label="Review headline" value={p.title} onChange={(e) => p.onTitleChange(e.target.value)} />}
         <input aria-label="Custom tag draft" value={draft} onChange={(e) => setDraft(e.target.value)} />
       </>}
-      {p.part === 'visibility' && ['public', 'circle_only', 'private'].map((v) => <button key={v} onClick={() => p.onVisibilityChange(v)}>Visibility {v}</button>)}
+      {p.part === 'visibility' && ['public', 'private'].map((v) => <button key={v} onClick={() => p.onVisibilityChange(v)}>Visibility {v}</button>)}
     </>;
   },
 }));
@@ -73,7 +73,7 @@ describe('single-page review composer', () => {
     expect(screen.getByText('Subject section')).toBeInTheDocument();
     expect(screen.getByLabelText('Your thoughts')).toBeInTheDocument();
     expect(screen.getByTestId('media-el')).toBeInTheDocument();
-    expect(screen.getByText('Visibility circle_only')).toBeInTheDocument();
+    expect(screen.getByText('Visibility private')).toBeInTheDocument();
     expect(screen.queryByText('Next')).toBeNull();
     expect(screen.queryByText('Back')).toBeNull();
     expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
@@ -122,12 +122,12 @@ describe('single-page review composer', () => {
     render(<ReviewComposerScreen {...createProps} />, { wrapper });
     fireEvent.click(screen.getByText('Rate 4'));
     fireEvent.change(screen.getByLabelText('Your thoughts'), { target: { value: 'Great product' } });
-    fireEvent.click(screen.getByText('Visibility circle_only'));
+    fireEvent.click(screen.getByText('Visibility private'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
     await waitFor(() => expect(mock.save).toHaveBeenCalledOnce());
     expect(mock.payload).toMatchObject({
-      entity_id: 'subject', rating: 4, description: 'Great product', subtitle: '', visibility: 'circle_only', media: [],
+      entity_id: 'subject', rating: 4, description: 'Great product', subtitle: '', visibility: 'private', media: [],
     });
   });
 

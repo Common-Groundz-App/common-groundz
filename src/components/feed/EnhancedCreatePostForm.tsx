@@ -78,24 +78,22 @@ interface EnhancedCreatePostFormProps {
   defaultPostType?: DatabasePostType;
 }
 
-type VisibilityOption = 'public' | 'private' | 'circle';
+type VisibilityOption = 'public' | 'private';
 
 // Map UI visibility types to database visibility types
-const mapVisibilityToDatabase = (visibility: VisibilityOption): 'public' | 'private' | 'circle_only' => {
-  switch (visibility) {
-    case 'public': return 'public';
-    case 'private': return 'private';
-    case 'circle': return 'circle_only';
-    default: return 'public';
-  }
-};
+const mapVisibilityToDatabase = (visibility: VisibilityOption): 'public' | 'private' =>
+  visibility === 'private' ? 'private' : 'public';
 
 // Map database visibility back to UI option (for edit hydration)
 const mapVisibilityFromDatabase = (visibility?: string | null): VisibilityOption => {
   switch (visibility) {
+    case 'public': return 'public';
     case 'private': return 'private';
-    case 'circle_only': return 'circle';
-    default: return 'public';
+    // Missing value = brand-new post. Any unexpected legacy value must never
+    // silently become Public, so it falls back to Private.
+    case undefined:
+    case null: return 'public';
+    default: return 'private';
   }
 };
 
@@ -1215,8 +1213,6 @@ export function EnhancedCreatePostForm({
     switch (visibility) {
       case 'private':
         return <Lock className="h-4 w-4" />;
-      case 'circle':
-        return <Users className="h-4 w-4" />;
       default:
         return <Globe className="h-4 w-4" />;
     }
@@ -1685,17 +1681,11 @@ export function EnhancedCreatePostForm({
                   <div className="flex items-center gap-1.5">
                     {visibility === 'private' ? (
                       <Lock className="h-4 w-4" />
-                    ) : visibility === 'circle' ? (
-                      <Users className="h-4 w-4" />
                     ) : (
                       <Globe className="h-4 w-4" />
                     )}
                     <span>
-                      {visibility === 'public'
-                        ? 'Public'
-                        : visibility === 'private'
-                        ? 'Only Me'
-                        : 'Circle Only'}
+                      {visibility === 'private' ? 'Private' : 'Public'}
                     </span>
                   </div>
                 </SelectValue>
@@ -1710,13 +1700,7 @@ export function EnhancedCreatePostForm({
                 <SelectItem value="private">
                   <div className="flex items-center gap-2">
                     <Lock className="h-4 w-4" />
-                    <span>Only Me</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="circle">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    <span>Circle Only</span>
+                    <span>Private</span>
                   </div>
                 </SelectItem>
               </SelectContent>

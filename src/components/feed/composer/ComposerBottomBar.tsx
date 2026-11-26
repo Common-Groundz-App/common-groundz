@@ -7,7 +7,7 @@ import { MoreToolsPopover } from './MoreToolsPopover';
 import { cn } from '@/lib/utils';
 import type { MediaItem, MediaUploadState } from '@/types/media';
 
-export type VisibilityOption = 'public' | 'private' | 'circle';
+export type VisibilityOption = 'public' | 'private';
 
 interface ComposerBottomBarProps {
   sessionId: string;
@@ -37,13 +37,12 @@ interface ComposerBottomBarProps {
 const getVisibilityIcon = (v: VisibilityOption) => {
   switch (v) {
     case 'private': return <Lock className="h-4 w-4" />;
-    case 'circle': return <Users className="h-4 w-4" />;
     default: return <Globe className="h-4 w-4" />;
   }
 };
 
 const getVisibilityLabel = (v: VisibilityOption) =>
-  v === 'public' ? 'Public' : v === 'private' ? 'Only Me' : 'Circle Only';
+  v === 'private' ? 'Private' : 'Public';
 
 /**
  * Sticky bottom toolbar.
@@ -156,13 +155,7 @@ export const ComposerBottomBar: React.FC<ComposerBottomBarProps> = ({
           <SelectItem value="private">
             <div className="flex items-center gap-2">
               <Lock className="h-4 w-4" />
-              <span>Only Me</span>
-            </div>
-          </SelectItem>
-          <SelectItem value="circle">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span>Circle Only</span>
+              <span>Private</span>
             </div>
           </SelectItem>
         </SelectContent>

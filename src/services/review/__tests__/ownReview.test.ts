@@ -43,7 +43,7 @@ describe('findOwnReviewForEntity', () => {
     state.calls = [];
   });
 
-  it.each(['public', 'circle_only', 'private'])('finds an owned %s review', async (v) => {
+  it.each(['public', 'private'])('finds an owned %s review', async (v) => {
     state.result = { data: row(v), error: null };
     const r = await findOwnReviewForEntity('e1');
     expect(r).toEqual({ status: 'found', review: row(v), canonicalPath: '/entity/zero-to-one' });

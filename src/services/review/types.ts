@@ -43,7 +43,7 @@ export interface ReviewCreateData {
   rating: number;
   venue?: string;
   entity_id?: string;
-  visibility: 'public' | 'private' | 'circle_only';
+  visibility: 'public' | 'private';
   experience_date?: string;
   user_id: string;
 }
@@ -58,7 +58,7 @@ export interface ReviewUpdateData {
   rating?: number;
   venue?: string;
   entity_id?: string;
-  visibility?: 'public' | 'private' | 'circle_only';
+  visibility?: 'public' | 'private';
   experience_date?: string;
   status?: string;
 }

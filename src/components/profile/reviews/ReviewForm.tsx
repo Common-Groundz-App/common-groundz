@@ -212,8 +212,8 @@ const ReviewForm = ({
   const [experienceDate, setExperienceDate] = useState<Date | undefined>(
     review?.experience_date ? new Date(review.experience_date) : undefined
   );
-  const [visibility, setVisibility] = useState<"public" | "circle_only" | "private">(
-    (review?.visibility as "public" | "circle_only" | "private") || "public"
+  const [visibility, setVisibility] = useState<"public" | "private">(
+    (review?.visibility as "public" | "private") || "public"
   );
   const [foodTags, setFoodTags] = useState<string[]>(review?.metadata?.food_tags || []);
   
@@ -564,7 +564,7 @@ const ReviewForm = ({
           : null,
       );
       setDescription(review.description || '');
-      setVisibility((review.visibility as "public" | "circle_only" | "private") || "public");
+      setVisibility((review.visibility as "public" | "private") || "public");
       setResolvedProviderName(null);
       setSubjectContextLine(null);
       
@@ -1085,7 +1085,7 @@ const ReviewForm = ({
           image_url,
           media: selectedMedia,
           // Subject identity (entity_id, category) is locked in Edit and never sent.
-          visibility: visibility as "public" | "private" | "circle_only", // Match what the API expects
+          visibility: visibility as "public" | "private", // Match what the API expects
           experience_date: formattedExperienceDate,
           metadata,
         });
@@ -1103,7 +1103,7 @@ const ReviewForm = ({
           image_url,
           media: selectedMedia,
           category: persistedCategory,
-          visibility: visibility as "public" | "private" | "circle_only", // Match what the API expects
+          visibility: visibility as "public" | "private", // Match what the API expects
           entity_id: entityId,
           experience_date: formattedExperienceDate,
           metadata,
@@ -1363,7 +1363,7 @@ const ReviewForm = ({
                   experienceDate={experienceDate}
                   onExperienceDateChange={setExperienceDate}
                   visibility={visibility}
-                  onVisibilityChange={(value: "public" | "circle_only" | "private") => setVisibility(value)}
+                  onVisibilityChange={(value: "public" | "private") => setVisibility(value)}
                 />
               )}
 

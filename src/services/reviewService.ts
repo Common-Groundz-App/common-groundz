@@ -105,7 +105,7 @@ export const createReview = async (reviewData: {
   image_url?: string;
   media?: any;
   category: string;
-  visibility: 'public' | 'private' | 'circle_only';
+  visibility: 'public' | 'private';
   entity_id?: string;
   experience_date?: string;
   metadata?: any;
@@ -210,7 +210,7 @@ export const updateReview = async (reviewId: string, updates: {
   image_url?: string;
   media?: any;
   category?: string;
-  visibility?: 'public' | 'private' | 'circle_only';
+  visibility?: 'public' | 'private';
   entity_id?: string;
   experience_date?: string;
   metadata?: any;

@@ -1,3 +1,4 @@
+import { isReviewVideoVisibilityLocked, REVIEW_VIDEO_VISIBILITY_LOCKED_TITLE, REVIEW_VIDEO_VISIBILITY_LOCKED_MESSAGE } from '@/utils/reviewVideoErrors';
 import React, { useState } from 'react';
 import { Eye, MoreVertical, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -113,8 +114,9 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
     }
   };
 
-  type Visibility = 'public' | 'circle_only' | 'private';
-  const currentVisibility = (review.visibility as Visibility | undefined) ?? undefined;
+  type Visibility = 'public' | 'private';
+  const currentVisibility: Visibility | undefined =
+    review.visibility === 'public' || review.visibility === 'private' ? review.visibility : undefined;
   /** Step 3.0A — visibility is a privacy control the owner can change at any time. */
   const handleVisibility = async (value: string) => {
     if (value === currentVisibility) return;
@@ -122,7 +124,11 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
       await updateReview(review.id, { visibility: value as Visibility });
       toast({ title: 'Visibility updated' });
       await onEdited?.();
-    } catch {
+    } catch (error) {
+      if (isReviewVideoVisibilityLocked(error)) {
+        toast({ title: REVIEW_VIDEO_VISIBILITY_LOCKED_TITLE, description: REVIEW_VIDEO_VISIBILITY_LOCKED_MESSAGE, variant: 'destructive' });
+        return;
+      }
       toast({ title: 'Could not change visibility', description: 'Please try again.', variant: 'destructive' });
     }
   };
@@ -182,7 +188,6 @@ export const ReviewOwnerMenu: React.FC<ReviewOwnerMenuProps> = ({
               <DropdownMenuSubContent onClick={stop}>
                 <DropdownMenuRadioGroup value={currentVisibility} onValueChange={handleVisibility}>
                   <DropdownMenuRadioItem value="public">Public</DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="circle_only">Circle only</DropdownMenuRadioItem>
                   <DropdownMenuRadioItem value="private">Private</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>

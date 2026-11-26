@@ -8,8 +8,8 @@ import type { MediaItem } from '@/types/media';
 import type { CanonicalEntityType } from '@/services/entityType';
 import type { CuratedTagAnswer } from '@/components/profile/reviews/questionnaire/curatedTagInput';
 
-export type ReviewVisibility = 'public' | 'private' | 'circle_only';
-export const REVIEW_VISIBILITIES: readonly ReviewVisibility[] = ['public', 'circle_only', 'private'];
+export type ReviewVisibility = 'public' | 'private';
+export const REVIEW_VISIBILITIES: readonly ReviewVisibility[] = ['public', 'private'];
 
 export type RecommendationChoice = 'yes' | 'maybe' | 'no';
 

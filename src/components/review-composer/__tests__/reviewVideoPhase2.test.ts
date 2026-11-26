@@ -42,7 +42,7 @@ describe('videoPickPolicy', () => {
   });
   it('public-only for reviews and parent reviews', () => {
     expect(videoPickPolicy({ settingOn: true, muxUploadsOn: true, visibility: 'private' }).reason).toBe(REVIEW_VIDEO_COPY.publicOnly);
-    expect(videoPickPolicy({ settingOn: true, muxUploadsOn: true, visibility: 'circle_only', timeline: true }).reason).toBe(REVIEW_VIDEO_COPY.parentNotPublic);
+    expect(videoPickPolicy({ settingOn: true, muxUploadsOn: true, visibility: 'private', timeline: true }).reason).toBe(REVIEW_VIDEO_COPY.parentNotPublic);
     expect(videoPickPolicy({ settingOn: true, muxUploadsOn: true, visibility: 'public' }).allowVideo).toBe(true);
   });
 });
