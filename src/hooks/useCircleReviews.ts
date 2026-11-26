@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { ReviewWithUser } from '@/types/entities';
 import { transformToSafeProfile } from '@/types/profile';
+import { REVIEWS_CHANGED_EVENT } from '@/services/review/reviewChangeEvents';
 
 interface CircleReviewsData {
   circleReviews: ReviewWithUser[];
@@ -18,10 +19,21 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
   const [circleUserIds, setCircleUserIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // Visibility changes (Public <-> Private) emit the shared review event.
+  useEffect(() => {
+    const bump = () => setRefreshTick(t => t + 1);
+    window.addEventListener(REVIEWS_CHANGED_EVENT, bump);
+    return () => window.removeEventListener(REVIEWS_CHANGED_EVENT, bump);
+  }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchCircleReviews = async () => {
       if (!user || !entityId) {
+        setCircleReviews([]);
+        setCircleUserIds([]);
         setIsLoading(false);
         return;
       }
@@ -64,6 +76,7 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
           .select('*')
           .eq('entity_id', entityId)
           .eq('status', 'published')
+          .eq('visibility', 'public')
           .in('user_id', followedUserIds)
           .order('created_at', { ascending: false });
 
@@ -105,7 +118,7 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
                 // Handle media properly - ensure it matches MediaItem[] type
                 media: Array.isArray(review.media) ? review.media as any[] : [],
                 // Ensure correct types
-                visibility: review.visibility as 'public' | 'private' | 'friends_only',
+                visibility: review.visibility as 'public' | 'private',
                 status: review.status as 'published' | 'draft' | 'deleted'
               };
             }).filter(review => review.user.id);
@@ -119,7 +132,7 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
               title: r.title
             })));
 
-            setCircleReviews(formattedReviews);
+            if (!cancelled) setCircleReviews(formattedReviews);
           }
         } else {
           setCircleReviews([]);
@@ -135,7 +148,8 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
     };
 
     fetchCircleReviews();
-  }, [entityId, user?.id]);
+    return () => { cancelled = true; };
+  }, [entityId, user?.id, refreshTick]);
 
   return {
     circleReviews,

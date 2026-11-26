@@ -64,6 +64,7 @@ import {
 } from '../store';
 import { validateForSubmit } from '../stepEngine';
 import { buildCreateReviewPayload, buildEditReviewPayload } from '../saveBuilders';
+import { isReviewVideoVisibilityLocked, REVIEW_VIDEO_VISIBILITY_LOCKED_TITLE } from '@/utils/reviewVideoErrors';
 import { fromCreateReviewError, fromUpdateReviewError, MEDIA_RETIRED_TOAST, reviewVideoErrorMessage } from '../serverErrors';
 import { gatherAmbiguousSaveEvidence } from '../reconcile';
 import { useUploadSession } from '../useUploadSession';
@@ -440,7 +441,8 @@ export function ReviewComposerScreen(props: Props) {
       if (result.status === 'media_retired') toast(MEDIA_RETIRED_TOAST);
       const videoMsg = result.status === 'error' ? reviewVideoErrorMessage(error) : null;
       if (videoMsg) {
-        toast({ title: "Couldn't save your review", description: videoMsg, variant: 'destructive' });
+        const title = isReviewVideoVisibilityLocked(error) ? REVIEW_VIDEO_VISIBILITY_LOCKED_TITLE : "Couldn't save your review";
+        toast({ title, description: videoMsg, variant: 'destructive' });
       } else if (result.status === 'error') {
         const reason = (error as { code?: string } | null)?.code;
         toast({ title: "Couldn't save your review", description: reason ? `Please try again. (Reason: ${reason})` : 'Please try again.', variant: 'destructive' });

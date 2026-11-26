@@ -277,7 +277,8 @@ const AuthorCard: React.FC<{ userId: string }> = ({ userId }) => {
         .from('posts')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .eq('is_deleted', false);
+        .eq('is_deleted', false)
+        .eq('visibility', 'public');
       return count || 0;
     },
     staleTime: 1000 * 60 * 5,

@@ -46,6 +46,7 @@ export async function fetchEntityPosts(
       .select('id')
       .eq('entity_id', entityId)
       .eq('is_deleted', false)
+      .eq('visibility', 'public')
       .order('created_at', { ascending: false });
 
     if (directErr) {
@@ -58,7 +59,7 @@ export async function fetchEntityPosts(
     const combinedIds = Array.from(new Set([...taggedIds, ...directIds]));
     if (combinedIds.length === 0) return [];
 
-    // 3) Fetch posts by IDs with pagination; RLS will ensure only public/own posts are returned
+    // 3) Fetch posts by IDs with pagination; public only; the author's private posts never enter entity feeds
     const from = page * itemsPerPage;
     const to = from + itemsPerPage - 1;
 
@@ -67,6 +68,7 @@ export async function fetchEntityPosts(
       .select(POST_SELECT)
       .in('id', combinedIds)
       .eq('is_deleted', false)
+      .eq('visibility', 'public')
       .order('created_at', { ascending: false })
       .range(from, to);
 

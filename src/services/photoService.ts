@@ -337,6 +337,7 @@ export const fetchEntityReviewMedia = async (entityId: string): Promise<PhotoWit
       .select('id, title, media, created_at, user_id, metadata')
       .eq('entity_id', entityId)
       .eq('status', 'published')
+      .eq('visibility', 'public')
       .not('media', 'is', null)
       .neq('media', '[]');
     
@@ -357,10 +358,11 @@ export const fetchEntityReviewMedia = async (entityId: string): Promise<PhotoWit
         media, 
         created_at, 
         user_id,
-        reviews!inner(entity_id, title, status)
+        reviews!inner(entity_id, title, status, visibility)
       `)
       .eq('reviews.entity_id', entityId)
       .eq('reviews.status', 'published')
+      .eq('reviews.visibility', 'public')
       .not('media', 'is', null)
       .neq('media', '[]');
     
