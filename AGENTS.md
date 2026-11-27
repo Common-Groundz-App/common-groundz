@@ -1,5 +1,7 @@
 # Project architecture rules
 
+- Helpful uses the existing review_likes table and three RPCs; mutations are RPC-only, with auth.uid identity and a parent-review row lock before eligibility checks, so votes cannot bypass privacy or race visibility/deletion changes. Privileged Helpful RPCs use an empty search path, qualified objects and explicit execution grants; reads expose only eligible public aggregates or the caller's own state.
+
 - Viewer canonical endorsement RPCs select published public reviews only, with caller-author filters distinguishing Circle from extended/community discovery; preserve canonical-first deduplication and identity checks so private history never seeds social proof.
 
 - Mux upload creation preallocates the persisted row UUID for server-only correlation metadata; a failed/uncertain insert returns no signed URL and logs correlation only, avoiding a hidden lineage gap without fake upload IDs.

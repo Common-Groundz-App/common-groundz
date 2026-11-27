@@ -5015,7 +5015,7 @@ export type Database = {
         }[]
       }
       get_user_review_likes: {
-        Args: { p_review_ids: string[]; p_user_id: string }
+        Args: { p_review_ids: string[]; p_user_id?: string }
         Returns: {
           review_id: string
         }[]
@@ -5531,7 +5531,7 @@ export type Database = {
         Returns: boolean
       }
       toggle_review_like: {
-        Args: { p_review_id: string; p_user_id: string }
+        Args: { p_review_id: string; p_user_id?: string }
         Returns: boolean
       }
       toggle_review_save: {
