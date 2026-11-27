@@ -1,5 +1,13 @@
 # Roadmap
 
+## Phase 11 — Helpful (product decisions finalized)
+- [ ] 11.1 — Harden existing voting/count/viewer RPCs and table permissions; exact dummy self-vote cleanup; authorization, concurrency and regression verification (in progress)
+- [ ] 11.2 — Entity V4 standard/Timeline Helpful controls (not started)
+- [ ] 11.3 — Review Details/Profile shared state (not started)
+- [ ] 11.4 — Optional full-dataset Most Helpful sorting (not started)
+- [ ] 11.5 — Cross-account regression and signoff (not started)
+- Review Comments/Q&A is a separate future enhancement, not a pre-launch blocker.
+
 ## Phase 10 — Visibility simplification stabilization (original Phases 11–13 paused)
 - [x] 10.1 — Approved Nandi Hills dummy converted; public-only canonical viewer endorsements; correct RLS preserved; 39 database-role checks, six guest API checks and public details browser verification passed (docs/verification/phase-10-1-visibility.md)
 - [ ] 10.1 signed-in browser acceptance — owner/Hana/outsider profile and Circle checks blocked by external unmanaged Supabase session minting; database-role checks are not real login sessions
