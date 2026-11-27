@@ -79,11 +79,13 @@ vi.mock('@/components/entity/EntityRecommendationModal', () => ({ EntityRecommen
 vi.mock('@/components/profile/reviews/ReviewForm', () => ({ default: () => null }));
 vi.mock('@/components/profile/reviews/ReviewTimelineViewer', () => ({ ReviewTimelineViewer: () => null }));
 vi.mock('@/hooks/use-entity-detail-cached', () => ({
+  entityDetailQueryKey: (s: string, v: string | null) => ['entity-detail', s, v ?? 'guest'],
   useEntityDetailCached: () => ({
     entity: { id: 'e1', name: 'Isha Foundation Chikkaballapura', slug: 'isha-foundation-chikkaballapura', type: 'place', description: 'A place', image_url: null },
     reviews: [], stats: null, isLoading: false, isRefetching: false, redirectToSlug: null, error: null,
   }),
 }));
+vi.mock('@/components/reviews/helpful/ReviewHelpfulContext', () => ({ ReviewHelpfulProvider: ({ children }: any) => children, useReviewHelpful: () => null }));
 vi.mock('@/hooks/use-entity-hierarchy', () => ({ useEntityHierarchy: () => ({ entityWithChildren: null, parentEntity: null, isLoading: false, error: null, hasChildren: false, hasParent: false }) }));
 vi.mock('@/hooks/use-entity-siblings', () => ({ useEntitySiblings: () => ({ siblings: [], isLoading: false, error: null }) }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null, isLoading: false }) }));
