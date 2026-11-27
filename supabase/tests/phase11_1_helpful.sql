@@ -28,8 +28,8 @@ BEGIN
        OR NOT EXISTS(SELECT 1 FROM auth.users WHERE id=other_id) THEN
       RAISE EXCEPTION 'Named test accounts missing';
     END IF;
-    INSERT INTO public.reviews(id,user_id,title,rating,category,visibility,status,media)
-      VALUES(rid,author_id,'Phase 11.1 rollback-only test',4,'product','public','published','[]');
+    INSERT INTO public.reviews(id,user_id,entity_id,title,rating,category,visibility,status,media)
+      VALUES(rid,author_id,'6229a7b9-78ed-4df2-a3bb-f643bd9bf7d6','Phase 11.1 rollback-only test',4,'product','public','published','[]');
 
     -- Guest cannot enumerate voters or execute either identity-bearing RPC.
     PERFORM set_config('request.jwt.claim.sub','',true);
