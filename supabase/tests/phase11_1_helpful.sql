@@ -152,15 +152,15 @@ BEGIN
     EXECUTE 'RESET ROLE';
 
     PERFORM set_config('request.jwt.claims','{}',true);
-    UPDATE public.reviews SET visibility='public',status='draft' WHERE id=rid;
+    UPDATE public.reviews SET visibility='public',status='flagged' WHERE id=rid;
     PERFORM set_config('request.jwt.claims',jsonb_build_object('sub',voter_id,'role','authenticated')::text,true);
     EXECUTE 'SET LOCAL ROLE authenticated';
     denied:=false;
     BEGIN PERFORM public.toggle_review_like(rid); EXCEPTION WHEN insufficient_privilege THEN denied:=true; END;
-    IF NOT denied THEN RAISE EXCEPTION 'Draft unvote accepted'; END IF;
+    IF NOT denied THEN RAISE EXCEPTION 'Flagged unvote accepted'; END IF;
     passed:=passed+1;
     SELECT count(*) INTO n FROM public.get_review_likes_batch(ARRAY[rid]);
-    IF n<>0 THEN RAISE EXCEPTION 'Draft count leaked'; END IF;
+    IF n<>0 THEN RAISE EXCEPTION 'Flagged count leaked'; END IF;
     passed:=passed+1;
     EXECUTE 'RESET ROLE';
     PERFORM set_config('request.jwt.claims','{}',true);
