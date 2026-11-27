@@ -1,7 +1,8 @@
 # Roadmap
 
 ## Phase 11 — Helpful (product decisions finalized)
-- [ ] 11.1 — Harden existing voting/count/viewer RPCs and table permissions; exact dummy self-vote cleanup; authorization, concurrency and regression verification (in progress)
+- [x] 11.1 implementation — exact cleanup, RPC/table security, rollback-only authorization tests, full regression suite; see docs/verification/phase-11-1-helpful.md
+- [ ] 11.1 verification closeout — true overlapping-session tests and real signed-in vote/readback blocked by unavailable external Supabase session/PG connection; separate TypeScript/production build evidence unavailable (automatic build OK only)
 - [ ] 11.2 — Entity V4 standard/Timeline Helpful controls (not started)
 - [ ] 11.3 — Review Details/Profile shared state (not started)
 - [ ] 11.4 — Optional full-dataset Most Helpful sorting (not started)
