@@ -148,7 +148,7 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Prevent navigation when clicking on buttons or dropdown menu
-    if ((e.target as HTMLElement).closest('button, [role="menuitem"]')) {
+    if ((e.target as HTMLElement).closest('button, [role="menuitem"], a, [data-no-timeline-click]')) {
       return;
     }
     onTimelineClick(review);

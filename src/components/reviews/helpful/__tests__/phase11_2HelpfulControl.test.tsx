@@ -28,7 +28,26 @@ describe('Phase 11.2 HelpfulControl', () => {
     ctx.viewerId = 'author';
     render(<HelpfulControl review={review()} />);
     expect(screen.queryByRole('button')).toBeNull();
-    expect(screen.getByTestId('helpful-passive').textContent).toContain('Helpful · 3');
+    expect(screen.getByTestId('helpful-passive').textContent).toContain('3 found this helpful');
+  });
+
+  it('authors see a zero count and clicking it does not reach the card', () => {
+    ctx.viewerId = 'author';
+    const parent = vi.fn();
+    render(<div onClick={parent}><HelpfulControl review={review({ likes: 0 })} /></div>);
+    const el = screen.getByTestId('helpful-passive');
+    expect(el.textContent).toContain('0 found this helpful');
+    expect(el.hasAttribute('data-no-timeline-click')).toBe(true);
+    fireEvent.click(el);
+    expect(parent).not.toHaveBeenCalled();
+  });
+
+  it('selected state uses blue, not brand orange', () => {
+    ctx.viewerId = 'u1';
+    render(<HelpfulControl review={review({ isLiked: true })} />);
+    const btn = screen.getByRole('button', { name: /Remove Helpful vote/ });
+    expect(btn.className).toContain('text-blue-600');
+    expect(btn.className).not.toContain('text-primary');
   });
 
   it('private reviews render nothing', () => {
