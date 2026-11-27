@@ -53,7 +53,7 @@ export async function performHelpfulToggle(d: HelpfulToggleDeps): Promise<Helpfu
     const result = await d.toggle(d.reviewId);
     if (!sameViewer()) return 'viewer_changed';
 
-    if (result.success) {
+    if (!('error' in result)) {
       const current = d.read();
       d.write({ isLiked: result.isLiked, likes: current?.likes ?? prev.likes });
       try {
@@ -67,7 +67,7 @@ export async function performHelpfulToggle(d: HelpfulToggleDeps): Promise<Helpfu
       return 'confirmed';
     }
 
-    if (!result.ambiguous) {
+    if ('error' in result && !result.ambiguous) {
       d.write(prev);
       d.notifyError('rejected');
       return 'rejected';
