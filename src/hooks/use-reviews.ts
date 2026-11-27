@@ -57,7 +57,8 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
       );
 
       // Server update
-      await toggleReviewLike(id, user.id);
+      const result = await toggleReviewLike(id);
+      if (!result.success) throw new Error(result.error);
     } catch (err) {
       console.error('Error toggling like:', err);
       // Revert on failure

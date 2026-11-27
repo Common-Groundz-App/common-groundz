@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useLocation, useSearchParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import GuestNavBar from '@/components/profile/GuestNavBar';
-import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
+import { useEntityDetailCached, entityDetailQueryKey } from '@/hooks/use-entity-detail-cached';
+import { ReviewHelpfulProvider } from '@/components/reviews/helpful/ReviewHelpfulContext';
 import SEOHead from '@/components/seo/SEOHead';
 import EntityStructuredData from '@/components/seo/EntityStructuredData';
 import PublicContentNotFound from '@/components/content/PublicContentNotFound';
@@ -95,14 +96,14 @@ const EntityV4 = () => {
           console.log(`🔍 Silently checking for stored photos (${pollCount}/${maxPolls})...`);
           
           // Check current entity data WITHOUT triggering re-render
-          const cachedData = queryClient.getQueryData(['entity-detail', entitySlug]) as any;
+          const cachedData = queryClient.getQueryData(entityDetailQueryKey(entitySlug, user?.id ?? null)) as any;
           const currentEntity = cachedData?.entity;
           
           // If stored URLs are NOT available yet, silently refetch
           if (!currentEntity?.metadata?.stored_photo_urls) {
             // Silently refetch without invalidation
             queryClient.refetchQueries({ 
-              queryKey: ['entity-detail', entitySlug],
+              queryKey: entityDetailQueryKey(entitySlug, user?.id ?? null),
               exact: true 
             });
           } else {
@@ -698,6 +699,7 @@ const EntityV4 = () => {
                 />
 
                 {/* SECTION 5: Reviews & Social Proof - Now with Enhanced Authentication Handling */}
+                <ReviewHelpfulProvider entitySlug={entitySlug}>
                 <ReviewsSection 
                   reviews={reviews}
                   ownerPrivateReview={pinnedPrivateReview}
@@ -721,6 +723,7 @@ const EntityV4 = () => {
                     }
                   }}
                 />
+                </ReviewHelpfulProvider>
               </div>
 
               {/* SECTION 6: Info & Discovery Sidebar */}

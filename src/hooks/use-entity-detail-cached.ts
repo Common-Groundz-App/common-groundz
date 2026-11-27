@@ -36,8 +36,12 @@ export interface EntityDetailData {
   error: string | null;
 }
 
+/** Viewer-scoped key: reviews carry the viewer's own Helpful selection. */
+export const entityDetailQueryKey = (slug: string, viewerId: string | null) =>
+  ['entity-detail', slug, viewerId ?? 'guest'] as const;
+
 export const useEntityDetailCached = (slug: string): EntityDetailData => {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   
   // GUARDRAIL #2: Seed with undefined sentinel to skip initial invalidation
@@ -49,7 +53,7 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
     isFetching,
     error
   } = useQuery({
-    queryKey: ['entity-detail', slug],
+    queryKey: entityDetailQueryKey(slug, user?.id ?? null),
     queryFn: async () => {
       console.log('🔍 Fetching entity detail for slug:', slug);
       
@@ -85,7 +89,7 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
         redirectToSlug
       };
     },
-    enabled: !!slug,
+    enabled: !!slug && !authLoading,
     staleTime: 1000 * 60 * 2, // 2 minutes
     gcTime: 1000 * 60 * 30, // 30 minutes
     refetchOnWindowFocus: false,
@@ -108,7 +112,8 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
         to: currentUserId,
         slug 
       });
-      queryClient.invalidateQueries({ queryKey: ['entity-detail', slug] });
+      // Drop the previous viewer's partition (it holds their Helpful selection).
+      queryClient.removeQueries({ queryKey: entityDetailQueryKey(slug, previousUserId) });
       previousUserIdRef.current = currentUserId;
     }
   }, [user?.id, slug, queryClient]);
@@ -119,7 +124,7 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
     reviews: data?.reviews || [],
     stats: data?.stats || null,
     redirectToSlug: data?.redirectToSlug || null,
-    isLoading,
+    isLoading: isLoading || (authLoading && !data),
     isFetching,
     isRefetching: isFetching && !!data,
     error: error?.message || null

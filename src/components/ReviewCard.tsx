@@ -16,6 +16,7 @@ import type { Review } from '@/services/reviewService';
 import { SpoilerBarrier } from '@/components/reviews/SpoilerBarrier';
 import { hasSpoilerFlag } from '@/utils/spoilers';
 import { PrivateReviewBanner, PRIVATE_CARD_CLASSES } from '@/components/entity-v4/PrivateReviewBanner';
+import { HelpfulControl } from '@/components/reviews/helpful/HelpfulControl';
 import CompactReviewSignals from '@/components/profile/reviews/questionnaire/CompactReviewSignals';
 
 interface ReviewCardProps {
@@ -167,8 +168,10 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimel
           )}
           </>)}
 
-          {'user' in review && onTimelineClick && (
-            <div className="mt-3">
+          {'user' in review && (onTimelineClick || review.visibility === 'public') && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <HelpfulControl review={review} isPrivateReview={isPrivateReview} />
+              {onTimelineClick && (
               <button
                 type="button"
                 onClick={() => onTimelineClick(review)}
@@ -177,6 +180,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick, onTimel
               >
                 View Details →
               </button>
+              )}
             </div>
           )}
         </div>

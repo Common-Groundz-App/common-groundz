@@ -3,7 +3,7 @@
 ## Phase 11 — Helpful (product decisions finalized)
 - [x] 11.1 implementation — exact cleanup, RPC/table security, rollback-only authorization tests, full regression suite; see docs/verification/phase-11-1-helpful.md
 - [ ] 11.1 verification closeout — true overlapping-session tests and real signed-in vote/readback blocked by unavailable external Supabase session/PG connection; separate TypeScript/production build evidence unavailable (automatic build OK only)
-- [ ] 11.2 — Entity V4 standard/Timeline Helpful controls (not started)
+- [x] 11.2 — Entity V4 standard/Timeline Helpful controls implemented; signed-in browser QA (vote/unvote, account switch, mobile look) pending owner check
 - [ ] 11.3 — Review Details/Profile shared state (not started)
 - [ ] 11.4 — Optional full-dataset Most Helpful sorting (not started)
 - [ ] 11.5 — Cross-account regression and signoff (not started)

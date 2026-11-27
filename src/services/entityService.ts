@@ -156,22 +156,19 @@ export const enrichEntityReviewRows = async (
     let likedIds = new Set<string>();
     let likeCountMap = new Map<string, number>();
     
-    if (userId && reviewIds.length > 0) {
-      const [likesData, likeCountsData] = await Promise.all([
-        supabase
-          .from('review_likes')
-          .select('review_id')
-          .eq('user_id', userId)
-          .in('review_id', reviewIds),
-        
-        supabase.rpc('get_review_likes_batch', {
-          p_review_ids: reviewIds
-        })
+    if (reviewIds.length > 0) {
+      // Hardened Phase 11.1 RPCs only: public aggregates for everyone
+      // (guests included), the caller's own selection when signed in.
+      const [likeCountsData, likesData] = await Promise.all([
+        supabase.rpc('get_review_likes_batch', { p_review_ids: reviewIds }),
+        userId
+          ? supabase.rpc('get_user_review_likes', { p_review_ids: reviewIds })
+          : Promise.resolve({ data: [] as { review_id: string }[] }),
       ]);
-      
+
       likedIds = new Set((likesData.data || []).map(like => like.review_id));
       likeCountMap = new Map(
-        (likeCountsData.data || []).map(item => [item.review_id, item.like_count])
+        (likeCountsData.data || []).map(item => [item.review_id, Number(item.like_count) || 0])
       );
     }
     

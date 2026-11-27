@@ -23,6 +23,7 @@ import { hasSpoilerFlag } from '@/utils/spoilers';
 import CompactReviewSignals from '@/components/profile/reviews/questionnaire/CompactReviewSignals';
 import { useAuth } from '@/contexts/AuthContext';
 import UsernameLink from '@/components/common/UsernameLink';
+import { HelpfulControl } from '@/components/reviews/helpful/HelpfulControl';
 
 interface TimelineReviewCardProps {
   review: ReviewWithUser;
@@ -302,6 +303,10 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
                   View all {timelineEntries.length} timeline entries →
                 </div>
               )}
+            </div>
+
+            <div className="mt-3 flex items-center">
+              <HelpfulControl review={review} isPrivateReview={isPrivateReview} />
             </div>
           </div>
         </div>
