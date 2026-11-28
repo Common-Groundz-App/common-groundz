@@ -4,6 +4,8 @@ import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileServi
 import { ReviewWithUser } from '@/types/entities';
 import { MediaItem } from '@/types/common';
 import { resolveSlugWithHistory } from '@/services/entityRedirectService';
+import { fetchReviewHelpfulState } from '@/services/review/interactions';
+import { fetchAllRowsPaged } from '@/services/review/pagedFetch';
 import { SUBJECT_RELATION_NOT_LOADED } from '@/services/reviewSubjectRelation';
 
 export interface EntityFetchResult {
@@ -153,24 +155,10 @@ export const enrichEntityReviewRows = async (
     const reviewIds = reviewsData.map(rev => rev.id);
     
     // Fetch interaction data if user is logged in
-    let likedIds = new Set<string>();
-    let likeCountMap = new Map<string, number>();
-    
-    if (reviewIds.length > 0) {
-      // Hardened Phase 11.1 RPCs only: public aggregates for everyone
-      // (guests included), the caller's own selection when signed in.
-      const [likeCountsData, likesData] = await Promise.all([
-        supabase.rpc('get_review_likes_batch', { p_review_ids: reviewIds }),
-        userId
-          ? supabase.rpc('get_user_review_likes', { p_review_ids: reviewIds })
-          : Promise.resolve({ data: [] as { review_id: string }[] }),
-      ]);
-
-      likedIds = new Set((likesData.data || []).map(like => like.review_id));
-      likeCountMap = new Map(
-        (likeCountsData.data || []).map(item => [item.review_id, Number(item.like_count) || 0])
-      );
-    }
+    // Phase 11.4: chunked authoritative reads; a failed chunk throws.
+    const helpful = await fetchReviewHelpfulState(reviewIds, userId);
+    const likedIds = new Set([...helpful].filter(([, v]) => v.isLiked).map(([id]) => id));
+    const likeCountMap = new Map([...helpful].map(([id, v]) => [id, v.count] as [string, number]));
     
     // Transform to final format with interaction data and aggregated timeline content
     const finalReviews: ReviewWithUser[] = reviewsWithProfiles.map(rev => {
@@ -233,34 +221,24 @@ export const fetchEntityReviews = async (
 ): Promise<ReviewWithUser[]> => {
   console.log('Fetching entity reviews for entityId:', entityId, 'userId:', userId);
   
-  try {
-    // Fetch reviews with aggregated timeline comments for comprehensive search
-    const { data: reviewsData, error } = await supabase
+  // Phase 11.4: complete, deterministic paged retrieval. Failures and
+  // unverifiable completeness throw so the page never shows a partial set.
+  const reviewsData = await fetchAllRowsPaged<any>((from, to) =>
+    supabase
       .from('reviews')
       .select(`
         *,
         review_updates(comment)
-      `)
+      `, { count: 'exact' })
       .eq('entity_id', entityId)
-      .eq('visibility', 'public');
-    
-    if (error) {
-      console.error('Error fetching entity reviews:', error);
-      return [];
-    }
-    
-    if (!reviewsData || reviewsData.length === 0) {
-      return [];
-    }
+      .eq('visibility', 'public')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, to) as any
+  );
 
-    console.log('Found reviews:', reviewsData.length);
-    const finalReviews = await enrichEntityReviewRows(reviewsData, userId);
-    console.log('Processed reviews with enhanced unified profiles:', finalReviews.length);
-    return finalReviews;
-  } catch (err) {
-    console.error('Exception in fetchEntityReviews:', err);
-    return [];
-  }
+  if (reviewsData.length === 0) return [];
+  return enrichEntityReviewRows(reviewsData, userId);
 };
 
 /** Read the canonical public rating from the Phase 4.2B.0 aggregate. */

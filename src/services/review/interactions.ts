@@ -1,3 +1,4 @@
+import { chunkIds } from './pagedFetch';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -46,16 +47,21 @@ export const fetchReviewHelpfulState = async (
 ): Promise<Map<string, ReviewHelpfulState>> => {
   const out = new Map<string, ReviewHelpfulState>();
   if (reviewIds.length === 0) return out;
-  const [countsRes, likedRes] = await Promise.all([
-    supabase.rpc('get_review_likes_batch', { p_review_ids: reviewIds }),
-    viewerId
-      ? supabase.rpc('get_user_review_likes', { p_review_ids: reviewIds })
-      : Promise.resolve({ data: [] as { review_id: string }[], error: null }),
-  ]);
-  if (countsRes.error) throw countsRes.error;
-  if (likedRes.error) throw likedRes.error;
-  const liked = new Set((likedRes.data || []).map((r) => r.review_id));
-  const counts = new Map((countsRes.data || []).map((r) => [r.review_id, Number(r.like_count) || 0]));
+  // Bounded chunks; any failed chunk fails the whole read (never synthetic zeros).
+  const liked = new Set<string>();
+  const counts = new Map<string, number>();
+  for (const ids of chunkIds([...new Set(reviewIds)])) {
+    const [countsRes, likedRes] = await Promise.all([
+      supabase.rpc('get_review_likes_batch', { p_review_ids: ids }),
+      viewerId
+        ? supabase.rpc('get_user_review_likes', { p_review_ids: ids })
+        : Promise.resolve({ data: [] as { review_id: string }[], error: null }),
+    ]);
+    if (countsRes.error) throw countsRes.error;
+    if (likedRes.error) throw likedRes.error;
+    for (const r of likedRes.data || []) liked.add(r.review_id);
+    for (const r of countsRes.data || []) counts.set(r.review_id, Number(r.like_count) || 0);
+  }
   for (const id of reviewIds) {
     out.set(id, { count: counts.get(id) ?? 0, isLiked: viewerId ? liked.has(id) : null });
   }

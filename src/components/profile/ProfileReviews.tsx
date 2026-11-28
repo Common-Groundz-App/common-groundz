@@ -9,6 +9,8 @@ import ReviewFilters from './reviews/ReviewFilters';
 import { useAuth } from '@/contexts/AuthContext';
 import { useReviewComposerNavigate } from '@/hooks/useReviewComposerNavigate';
 import { resolveReviewDisplayType, displayTypeValue } from './reviews/reviewDisplayType';
+import { sortReviews } from '@/utils/reviewDataUtils';
+import { useStableReviewOrder } from '@/hooks/reviews/use-stable-review-order';
 
 interface ProfileReviewsProps {
   profileUserId: string;
@@ -22,7 +24,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
   const composer = useReviewComposerNavigate();
   const openWrite = () => composer.open({ kind: 'write' }, () => setIsFormOpen(true));
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'latest' | 'highestRated' | 'mostLiked'>('latest');
+  const [sortBy, setSortBy] = useState<'latest' | 'highestRated' | 'mostHelpful'>('latest');
   
   const {
     reviews,
@@ -54,22 +56,28 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
     }));
   }, [reviews]);
 
-  // Filter and sort reviews
-  const filteredReviews = React.useMemo(() => {
-    return resolvedReviews
+  // Filter and sort reviews. Most Helpful ranks only Public reviews
+  // (Helpful DESC, created_at DESC, id DESC); the owner's Private reviews
+  // never join that ranking and follow afterwards, newest first.
+  const sortedReviews = React.useMemo(() => {
+    const rows = resolvedReviews
       .filter(({ resolvedType }) => !activeFilter || resolvedType === activeFilter)
-      .map(({ review }) => review)
-      .sort((a, b) => {
-        if (sortBy === 'latest') {
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        } else if (sortBy === 'highestRated') {
-          return b.rating - a.rating;
-        } else if (sortBy === 'mostLiked') {
-          return (b.likes || 0) - (a.likes || 0);
-        }
-        return 0;
-      });
+      .map(({ review }) => review);
+    if (sortBy === 'mostHelpful') {
+      const isPublic = (r: typeof rows[number]) => r.visibility === 'public';
+      return [
+        ...sortReviews(rows.filter(isPublic), 'mostHelpful'),
+        ...sortReviews(rows.filter(r => !isPublic(r)), 'mostRecent'),
+      ];
+    }
+    return sortReviews(rows, sortBy === 'latest' ? 'mostRecent' : 'highestRated');
   }, [resolvedReviews, activeFilter, sortBy]);
+  // Positions stay stable while voting; re-ranked on sort/filter change.
+  const filteredReviews = useStableReviewOrder(
+    sortedReviews,
+    JSON.stringify([profileUserId, sortBy, activeFilter]),
+    sortBy === 'mostHelpful',
+  );
 
   // Extract unique resolved types for the filter chips
   const categories = React.useMemo(() => {

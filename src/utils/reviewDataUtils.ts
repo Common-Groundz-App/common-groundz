@@ -32,6 +32,47 @@ export const transformReviewForUI = (review: ReviewWithUser) => ({
   }))
 });
 
+export type ReviewSortKey = 'mostRecent' | 'highestRated' | 'lowestRated' | 'mostHelpful';
+
+type SortableReview = { id: string; created_at: string; rating: number; latest_rating?: number | null; likes?: number | null };
+
+const time = (r: SortableReview) => new Date(r.created_at).getTime() || 0;
+const currentRating = (r: SortableReview) => r.latest_rating || r.rating || 0;
+
+/** Final tiers shared by every sort: created_at DESC, then id DESC. */
+const byRecencyThenId = (a: SortableReview, b: SortableReview) =>
+  time(b) - time(a) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
+
+export const compareReviews = (sortBy: ReviewSortKey) => (a: SortableReview, b: SortableReview): number => {
+  switch (sortBy) {
+    case 'mostHelpful':
+      return (b.likes || 0) - (a.likes || 0) || byRecencyThenId(a, b);
+    case 'highestRated':
+      return currentRating(b) - currentRating(a) || byRecencyThenId(a, b);
+    case 'lowestRated':
+      return currentRating(a) - currentRating(b) || byRecencyThenId(a, b);
+    case 'mostRecent':
+    default:
+      return byRecencyThenId(a, b);
+  }
+};
+
+export const sortReviews = <T extends SortableReview>(reviews: T[], sortBy: ReviewSortKey): T[] =>
+  [...reviews].sort(compareReviews(sortBy));
+
+/**
+ * Session-stable ordering: ids already shown keep their previous relative
+ * position (so a Helpful vote never moves a card); ids no longer present are
+ * dropped at once (Private/deleted/ineligible); new ids follow in sorted order.
+ */
+export const applyStableOrder = <T extends { id: string }>(sorted: T[], previousIds: string[] | null): T[] => {
+  if (!previousIds) return sorted;
+  const byId = new Map(sorted.map(r => [r.id, r]));
+  const kept = previousIds.filter(id => byId.has(id)).map(id => byId.get(id)!);
+  const keptIds = new Set(kept.map(r => r.id));
+  return [...kept, ...sorted.filter(r => !keptIds.has(r.id))];
+};
+
 // Filter reviews based on criteria
 export const filterReviews = (reviews: ReviewWithUser[], filters: {
   search?: string;
@@ -43,7 +84,7 @@ export const filterReviews = (reviews: ReviewWithUser[], filters: {
   networkOnly?: boolean;
   hasTimeline?: boolean;
   hasMedia?: boolean;
-  sortBy?: 'mostRecent' | 'highestRated' | 'lowestRated';
+  sortBy?: ReviewSortKey;
 }, userFollowingIds: string[] = []) => {
   let filtered = [...reviews];
 
@@ -112,26 +153,9 @@ export const filterReviews = (reviews: ReviewWithUser[], filters: {
     filtered = filtered.filter(review => review.media && review.media.length > 0);
   }
 
-  // Apply sorting
+  // Apply sorting (deterministic tie-breakers: created_at DESC, id DESC)
   if (filters.sortBy) {
-    filtered.sort((a, b) => {
-      switch (filters.sortBy) {
-        case 'mostRecent':
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        case 'highestRated':
-          // Use latest_rating if available, fall back to rating
-          const aRating = a.latest_rating || a.rating;
-          const bRating = b.latest_rating || b.rating;
-          return bRating - aRating;
-        case 'lowestRated':
-          // Use latest_rating if available, fall back to rating
-          const aRatingLow = a.latest_rating || a.rating;
-          const bRatingLow = b.latest_rating || b.rating;
-          return aRatingLow - bRatingLow;
-        default:
-          return 0;
-      }
-    });
+    filtered = sortReviews(filtered, filters.sortBy);
   }
 
   return filtered;

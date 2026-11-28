@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { notifyReviewsChanged } from './review/reviewChangeEvents';
 import { fetchReviewHelpfulState } from './review/interactions';
+import { fetchAllRowsPaged } from './review/pagedFetch';
 import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
 import { resolveSubjectRelation, type SubjectLookupOutcome, type SubjectRelation } from '@/services/reviewSubjectRelation';
 
@@ -290,18 +291,17 @@ export const updateReviewStatus = async (reviewId: string, status: string): Prom
 // Fetch user reviews with enhanced unified profile service
 export const fetchUserReviews = async (currentUserId: string | null, profileUserId: string): Promise<Review[]> => {
   try {
-    // First, get the reviews with latest_rating
-    const { data: reviews, error: reviewsError } = await supabase
-      .from('reviews')
-      .select('*, latest_rating')
-      .eq('user_id', profileUserId)
-      .eq('status', 'published')
-      .order('created_at', { ascending: false });
-
-    if (reviewsError) {
-      console.error('Error fetching reviews:', reviewsError);
-      return [];
-    }
+    // Phase 11.4: complete paged retrieval; incompleteness throws below.
+    const reviews = await fetchAllRowsPaged<any>((from, to) =>
+      supabase
+        .from('reviews')
+        .select('*, latest_rating', { count: 'exact' })
+        .eq('user_id', profileUserId)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .range(from, to) as any
+    );
 
     if (!reviews?.length) return [];
 
@@ -341,7 +341,8 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
 
   } catch (error) {
     console.error('Error in fetchUserReviews:', error);
-    return [];
+    // Phase 11.4: surface failures; an empty list would misstate completeness.
+    throw error;
   }
 };
 

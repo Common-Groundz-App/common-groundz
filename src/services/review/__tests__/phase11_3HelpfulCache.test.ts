@@ -7,7 +7,7 @@ import { fetchUserReviews as fetchProfileReviews } from '@/services/reviewServic
 const db = vi.hoisted(() => ({ rpc: vi.fn(), rows: [] as any[] }));
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {
   rpc: (...args: unknown[]) => db.rpc(...args),
-  from: () => { const query: any = { select: () => query, eq: () => query, order: async () => ({ data: db.rows, error: null }) }; return query; },
+  from: () => { const query: any = { select: () => query, eq: () => query, order: () => query, range: () => query, then: (res: any, rej: any) => Promise.resolve({ data: db.rows, error: null, count: db.rows.length }).then(res, rej) }; return query; },
 } }));
 vi.mock('@/services/enhancedUnifiedProfileService', () => ({ attachProfilesToEntities: async (rows: any[]) => rows.map(r => ({ ...r, user: { displayName: 'Author', avatar_url: null } })) }));
 

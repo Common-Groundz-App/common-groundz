@@ -29,3 +29,6 @@
 - Helpful state is shared in viewer-partitioned `review-helpful` queries and assigned into matching Entity/Profile caches, driven by `ReviewHelpfulProvider` + `performHelpfulToggle` (shared pending per root review id, one toggle never retried, ambiguous outcomes reconciled by read RPCs, late responses dropped on viewer change); `toggleReviewLike` returns a discriminated result so a failure is never an unvote.
 
 - Helpful providers share a QueryClient/session coordinator and per-root pending/version guards; Details reads use cancellation and epoch/version checks so late reads never overwrite votes or another session.
+
+- Review lists load through `fetchAllRowsPaged` (stable created_at/id order, exact count must match every page and the deduplicated total) and chunked `fetchReviewHelpfulState`; any failure throws, so sorting never runs over a silently partial set. Server-side ranking is the next step past current scale.
+- Review sorts use `compareReviews`/`sortReviews` (primary key, then created_at DESC, id DESC); Most Helpful ranks Standard and Timeline together inside Circle/Community groups and freezes positions via `useStableReviewOrder` (membership changes apply at once), keeping votes from reshuffling cards.

@@ -6,7 +6,9 @@
 - [x] 11.2 — Entity V4 standard/Timeline Helpful controls implemented; signed-in browser QA (vote/unvote, account switch, mobile look) pending owner check
 - [x] 11.3 implementation — Profile/Details shared Helpful, guest counts, viewer isolation; 1,378 tests passed / 3 skipped; automatic build OK (docs/verification/phase-11-3-helpful.md)
 - [ ] 11.3 acceptance — real signed-in Profile/Details vote/readback and cross-account/theme QA blocked by user-managed Supabase session access; standalone TypeScript/production build evidence unavailable under environment restrictions
-- [ ] 11.4 — Optional full-dataset Most Helpful sorting (not started)
+- [x] 11.4 — Most Helpful sorting (Entity V4 + Profile), complete paged retrieval with consistency checks, batched Helpful counts, Show More, stable positions (docs/verification/phase-11-4-most-helpful.md)
+- [ ] 11.4 acceptance — signed-in voting/stable-position browser QA pending owner check (same session limitation as 11.3)
+- [ ] 11.4A — Author-only historical Helpful count on Private reviews ("N people found this helpful while public", hidden at zero) via a new owner-gated read; public-only RPC unchanged (not started)
 - [ ] 11.5 — Cross-account regression and signoff (not started)
 - Review Comments/Q&A is a separate future enhancement, not a pre-launch blocker.
 

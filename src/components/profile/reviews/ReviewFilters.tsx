@@ -15,10 +15,10 @@ import {
 interface ReviewFiltersProps {
   isOwnProfile: boolean;
   activeFilter: string | null;
-  sortBy: 'latest' | 'highestRated' | 'mostLiked';
+  sortBy: 'latest' | 'highestRated' | 'mostHelpful';
   categories: string[];
   onFilterChange: (category: string) => void;
-  onSortChange: (sort: 'latest' | 'highestRated' | 'mostLiked') => void;
+  onSortChange: (sort: 'latest' | 'highestRated' | 'mostHelpful') => void;
   onClearFilters: () => void;
   onAddNew: () => void;
 }
@@ -100,10 +100,10 @@ const ReviewFilters = ({
                   Highest Rated
                 </DropdownMenuItem>
                 <DropdownMenuItem 
-                  onClick={() => onSortChange('mostLiked')}
-                  className={cn("cursor-pointer", sortBy === 'mostLiked' ? "bg-gray-100" : "")}
+                  onClick={() => onSortChange('mostHelpful')}
+                  className={cn("cursor-pointer", sortBy === 'mostHelpful' ? "bg-gray-100" : "")}
                 >
-                  Most Liked
+                  Most Helpful
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>

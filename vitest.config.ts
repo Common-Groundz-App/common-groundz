@@ -58,6 +58,8 @@ const nodeIncludes = [
   'src/services/__tests__/phase10_2Visibility.test.ts',
   'src/services/review/__tests__/phase11_2HelpfulToggle.test.ts',
   'src/services/review/__tests__/phase11_3HelpfulCache.test.ts',
+  'src/services/review/__tests__/phase11_4HelpfulBatches.test.ts',
+  'src/utils/__tests__/phase11_4MostHelpful.test.ts',
   'src/components/review-composer/__tests__/phase10_3Visibility.test.tsx',
   'src/components/profile/reviews/__tests__/phase3dCompatibility.test.ts',
   'src/components/profile/reviews/__tests__/reviewSubjectPolicy.test.ts',

@@ -18,6 +18,7 @@ import ReviewCard from "@/components/ReviewCard";
 import { ReviewWithUser } from '@/types/entities';
 import { 
   filterReviews, 
+  type ReviewSortKey,
   getTimelineReviews
 } from '@/utils/reviewDataUtils';
 import { TimelineReviewCard } from './TimelineReviewCard';
@@ -27,6 +28,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCircleReviews } from '@/hooks/useCircleReviews';
 import { SiblingCarousel } from '@/components/entity/SiblingCarousel';
 import { Entity } from '@/services/recommendation/types';
+import { useStableReviewOrder } from '@/hooks/reviews/use-stable-review-order';
+
+const DEFAULT_REGULAR_VISIBLE = 3;
+const HELPFUL_INITIAL_VISIBLE = 5;
+const HELPFUL_PAGE_STEP = 5;
 
 interface ReviewsSectionProps {
   reviews: ReviewWithUser[];
@@ -69,7 +75,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     }
   }, [isAuthenticated, entityId]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'mostRecent' | 'highestRated' | 'lowestRated'>('mostRecent');
+  const [sortBy, setSortBy] = useState<ReviewSortKey>('mostRecent');
   const [activeFilters, setActiveFilters] = useState({
     verified: false,
     starRating: null as number | null,
@@ -109,6 +115,22 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     hasMedia: activeFilters.hasMedia || undefined,
     sortBy: sortBy
   }, circleUserIds);
+
+  // Phase 11.4 — Most Helpful: positions stay stable while voting; the
+  // ranking is recomputed on sort/filter/search change or fresh navigation.
+  const isMostHelpful = sortBy === 'mostHelpful';
+  const orderResetKey = JSON.stringify([entityId, sortBy, activeFilters, searchQuery, hasCircleData]);
+  const stableReviews = useStableReviewOrder(filteredReviews, orderResetKey, isMostHelpful);
+  const helpfulCircleGroup = isMostHelpful && hasCircleData
+    ? stableReviews.filter(r => circleUserIds.includes(r.user_id)) : [];
+  const helpfulCommunityGroup = isMostHelpful
+    ? stableReviews.filter(r => !(hasCircleData && circleUserIds.includes(r.user_id))) : [];
+  const [expanded, setExpanded] = useState({ key: orderResetKey, circle: 0, community: 0 });
+  const expansion = expanded.key === orderResetKey ? expanded : { key: orderResetKey, circle: 0, community: 0 };
+  const showMore = (group: 'circle' | 'community') =>
+    setExpanded({ ...expansion, [group]: expansion[group] + 1 });
+  const circleLimit = HELPFUL_INITIAL_VISIBLE + expansion.circle * HELPFUL_PAGE_STEP;
+  const communityLimit = HELPFUL_INITIAL_VISIBLE + expansion.community * HELPFUL_PAGE_STEP;
 
   const bypassPrioritySystem = sortBy === 'highestRated' || sortBy === 'lowestRated';
   
@@ -172,7 +194,77 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     displayReviews = [...hybridReviews, ...circleOnlyReviews, ...timelineOnlyReviews, ...regularReviews];
   }
 
-  const displayRegularReviews = regularReviews.slice(0, 3);
+  // Default layout keeps its first 3 regular cards; Show More reveals the rest.
+  const regularLimit = DEFAULT_REGULAR_VISIBLE + expansion.community * HELPFUL_PAGE_STEP;
+  const displayRegularReviews = regularReviews.slice(0, regularLimit);
+  const hiddenRegularCount = Math.max(0, regularReviews.length - displayRegularReviews.length);
+
+  const emptyState = (
+              <div className="text-center py-8">
+                {visibleReviews.length === 0 && pinnedPrivate ? (
+                  <>
+                    <h4 className="text-base font-semibold text-foreground">No public reviews yet</h4>
+                    {pinnedCanGoPublic && (
+                      <p className="text-sm text-muted-foreground mt-1">Your review is private. Only you can see it.</p>
+                    )}
+                  </>
+                ) : visibleReviews.length === 0 ? (
+                  <>
+                    <h4 className="text-base font-semibold text-foreground">No reviews yet</h4>
+                    <p className="text-sm text-muted-foreground mt-1">Be the first to share your experience!</p>
+                  </>
+                ) : (
+                  <>
+                    <h4 className="text-base font-semibold text-foreground">No matching reviews</h4>
+                    <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters to find what you're looking for.</p>
+                  </>
+                )}
+              </div>
+  );
+
+  // Most Helpful: Standard and Timeline reviews share one ranking per group;
+  // the card format follows the review, never its position.
+  const renderHelpfulCard = (review: ReviewWithUser, inCircle: boolean) => {
+    if (review.has_timeline && (review.timeline_count || 0) > 0) {
+      return (
+        <TimelineReviewCard
+          key={review.id}
+          review={review}
+          onTimelineClick={handleTimelineClick}
+          onDeleted={() => handleReviewDeleted(review.id)}
+          isCircleReview={inCircle}
+          circleUserName={review.user.displayName || review.user.username}
+        />
+      );
+    }
+    const card = (
+      <ReviewCard
+        key={inCircle ? undefined : review.id}
+        review={review}
+        onHelpfulClick={onHelpfulClick}
+        onTimelineClick={handleTimelineClick}
+        onDeleted={handleReviewDeleted}
+      />
+    );
+    if (!inCircle) return card;
+    return (
+      <Card key={review.id} className="border-2 border-blue-200 bg-blue-50/30">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Badge className="bg-blue-600 text-white">
+              <Users className="w-3 h-3 mr-1" />
+              From Your Circle
+            </Badge>
+            <Eye className="w-4 h-4 text-blue-600" />
+            <span className="text-sm text-blue-600 font-medium">
+              {review.user.displayName || review.user.username || 'Someone'} you follow reviewed this
+            </span>
+          </div>
+          {card}
+        </CardContent>
+      </Card>
+    );
+  };
 
   const toggleFilter = (filter: keyof typeof activeFilters) => {
     if (filter === 'starRating') return;
@@ -205,6 +297,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
       case 'mostRecent': return 'Most Recent';
       case 'highestRated': return 'Highest Rated';
       case 'lowestRated': return 'Lowest Rated';
+      case 'mostHelpful': return 'Most Helpful';
       default: return 'Sort';
     }
   };
@@ -321,6 +414,13 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   >
                     {sortBy === 'lowestRated' && <span className="mr-2">✓</span>}
                     Lowest Rated
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setSortBy('mostHelpful')}
+                    className={sortBy === 'mostHelpful' ? "bg-blue-50 text-blue-700" : ""}
+                  >
+                    {sortBy === 'mostHelpful' && <span className="mr-2">✓</span>}
+                    Most Helpful
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -527,6 +627,36 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             </div>
           )}
 
+          {isMostHelpful ? (
+            <>
+              {helpfulCircleGroup.length > 0 && (
+                <section aria-label="From Your Circle" className="space-y-6">
+                  <h4 className="text-sm font-semibold text-foreground">From Your Circle</h4>
+                  {helpfulCircleGroup.slice(0, circleLimit).map(review => renderHelpfulCard(review, true))}
+                  {helpfulCircleGroup.length > circleLimit && (
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => showMore('circle')}>
+                      Show more Circle reviews ({helpfulCircleGroup.length - circleLimit} remaining)
+                    </Button>
+                  )}
+                </section>
+              )}
+              {helpfulCommunityGroup.length > 0 && (
+                <section aria-label="Community Reviews" className="space-y-6">
+                  {helpfulCircleGroup.length > 0 && (
+                    <h4 className="text-sm font-semibold text-foreground">Community Reviews</h4>
+                  )}
+                  {helpfulCommunityGroup.slice(0, communityLimit).map(review => renderHelpfulCard(review, false))}
+                  {helpfulCommunityGroup.length > communityLimit && (
+                    <Button variant="outline" size="sm" className="w-full" onClick={() => showMore('community')}>
+                      Show more reviews ({helpfulCommunityGroup.length - communityLimit} remaining)
+                    </Button>
+                  )}
+                </section>
+              )}
+              {stableReviews.length === 0 && emptyState}
+            </>
+          ) : (
+            <>
           {hybridReviews.map(review => (
             <TimelineReviewCard
               key={review.id}
@@ -583,28 +713,14 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
               />
             ))
           ) : (
-            !hybridReviews.length && !circleOnlyReviews.length && !timelineOnlyReviews.length && (
-              <div className="text-center py-8">
-                {visibleReviews.length === 0 && pinnedPrivate ? (
-                  <>
-                    <h4 className="text-base font-semibold text-foreground">No public reviews yet</h4>
-                    {pinnedCanGoPublic && (
-                      <p className="text-sm text-muted-foreground mt-1">Your review is private. Only you can see it.</p>
-                    )}
-                  </>
-                ) : visibleReviews.length === 0 ? (
-                  <>
-                    <h4 className="text-base font-semibold text-foreground">No reviews yet</h4>
-                    <p className="text-sm text-muted-foreground mt-1">Be the first to share your experience!</p>
-                  </>
-                ) : (
-                  <>
-                    <h4 className="text-base font-semibold text-foreground">No matching reviews</h4>
-                    <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters to find what you're looking for.</p>
-                  </>
-                )}
-              </div>
-            )
+            !hybridReviews.length && !circleOnlyReviews.length && !timelineOnlyReviews.length && emptyState
+          )}
+              {hiddenRegularCount > 0 && (
+                <Button variant="outline" size="sm" className="w-full" onClick={() => showMore('community')}>
+                  Show more reviews ({hiddenRegularCount} remaining)
+                </Button>
+              )}
+            </>
           )}
         </div>
 
