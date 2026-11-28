@@ -13,7 +13,7 @@
 ## Automated evidence
 - New focused suites: 18 tests covering guest aggregate RPC reads, viewer-scoped cache assignment, Public/Private author/reader/guest rules, both profile card layouts, root Details integration, immediate shared counts/pending locks, single optimistic increments, rejection/timeout reconciliation, missing initial data, modal closure/review changes, auth resolution and account-switch isolation.
 - Existing Phase 11.2 control/orchestration, Timeline and review suites remain in the full regression gate.
-- Full-suite final result: awaiting final run below.
+- Full-suite final result: **122 files passed; 1,378 tests passed, 3 skipped (1,381 total)**. Run completed on 2026-11-28 in 109.22 seconds with `--maxWorkers=2`. The new suites contributed 18 passing tests. The route-only App fixture was updated to mock the newly installed provider; its 11 route assertions remain unchanged and pass.
 - Automatic preview compilation/typecheck feedback: latest build log reports `build OK` after correcting test-interface errors. Separate manual TypeScript and production-build commands are prohibited by this environment; no independent production-build pass is claimed.
 
 ## Browser evidence and limitations
