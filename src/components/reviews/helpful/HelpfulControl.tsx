@@ -1,21 +1,35 @@
 import React from 'react';
 import { ThumbsUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { ReviewWithUser } from '@/types/entities';
-import { useReviewHelpful } from './ReviewHelpfulContext';
+import type { HelpfulReview } from '@/services/review/helpfulCache';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useReviewHelpful, useHelpfulSnapshot, ReviewHelpfulProvider } from './ReviewHelpfulContext';
 
 interface HelpfulControlProps {
-  review: ReviewWithUser;
+  review: HelpfulReview;
+  reconcile?: boolean;
+  surface?: string;
   isPrivateReview?: boolean;
   className?: string;
 }
 
 /** Compact Helpful action for root reviews. Hidden on private reviews. */
-export const HelpfulControl: React.FC<HelpfulControlProps> = ({ review, isPrivateReview, className }) => {
+export const HelpfulControl: React.FC<HelpfulControlProps> = (props) => {
   const ctx = useReviewHelpful();
-  if (!ctx || isPrivateReview || review.visibility !== 'public') return null;
+  if (props.isPrivateReview || props.review.visibility !== 'public') return null;
+  if (!ctx) return <ReviewHelpfulProvider><HelpfulControl {...props} /></ReviewHelpfulProvider>;
+  return <HelpfulStateControl {...props} />;
+};
 
-  const count = review.likes || 0;
+const HelpfulStateControl: React.FC<HelpfulControlProps> = ({ review, className, reconcile, surface }) => {
+  const ctx = useReviewHelpful();
+  const { data, error } = useHelpfulSnapshot(review, reconcile);
+  if (!ctx) return null;
+  if (!data) return error
+    ? <span role="status" className="text-sm text-muted-foreground">Helpful unavailable</span>
+    : <Skeleton aria-label="Loading Helpful" className="h-5 w-32" />;
+  const count = data.likes;
   const isAuthor = !!ctx.viewerId && ctx.viewerId === review.user_id;
 
   if (isAuthor) {
@@ -32,14 +46,15 @@ export const HelpfulControl: React.FC<HelpfulControlProps> = ({ review, isPrivat
     );
   }
 
-  const selected = !!ctx.viewerId && !!review.isLiked;
+  const selected = !!ctx.viewerId && data.isLiked;
   const pending = ctx.isPending(review.id);
   const label = selected
     ? `Remove Helpful vote (${count} found this helpful)`
     : `Mark as Helpful (${count} found this helpful)`;
 
   return (
-    <button
+    <Button
+      variant="ghost"
       type="button"
       aria-pressed={selected}
       aria-label={label}
@@ -47,7 +62,7 @@ export const HelpfulControl: React.FC<HelpfulControlProps> = ({ review, isPrivat
       disabled={pending}
       onClick={(e) => {
         e.stopPropagation();
-        ctx.toggle(review);
+        ctx.toggle(review, surface);
       }}
       className={cn(
         '-my-2 -ml-2 inline-flex min-h-11 min-w-11 items-center gap-1.5 rounded-md px-2 text-sm transition-colors',
@@ -60,6 +75,6 @@ export const HelpfulControl: React.FC<HelpfulControlProps> = ({ review, isPrivat
     >
       <ThumbsUp className={cn('h-4 w-4', selected && 'fill-current')} aria-hidden="true" />
       <span>Helpful{count > 0 ? ` · ${count}` : ''}</span>
-    </button>
+    </Button>
   );
 };

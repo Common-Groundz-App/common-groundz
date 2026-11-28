@@ -6,6 +6,8 @@ import type { Json } from '@/integrations/supabase/types';
 // Base review interface
 export interface Review {
   id: string;
+  likes?: number;
+  isLiked?: boolean;
   title: string;
   subtitle?: string;
   description?: string;

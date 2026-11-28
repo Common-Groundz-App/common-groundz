@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { notifyReviewsChanged } from './review/reviewChangeEvents';
+import { fetchReviewHelpfulState } from './review/interactions';
 import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
 import { resolveSubjectRelation, type SubjectLookupOutcome, type SubjectRelation } from '@/services/reviewSubjectRelation';
 
@@ -311,24 +312,8 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     const subjectOutcome = await loadReviewSubjectEntities(reviews);
     const entities = subjectOutcome.attempted && !subjectOutcome.failed && 'rows' in subjectOutcome ? subjectOutcome.rows : [];
 
-    // Get interaction data if user is logged in
-    let likeData = [];
-    let likeCounts = [];
-
-    if (currentUserId) {
-      const [likesResponse, likeCountsResponse] = await Promise.all([
-        supabase.rpc('get_user_review_likes', { 
-          p_review_ids: reviewIds, 
-          p_user_id: currentUserId 
-        }),
-        supabase.rpc('get_review_likes_batch', { 
-          p_review_ids: reviewIds 
-        })
-      ]);
-
-      likeData = likesResponse.data || [];
-      likeCounts = likeCountsResponse.data || [];
-    }
+    // Public aggregates are readable for guests; viewer selection is auth-only.
+    const helpful = await fetchReviewHelpfulState(reviewIds, currentUserId);
 
     // Map reviews with interaction data and proper typing
     return reviewsWithProfiles.map(review => {
@@ -349,8 +334,8 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
         } : undefined,
         subjectRelation: resolveSubjectRelation(review.entity_id, subjectOutcome),
         comment_count: 0,
-        isLiked: likeData.some(like => like.review_id === review.id),
-        likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
+        isLiked: !!helpful.get(review.id)?.isLiked,
+        likes: helpful.get(review.id)?.count ?? 0
       };
     });
 

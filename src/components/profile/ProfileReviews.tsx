@@ -1,4 +1,5 @@
 
+import { ReviewHelpfulProvider } from '@/components/reviews/helpful/ReviewHelpfulContext';
 import React, { useState, useCallback, useEffect } from 'react';
 import EmptyReviews from './reviews/EmptyReviews';
 import { useReviews } from '@/hooks/use-reviews';
@@ -27,7 +28,6 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
     reviews,
     isLoading,
     error,
-    handleLike,
     refreshReviews,
   } = useReviews({ profileUserId });
 
@@ -155,7 +155,6 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
           <ReviewCard 
             key={review.id}
             review={review}
-            onLike={handleLike}
             refreshReviews={handleRefreshReviews}
             showTimelineFeatures={isOwnProfile && user?.id === review.user_id}
           />
@@ -173,4 +172,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
   );
 };
 
-export default ProfileReviews;
+const HelpfulProfileReviews = (props: ProfileReviewsProps) => (
+  <ReviewHelpfulProvider><ProfileReviews {...props} /></ReviewHelpfulProvider>
+);
+export default HelpfulProfileReviews;

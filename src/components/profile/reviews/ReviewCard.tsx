@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, MoreVertical, Pencil, Trash2, Calendar, Flag, AlertTriangle, ImageIcon, Share, Clock, Plus, Lock } from 'lucide-react';
+import { MoreVertical, Pencil, Trash2, Calendar, Flag, AlertTriangle, ImageIcon, Clock, Plus, Lock } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { HelpfulControl } from '@/components/reviews/helpful/HelpfulControl';
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -49,7 +50,7 @@ import ReviewRecommendationBadge from './questionnaire/ReviewRecommendationBadge
 
 interface ReviewCardProps {
   review: Review;
-  onLike: (id: string) => void;
+  onLike?: (id: string) => void;
   refreshReviews: () => Promise<void>;
   hideEntityFallbacks?: boolean;
   compact?: boolean;
@@ -353,46 +354,11 @@ const ReviewCard = ({
               </div>
             )}
             
-            {/* Minimal Social Actions */}
-            <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-3">
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className={cn(
-                    "flex items-center gap-1 py-0 px-1 text-xs h-6", 
-                    review.isLiked && "text-red-500 hover:text-red-600"
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onLike(review.id);
-                  }}
-                >
-                  <Heart className={cn("h-3 w-3", review.isLiked && "fill-current")} />
-                  <span>{review.likes}</span>
-                </Button>
-                
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center gap-1 py-0 px-1 text-xs h-6"
-                >
-                  <MessageCircle className="h-3 w-3" />
-                  <span>{review.comment_count || 0}</span>
-                </Button>
-                
+            {review.visibility === 'public' && (
+              <div className="flex items-center pt-3 border-t border-border">
+                <HelpfulControl review={review} surface="profile_review_card" />
               </div>
-              
-              {/* Share button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-1 py-0 px-1 text-xs h-6"
-              >
-                <Share className="h-3 w-3" />
-              </Button>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -607,46 +573,11 @@ const ReviewCard = ({
             </div>
           )}
           
-          {/* Social Actions */}
-          <div className="flex items-center justify-between border-t mt-4 pt-4">
-            <div className="flex items-center gap-3 sm:gap-6">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className={cn(
-                  "flex items-center gap-1 py-0 px-2 sm:px-4",
-                  review.isLiked && "text-red-500 hover:text-red-600"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onLike(review.id);
-                }}
-              >
-                <Heart className={cn("h-5 w-5", review.isLiked && "fill-current")} />
-                <span>{review.likes}</span>
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                className="flex items-center gap-1 py-0 px-2 sm:px-4"
-              >
-                <MessageCircle className="h-5 w-5" />
-                <span>{review.comment_count || 0}</span>
-              </Button>
-              
+          {review.visibility === 'public' && (
+            <div className="flex items-center border-t mt-4 pt-4">
+              <HelpfulControl review={review} surface="profile_review_card" />
             </div>
-            
-            {/* Share button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex items-center gap-1 py-0 px-2 sm:px-4"
-            >
-              <Share className="h-5 w-5" />
-            </Button>
-          </div>
+          )}
         </CardContent>
       </Card>
 

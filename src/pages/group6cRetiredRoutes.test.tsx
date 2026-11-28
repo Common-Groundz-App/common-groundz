@@ -47,6 +47,7 @@ vi.mock('@/components/ui/toaster', () => ({ Toaster: () => null }));
 vi.mock('@/components/ui/sonner', () => ({ Toaster: () => null }));
 vi.mock('@/contexts/ThemeContext', () => ({ ThemeProvider: pass.default }));
 vi.mock('@/contexts/AuthPromptContext', () => ({ AuthPromptProvider: pass.default }));
+vi.mock('@/components/reviews/helpful/ReviewHelpfulContext', () => ({ ReviewHelpfulProvider: pass.default }));
 vi.mock('@/contexts/NotificationsContext', () => ({ NotificationsProvider: pass.default }));
 vi.mock('@/contexts/ComposerFocusContext', () => ({ ComposerFocusProvider: pass.default }));
 vi.mock('@/services/feedbackService', () => ({ preloadSounds: () => {} }));

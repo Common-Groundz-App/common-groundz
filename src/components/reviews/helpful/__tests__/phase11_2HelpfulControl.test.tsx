@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 const ctx = { viewerId: null as string | null, isPending: vi.fn(() => false), toggle: vi.fn() };
-vi.mock('../ReviewHelpfulContext', () => ({ useReviewHelpful: () => ctx }));
+vi.mock('../ReviewHelpfulContext', () => ({ useReviewHelpful: () => ctx, useHelpfulSnapshot: (review: any) => ({ data: { likes: review.likes, isLiked: review.isLiked } }) }));
 import { HelpfulControl } from '../HelpfulControl';
 
 const review = (o: any = {}) => ({ id: 'r1', user_id: 'author', visibility: 'public', likes: 3, isLiked: false, ...o }) as any;

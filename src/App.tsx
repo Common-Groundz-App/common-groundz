@@ -49,6 +49,7 @@ import { NotificationDrawer } from '@/components/notifications/NotificationDrawe
 import { networkStatusService } from '@/services/networkStatusService';
 import PrewarmFlagBridge from '@/components/system/PrewarmFlagBridge';
 import ReviewChangeInvalidationBridge from '@/components/system/ReviewChangeInvalidationBridge';
+import { ReviewHelpfulProvider } from '@/components/reviews/helpful/ReviewHelpfulContext';
 
 /**
  * Global Error & Network Policy:
@@ -113,6 +114,7 @@ function App() {
               <ReviewChangeInvalidationBridge />
               <AuthInitializer>
               <AuthPromptProvider>
+                <ReviewHelpfulProvider>
                 <NotificationsProvider>
                 <ComposerFocusProvider>
                 <OfflineBanner />
@@ -242,6 +244,7 @@ function App() {
                 <NotificationDrawer />
                 </ComposerFocusProvider>
                 </NotificationsProvider>
+                </ReviewHelpfulProvider>
               </AuthPromptProvider>
               </AuthInitializer>
             </Router>

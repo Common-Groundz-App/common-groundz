@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
+import { fetchReviewHelpfulState } from './interactions';
 import { Review } from './types';
 import { resolveSubjectRelation, type SubjectLookupOutcome, type SubjectRelationRow } from '@/services/reviewSubjectRelation';
 
@@ -127,24 +128,7 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     const subjectOutcome = await loadSubjectEntities(reviews);
     const entities = subjectOutcome.attempted && !subjectOutcome.failed && 'rows' in subjectOutcome ? subjectOutcome.rows : [];
 
-    // Get interaction data if user is logged in
-    let likeData = [];
-    let likeCounts = [];
-
-    if (currentUserId) {
-      const [likesResponse, likeCountsResponse] = await Promise.all([
-        supabase.rpc('get_user_review_likes', { 
-          p_review_ids: reviewIds, 
-          p_user_id: currentUserId 
-        }),
-        supabase.rpc('get_review_likes_batch', { 
-          p_review_ids: reviewIds 
-        })
-      ]);
-
-      likeData = likesResponse.data || [];
-      likeCounts = likeCountsResponse.data || [];
-    }
+    const helpful = await fetchReviewHelpfulState(reviewIds, currentUserId);
 
     return reviewsWithProfiles.map(review => {
       const entity = entities.find(e => e.id === review.entity_id);
@@ -163,8 +147,8 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
         } : undefined,
         subjectRelation: resolveSubjectRelation(review.entity_id, subjectOutcome),
         comment_count: 0,
-        isLiked: likeData.some(like => like.review_id === review.id),
-        likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
+        isLiked: !!helpful.get(review.id)?.isLiked,
+        likes: helpful.get(review.id)?.count ?? 0
       };
     });
 

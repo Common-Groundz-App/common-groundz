@@ -4,7 +4,8 @@
  * switch is ON (the normal state since 3D) the viewer is read-only and
  * Add/Edit open the new page composer. Removal of the inline form is 3E.
  */
-import React, { useState, useEffect } from 'react';
+import { HelpfulControl } from '@/components/reviews/helpful/HelpfulControl';
+import React, { useState, useEffect, useRef } from 'react';
 import { useReviewComposerNavigate } from '@/hooks/useReviewComposerNavigate';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -120,6 +121,12 @@ export const ReviewTimelineViewer = ({
   const MAX_MEDIA_COUNT = 4;
 
   const isOwner = user?.id === reviewOwnerId;
+  // Reader requests belong to one opening/review/session, never a later modal.
+  const readerScope = `${isOpen}:${reviewId}:${user?.id ?? 'guest'}`;
+  const readerEpoch = useRef({ scope: readerScope, generation: 0 });
+  if (readerEpoch.current.scope !== readerScope) {
+    readerEpoch.current = { scope: readerScope, generation: readerEpoch.current.generation + 1 };
+  }
   // Step 3D — with the switch on, Add/Edit open the page (viewer is read-only);
   // switch off keeps the inline form exactly as before.
   const composer = useReviewComposerNavigate();
@@ -129,9 +136,11 @@ export const ReviewTimelineViewer = ({
       loadTimelineData();
       loadLatestIntent();
     }
-  }, [isOpen, reviewId]);
+  }, [isOpen, reviewId, user?.id]);
 
   const loadTimelineData = async () => {
+    const generation = readerEpoch.current.generation;
+    const isCurrent = () => generation === readerEpoch.current.generation;
     setIsLoading(true);
     setLoadFailed(false);
     try {
@@ -139,10 +148,12 @@ export const ReviewTimelineViewer = ({
         fetchReviewUpdates(reviewId),
         fetchReviewWithSummary(reviewId)
       ]);
+      if (!isCurrent()) return;
 
       if (!review) {
         // Distinguish "confirmed gone" from "request failed".
         const existence = await checkReviewExists(reviewId);
+        if (!isCurrent()) return;
         if (existence === 'gone') {
           setTimelineUpdates([]);
           setReviewData(null);
@@ -160,16 +171,19 @@ export const ReviewTimelineViewer = ({
       setTimelineUpdates(updates);
       setReviewData(review);
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('❌ Error loading timeline data:', error);
       setLoadFailed(true);
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   };
 
   const loadParentReview = async () => {
+    const generation = readerEpoch.current.generation;
     try {
       const review = await fetchReviewWithSummary(reviewId);
+      if (generation !== readerEpoch.current.generation) return;
       setReviewData(review);
     } catch (error) {
       console.error('Error reloading parent review:', error);
@@ -187,8 +201,10 @@ export const ReviewTimelineViewer = ({
   const [latestIntentEvent, setLatestIntentEvent] = useState<ReviewUpdate | null>(null);
 
   const loadLatestIntent = async () => {
+    const generation = readerEpoch.current.generation;
     setLatestIntentStatus('loading');
     const result = await fetchLatestRecommendationIntent(reviewId);
+    if (generation !== readerEpoch.current.generation) return;
     if (result.status === 'found') {
       setLatestIntentStatus('complete');
       setLatestIntentEvent(result.event);
@@ -620,6 +636,12 @@ export const ReviewTimelineViewer = ({
                   </div>
                 </div>
               </div>
+
+              {isOpen && reviewData?.id === reviewId && reviewData.visibility === 'public' && (
+                <div className="flex items-center">
+                  <HelpfulControl review={reviewData} reconcile surface="review_details" />
+                </div>
+              )}
 
               {/* Timeline Updates */}
               {timelineUpdates.map((update, index) => {
